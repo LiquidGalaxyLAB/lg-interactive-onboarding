@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="utf-8"?>
+<COLLADA xmlns="http://collada.org" version="1.4.1">
+  <asset>
+    <unit name="meter" meter="1"/>
+    <up_axis>Z_UP</up_axis>
+  </asset>
+  
+  <library_images/>
+  
+  <library_effects>
+    <!-- Define the colors used for the pyramid faces -->
+    <effect id="color_red-effect">
+      <profile_COMMON>
+        <technique sid="common">
+          <lambert>
+            <diffuse>
+              <color>1.0 0.0 0.0 1.0</color>
+            </diffuse>
+          </lambert>
+        </technique>
+      </profile_COMMON>
+    </effect>
+    
+    <effect id="color_green-effect">
+      <profile_COMMON>
+        <technique sid="common">
+          <lambert>
+            <diffuse>
+              <color>0.0 1.0 0.0 1.0</color>
+            </diffuse>
+          </lambert>
+        </technique>
+      </profile_COMMON>
+    </effect>
+
+    <effect id="color_blue-effect">
+      <profile_COMMON>
+        <technique sid="common">
+          <lambert>
+            <diffuse>
+              <color>0.0 0.0 1.0 1.0</color>
+            </diffuse>
+          </lambert>
+        </technique>
+      </profile_COMMON>
+    </effect>
+
+    <effect id="color_yellow-effect">
+      <profile_COMMON>
+        <technique sid="common">
+          <lambert>
+            <diffuse>
+              <color>1.0 1.0 0.0 1.0</color>
+            </diffuse>
+          </lambert>
+        </technique>
+      </profile_COMMON>
+    </effect>
+    
+    <effect id="color_purple-effect">
+      <profile_COMMON>
+        <technique sid="common">
+          <lambert>
+            <diffuse>
+              <color>1.0 0.0 1.0 1.0</color>
+            </diffuse>
+          </lambert>
+        </technique>
+      </profile_COMMON>
+    </effect>
+
+    <effect id="color_cyan-effect">
+      <profile_COMMON>
+        <technique sid="common">
+          <lambert>
+            <diffuse>
+              <color>0.0 1.0 1.0 1.0</color>
+            </diffuse>
+          </lambert>
+        </technique>
+      </profile_COMMON>
+    </effect>
+  </library_effects>
+
+  <library_materials>
+    <!-- Materials bind effects (colors) to geometry -->
+    <material id="red_mat" name="RedMaterial">
+      <instance_effect url="#color_red-effect"/>
+    </material>
+    <material id="green_mat" name="GreenMaterial">
+      <instance_effect url="#color_green-effect"/>
+    </material>
+    <material id="blue_mat" name="BlueMaterial">
+      <instance_effect url="#color_blue-effect"/>
+    </material>
+    <material id="yellow_mat" name="YellowMaterial">
+      <instance_effect url="#color_yellow-effect"/>
+    </material>
+    <material id="purple_mat" name="PurpleMaterial">
+      <instance_effect url="#color_purple-effect"/>
+    </material>
+    <material id="cyan_mat" name="CyanMaterial">
+      <instance_effect url="#color_cyan-effect"/>
+    </material>
+  </library_materials>
+
+  <library_geometries>
+    <geometry id="pyramid-mesh" name="PyramidMesh">
+      <mesh>
+        <!-- Vertex Positions: 5 vertices total (4 for base, 1 apex) -->
+        <source id="pyramid-mesh-positions">
+          <float_array id="pyramid-mesh-positions-array" count="15">
+            -1.0 -1.0 0.0   <!-- 0: Base corner 1 -->
+             1.0 -1.0 0.0   <!-- 1: Base corner 2 -->
+             1.0  1.0 0.0   <!-- 2: Base corner 3 -->
+            -1.0  1.0 0.0   <!-- 3: Base corner 4 -->
+             0.0  0.0 2.0   <!-- 4: Apex -->
+          </float_array>
+          <technique_common>
+            <accessor source="#pyramid-mesh-positions-array" count="5" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+        
+        <!-- Surface Normals -->
+        <source id="pyramid-mesh-normals">
+          <float_array id="pyramid-mesh-normals-array" count="18">
+            0.0 0.0 -1.0
+            0.0 0.0 -1.0
+            0.0 -1.0 0.45
+            1.0 0.0 0.45
+            0.0 1.0 0.45
+            -1.0 0.0 0.45
+          </float_array>
+          <technique_common>
+            <accessor source="#pyramid-mesh-normals-array" count="6" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+
+        <!-- Triangles Definition -->
+        <!-- The pyramid consists of 6 triangles (2 for the base, 4 for the sides). -->
+        <vertices id="pyramid-mesh-vertices">
+          <input semantic="POSITION" source="#pyramid-mesh-positions"/>
+        </vertices>
+
+        <!-- Base Face 1 -->
+        <triangles material="red_mat" count="1" offset="0">
+          <input semantic="VERTEX" source="#pyramid-mesh-vertices" offset="0"/>
+          <input semantic="NORMAL" source="#pyramid-mesh-normals" offset="1"/>
+          <p>0 0  1 0  2 0</p>
+        </triangles>
+
+        <!-- Base Face 2 -->
+        <triangles material="green_mat" count="1" offset="0">
+          <input semantic="VERTEX" source="#pyramid-mesh-vertices" offset="0"/>
+          <input semantic="NORMAL" source="#pyramid-mesh-normals" offset="1"/>
+          <p>2 1  3 1  0 1</p>
+        </triangles>
+
+        <!-- Side Face 1 -->
+        <triangles material="blue_mat" count="1" offset="0">
+          <input semantic="VERTEX" source="#pyramid-mesh-vertices" offset="0"/>
+          <input semantic="NORMAL" source="#pyramid-mesh-normals" offset="1"/>
+          <p>0 2  1 2  4 2</p>
+        </triangles>
+
+        <!-- Side Face 2 -->
+        <triangles material="yellow_mat" count="1" offset="0">
+          <input semantic="VERTEX" source="#pyramid-mesh-vertices" offset="0"/>
+          <input semantic="NORMAL" source="#pyramid-mesh-normals" offset="1"/>
+          <p>1 3  2 3  4 3</p>
+        </triangles>
+
+        <!-- Side Face 3 -->
+        <triangles material="purple_mat" count="1" offset="0">
+          <input semantic="VERTEX" source="#pyramid-mesh-vertices" offset="0"/>
+          <input semantic="NORMAL" source="#pyramid-mesh-normals" offset="1"/>
+          <p>2 4  3 4  4 4</p>
+        </triangles>
+
+        <!-- Side Face 4 -->
+        <triangles material="cyan_mat" count="1" offset="0">
+          <input semantic="VERTEX" source="#pyramid-mesh-vertices" offset="0"/>
+          <input semantic="NORMAL" source="#pyramid-mesh-normals" offset="1"/>
+          <p>3 5  0 5  4 5</p>
+        </triangles>
+      </mesh>
+    </geometry>
+  </library_geometries>
+  
+  <library_visual_scenes>
+    <visual_scene id="Scene" name="Scene">
+      <node id="PyramidNode" name="Pyramid">
+        <translate>0 0 0</translate>
+        <instance_geometry url="#pyramid-mesh">
+          <bind_material>
+            <technique_common>
+              <instance_material symbol="red_mat" target="#red_mat"/>
+              <instance_material symbol="green_mat" target="#green_mat"/>
+              <instance_material symbol="blue_mat" target="#blue_mat"/>
+              <instance_material symbol="yellow_mat" target="#yellow_mat"/>
+              <instance_material symbol="purple_mat" target="#purple_mat"/>
+              <instance_material symbol="cyan_mat" target="#cyan_mat"/>
+            </technique_common>
+          </bind_material>
+        </instance_geometry>
+      </node>
+    </visual_scene>
+  </library_visual_scenes>
+  
+  <scene>
+    <instance_visual_scene url="#Scene"/>
+  </scene>
+</COLLADA>
