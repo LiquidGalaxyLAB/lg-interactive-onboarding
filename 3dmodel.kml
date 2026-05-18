@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"
+     xmlns:gx="http://www.google.com/kml/ext/2.2">
+  <Document>
+    <name>My 3D Model</name>
+    <Placemark>
+      <name>3D Model Name</name>
+      <Model>
+        <!-- LINK: This is where you point to your .dae file -->
+        <Link>
+          <href>http://192.168.56.103/model/3dmodel_tri.dae</href>
+        </Link>
+        <!-- LOCATION: Where on Earth the model sits -->
+        <Location>
+          <latitude>40.7128</latitude>   <!-- e.g., New York -->
+          <longitude>-74.0060</longitude>
+          <altitude>10</altitude>
+        </Location>
+        <!-- ORIENTATION: How the model is rotated -->
+        <Orientation>
+          <heading>0</heading>   <!-- rotation about the z-axis (0-360) -->
+          <tilt>0</tilt>         <!-- rotation about the x-axis -->
+          <roll>0</roll>         <!-- rotation about the y-axis -->
+        </Orientation>
+        <!-- SCALE: Size of the model -->
+        <Scale>
+          <x>100.0</x>  <!-- width -->
+          <y>100.0</y>  <!-- depth -->
+          <z>100.0</z>  <!-- height -->
+        </Scale>
+      </Model>
+    </Placemark>
+  </Document>
+</kml>
