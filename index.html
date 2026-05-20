@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LG Multi-Pass Raymarcher (Fixed)</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+    </style>
+</head>
+<body>
+    <canvas id="glcanvas"></canvas>
+
+    <script>
+        // 1. Setup Liquid Galaxy Distributed Parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const screenIndex = parseInt(urlParams.get('screen') || '0', 10);
+        
+        const localWidth = window.innerWidth;
+        const localHeight = window.innerHeight;
+        const offsetX = screenIndex * localWidth;
+        const totalVirtualWidth = localWidth * 3.0; // Assuming a 3-screen setup
+
+        // 2. Initialize WebGL2 & Float Extensions
+        const canvas = document.getElementById('glcanvas');
+        canvas.width = localWidth;
+        canvas.height = localHeight;
+        const gl = canvas.getContext('webgl2');
+        if (!gl) { alert("WebGL2 not supported on this browser!"); }
+
+        // EXPLICIT FIX: Activate float buffer rendering extensions for your GPU
+        gl.getExtension('EXT_color_buffer_float');
+        gl.getExtension('OES_texture_float_linear');
+
+        // 3. Shared Vertex Shader
+        const vsSource = `#version 300 es
+            in vec2 position;
+            void main() {
+                gl_Position = vec4(position, 0.0, 1.0);
+            }
+        `;
+
+        // 4. Buffer A Fragment Shader (Calculates Geometry & Normals)
+        const fsBufferASource = `#version 300 es
+            precision mediump float;
+            uniform float u_time;
+            uniform float u_offsetX;
+            uniform vec2 u_resolution;
+            out vec4 fragColor;
+
+            float sdBox(vec3 p, vec3 b) {
+                vec3 d = abs(p) - b;
+                return min(max(d.x,max(d.y,d.z)),0.0) + length(max(d,0.0));
+            }
+
+            vec2 mirror(vec2 p, float v) {
+                float hv = v * 0.5;
+                vec2 fl = mod(floor(p / v + 0.5), 2.0) * 2.0 - 1.0;
+                vec2 mp = mod(p + hv, v) - hv;
+                return fl * mp;
+            }
+
+            vec2 rotate2D(vec2 p, float a) {
+                return p * mat2(cos(a), -sin(a), sin(a), cos(a));
+            }
+
+            float map(vec3 p) {
+                float r = u_time * 0.9;
+                p.xz = mirror(p.xz, 4.0);
+                p.xz = rotate2D(p.xz, r);
+                float d = sdBox(p, vec3(1.0));
+                d = min(d, sdBox(p, vec3(0.1, 0.1, 3.0)));
+                d = min(d, sdBox(p, vec3(3.0, 0.1, 0.1)));
+                return d;
+            }
+
+            mat3 calcLookAtMatrix(vec3 origin, vec3 target, float roll) {
+                vec3 rr = vec3(sin(roll), cos(roll), 0.0);
+                vec3 ww = normalize(target - origin);
+                vec3 uu = normalize(cross(ww, rr));
+                vec3 vv = normalize(cross(uu, ww));
+                return mat3(uu, vv, ww);
+            }
+
+            vec3 getRay(vec3 origin, vec3 target, vec2 screenPos, float lensLength) {
+                mat3 camMat = calcLookAtMatrix(origin, target, 0.0);
+                return normalize(camMat * vec3(screenPos, lensLength));
+            }
+
+            float calcRayIntersection(vec3 rayOrigin, vec3 rayDir, float maxd, float precis) {
+                float latest = precis * 2.0;
+                float dist = 0.0;
+                for (int i = 0; i < 30; i++) {
+                    if (latest < precis || dist > maxd) break;
+                    float result = map(rayOrigin + rayDir * dist);
+                    latest = result;
+                    dist += latest;
+                }
+                return (dist < maxd) ? dist : -1.0;
+            }
+
+            vec2 squareFrame(vec2 screenSize, vec2 coord) {
+                vec2 position = 2.0 * (coord.xy / screenSize.xy) - 1.0;
+                position.x *= screenSize.x / screenSize.y;
+                return position;
+            }
+
+            vec3 calcNormal(vec3 pos, float eps) {
+                const vec3 v1 = vec3(1.0,-1.0,-1.0);
+                const vec3 v2 = vec3(-1.0,-1.0, 1.0);
+                const vec3 v3 = vec3(-1.0, 1.0,-1.0);
+                const vec3 v4 = vec3(1.0, 1.0, 1.0);
+                return normalize(v1*map(pos + v1*eps) + v2*map(pos + v2*eps) + v3*map(pos + v3*eps) + v4*map(pos + v4*eps));
+            }
+
+            vec3 calcNormal(vec3 pos) { return calcNormal(pos, 0.002); }
+
+            void main() {
+                // Shift coordinates horizontally based on screen ID offset
+                vec2 globalCoord = vec2(gl_FragCoord.x + u_offsetX, gl_FragCoord.y);
+                vec2 uv = squareFrame(u_resolution.xy, globalCoord);
+                
+                vec3 ro = vec3(sin(u_time * 0.2), 1.5, cos(u_time * 0.2)) * 5.0;
+                vec3 ta = vec3(0.0, 0.0, 0.0);
+                vec3 rd = getRay(ro, ta, uv, 2.0);
+                
+                float t = calcRayIntersection(ro, rd, 20.0, 0.001);
+                vec3 pos = ro + rd * t;
+                vec3 nor = (t > 0.0) ? calcNormal(pos) : vec3(0.0);
+                
+                fragColor = vec4(nor, t);
+            }
+        `;
+
+        // 5. Main Image Fragment Shader (Edge Detection & Final Color)
+        const fsImageSource = `#version 300 es
+            precision mediump float;
+            uniform float u_time;
+            uniform float u_offsetX;
+            uniform vec2 u_resolution;      // Total virtual resolution
+            uniform vec2 u_localResolution; // This browser window's size
+            uniform sampler2D u_bufferATexture; 
+            out vec4 fragColor;
+
+            mat3 calcLookAtMatrix(vec3 origin, vec3 target, float roll) {
+                vec3 rr = vec3(sin(roll), cos(roll), 0.0);
+                vec3 ww = normalize(target - origin);
+                vec3 uu = normalize(cross(ww, rr));
+                vec3 vv = normalize(cross(uu, ww));
+                return mat3(uu, vv, ww);
+            }
+
+            vec3 getRay(vec3 origin, vec3 target, vec2 screenPos, float lensLength) {
+                mat3 camMat = calcLookAtMatrix(origin, target, 0.0);
+                return normalize(camMat * vec3(screenPos, lensLength));
+            }
+
+            vec2 squareFrame(vec2 screenSize, vec2 coord) {
+                vec2 position = 2.0 * (coord.xy / screenSize.xy) - 1.0;
+                position.x *= screenSize.x / screenSize.y;
+                return position;
+            }
+
+            vec2 getDeltas(sampler2D buffer, vec2 uv) {
+                vec2 pixel = vec2(1.0 / u_localResolution.xy);
+                vec3 pole = vec3(-1.0, 0.0, 1.0);
+                
+                vec4 s0 = texture(buffer, uv + pixel.xy * pole.xx);
+                vec4 s1 = texture(buffer, uv + pixel.xy * pole.yx);
+                vec4 s2 = texture(buffer, uv + pixel.xy * pole.zx);
+                vec4 s3 = texture(buffer, uv + pixel.xy * pole.xy);
+                vec4 s4 = texture(buffer, uv + pixel.xy * pole.yy);
+                vec4 s5 = texture(buffer, uv + pixel.xy * pole.zy);
+                vec4 s6 = texture(buffer, uv + pixel.xy * pole.xz);
+                vec4 s7 = texture(buffer, uv + pixel.xy * pole.yz);
+                vec4 s8 = texture(buffer, uv + pixel.xy * pole.zz);
+
+                float dpos = (abs(s1.a - s7.a) + abs(s5.a - s3.a) + abs(s0.a - s8.a) + abs(s2.a - s6.a)) * 0.5;
+                dpos += (max(0.0, 1.0 - dot(s1.rgb, s7.rgb)) + max(0.0, 1.0 - dot(s5.rgb, s3.rgb)) + max(0.0, 1.0 - dot(s0.rgb, s8.rgb)) + max(0.0, 1.0 - dot(s2.rgb, s6.rgb)));
+                dpos = pow(max(dpos - 0.5, 0.0), 5.0);
+                
+                return vec2(dpos, 0.0);
+            }
+
+            void main() {
+                vec2 globalCoord = vec2(gl_FragCoord.x + u_offsetX, gl_FragCoord.y);
+                vec3 ro = vec3(sin(u_time * 0.2), 1.5, cos(u_time * 0.2)) * 5.0;
+                vec3 ta = vec3(0.0, 0.0, 0.0);
+                vec3 rd = getRay(ro, ta, squareFrame(u_resolution.xy, globalCoord), 2.0);
+                
+                // Sample texture locally relative to this browser instance
+                vec2 uv = gl_FragCoord.xy / u_localResolution.xy;
+                vec4 buf = texture(u_bufferATexture, uv);
+                
+                float t = buf.a;
+                vec3 nor = buf.rgb;
+                
+                vec3 col = vec3(0.5, 0.8, 1.0);
+                vec2 deltas = getDeltas(u_bufferATexture, uv);
+                
+                if (t > 0.0) {
+                    col = vec3(1.0);
+                    col *= max(0.3, 0.3 + dot(nor, normalize(vec3(0.0, 1.0, 0.5))));
+                    col *= vec3(1.0, 0.8, 0.35);
+                }
+                
+                col.r = smoothstep(0.1, 1.0, col.r);
+                col.g = smoothstep(0.1, 1.1, col.g);
+                col.b = smoothstep(-0.1, 1.0, col.b);
+                col = pow(col, vec3(1.1));
+                col -= deltas.x - deltas.y;
+                
+                fragColor = vec4(col, 1.0);
+            }
+        `;
+
+        // 6. Boilerplate WebGL Shader Compiler Function
+        function createProgram(vsSource, fsSource) {
+            const vs = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(vs, vsSource); gl.compileShader(vs);
+            const fs = gl.createShader(gl.FRAGMENT_SHADER);
+            gl.shaderSource(fs, fsSource); gl.compileShader(fs);
+            const prog = gl.createProgram();
+            gl.attachShader(prog, vs); gl.attachShader(prog, fs);
+            gl.linkProgram(prog);
+            if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+                console.error(gl.getProgramInfoLog(prog));
+            }
+            return prog;
+        }
+
+        const programA = createProgram(vsSource, fsBufferASource);
+        const programImage = createProgram(vsSource, fsImageSource);
+
+        // 7. Setup Framebuffer and Texture Target (Offscreen Pass Buffer)
+        const targetTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, targetTexture);
+        
+        // EXPLICIT FIX: Changed internal format to RGBA16F for universal GPU compatibility 
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, localWidth, localHeight, 0, gl.RGBA, gl.HALF_FLOAT, null);
+
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        const fb = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, targetTexture, 0);
+
+        // Fallback: If hardware strictly rejects 16-bit float framebuffers, drop to standard unsigned byte
+        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, localWidth, localHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        }
+
+        // Quad geometry Setup
+        const buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+
+        // 8. Execution Pipeline Loop
+        function render() {
+            // Safe looping absolute time configuration to prevent precision collapse
+            const syncedTime = (Date.now() % 100000) * 0.001;
+
+            // ---- PASS 1: Render 3D Scene into Offscreen Framebuffer (Buffer A) ----
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+            gl.useProgram(programA);
+            
+            gl.uniform1f(gl.getUniformLocation(programA, "u_time"), syncedTime);
+            gl.uniform1f(gl.getUniformLocation(programA, "u_offsetX"), offsetX);
+            gl.uniform2f(gl.getUniformLocation(programA, "u_resolution"), totalVirtualWidth, localHeight);
+
+            let posAttrA = gl.getAttribLocation(programA, "position");
+            gl.enableVertexAttribArray(posAttrA);
+            gl.vertexAttribPointer(posAttrA, 2, gl.FLOAT, false, 0, 0);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+            // ---- PASS 2: Read Texture & Draw Final Output to Screen (Image) ----
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null); // Switch back to visible display canvas
+            gl.useProgram(programImage);
+
+            gl.uniform1f(gl.getUniformLocation(programImage, "u_time"), syncedTime);
+            gl.uniform1f(gl.getUniformLocation(programImage, "u_offsetX"), offsetX);
+            gl.uniform2f(gl.getUniformLocation(programImage, "u_resolution"), totalVirtualWidth, localHeight);
+            gl.uniform2f(gl.getUniformLocation(programImage, "u_localResolution"), localWidth, localHeight);
+
+            // Send our calculated Buffer A frame data into the Image sampler program
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, targetTexture);
+            gl.uniform1i(gl.getUniformLocation(programImage, "u_bufferATexture"), 0);
+
+            let posAttrImg = gl.getAttribLocation(programImage, "position");
+            gl.enableVertexAttribArray(posAttrImg);
+            gl.vertexAttribPointer(posAttrImg, 2, gl.FLOAT, false, 0, 0);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+            requestAnimationFrame(render);
+        }
+
+        requestAnimationFrame(render);
+    </script>
+</body>
+</html>
