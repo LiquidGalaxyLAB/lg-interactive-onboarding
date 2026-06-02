@@ -1,0 +1,145 @@
+import 'dart:async';
+
+import 'package:dartssh2/dartssh2.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+/// Core SSH service for connecting to the Liquid Galaxy master node.
+///
+/// Follows the GOLDEN RULE: Always use client!.run() directly for
+/// simple commands. For complex flows, access the client directly.
+class SSHService {
+  SSHClient? _client;
+
+  SSHClient? get client => _client;
+
+  bool get isConnected => _client != null && !(_client!.isClosed);
+
+  /// Connects to the SSH server.
+  Future<bool> connect({
+    required String host,
+    required int port,
+    required String username,
+    required String password,
+  }) async {
+    try {
+      final socket = await SSHSocket.connect(
+        host,
+        port,
+        timeout: const Duration(seconds: 10),
+      );
+      _client = SSHClient(
+        socket,
+        username: username,
+        onPasswordRequest: () => password,
+      );
+      debugPrint('SSH: Connected to $host');
+      return true;
+    } catch (e) {
+      debugPrint('SSH: Connection failed: $e');
+      return false;
+    }
+  }
+
+  /// Disconnects from the SSH server.
+  Future<void> disconnect() async {
+    _client?.close();
+    _client = null;
+    debugPrint('SSH: Disconnected');
+  }
+
+  /// Executes a command on the remote server and returns stdout.
+  Future<SSHResult?> execute(String command) async {
+    if (!isConnected) {
+      debugPrint('SSH: Not connected, cannot execute: $command');
+      return null;
+    }
+
+    try {
+      final result = await _client!.run(command);
+      return SSHResult(
+        stdout: String.fromCharCodes(result),
+        stderr: '',
+      );
+    } catch (e) {
+      debugPrint('SSH: Execution failed: $e');
+      return null;
+    }
+  }
+
+  /// Uploads a file to the remote server via SFTP.
+  Future<bool> uploadFile({
+    required String localData,
+    required String remotePath,
+  }) async {
+    if (!isConnected) {
+      debugPrint('SSH: Not connected, cannot upload to $remotePath');
+      return false;
+    }
+
+    SftpClient? sftp;
+    try {
+      sftp = await _client!.sftp();
+      final file = await sftp.open(
+        remotePath,
+        mode: SftpFileOpenMode.create |
+            SftpFileOpenMode.truncate |
+            SftpFileOpenMode.write,
+      );
+      final bytes = Uint8List.fromList(localData.codeUnits);
+      await file.write(Stream.value(bytes));
+      await file.close();
+      debugPrint('SSH: File uploaded to $remotePath');
+      return true;
+    } catch (e) {
+      debugPrint('SSH: SFTP upload failed: $e');
+      return false;
+    } finally {
+      sftp?.close();
+    }
+  }
+
+  /// Uploads raw bytes to the remote server via SFTP.
+  Future<bool> uploadBytes({
+    required Uint8List bytes,
+    required String remotePath,
+  }) async {
+    if (!isConnected) {
+      debugPrint('SSH: Not connected, cannot upload to $remotePath');
+      return false;
+    }
+
+    SftpClient? sftp;
+    try {
+      sftp = await _client!.sftp();
+      final file = await sftp.open(
+        remotePath,
+        mode: SftpFileOpenMode.create |
+            SftpFileOpenMode.truncate |
+            SftpFileOpenMode.write,
+      );
+      await file.write(Stream.value(bytes));
+      await file.close();
+      debugPrint('SSH: Bytes uploaded to $remotePath (${bytes.length} bytes)');
+      return true;
+    } catch (e) {
+      debugPrint('SSH: SFTP bytes upload failed: $e');
+      return false;
+    } finally {
+      sftp?.close();
+    }
+  }
+}
+
+/// Encapsulates the result of an SSH command execution.
+class SSHResult {
+  final String stdout;
+  final String stderr;
+
+  SSHResult({required this.stdout, required this.stderr});
+}
+
+/// Global SSH service provider.
+final sshServiceProvider = Provider<SSHService>((ref) {
+  return SSHService();
+});
