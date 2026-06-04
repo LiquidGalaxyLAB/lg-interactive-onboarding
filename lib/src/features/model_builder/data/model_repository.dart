@@ -216,8 +216,11 @@ class ModelRepository {
 
         // 3. If DAE, triangulate in-place on the remote
         if (ext == '.dae') {
-          await _triangulateRemoteDae(remoteModelPath);
+          final triangulated = await _triangulateRemoteDae(remoteModelPath);
           await _channelDelay();
+          if (!triangulated) {
+            return PushResult(success: false, message: 'DAE triangulation failed on LG rig.');
+          }
         }
       }
 
