@@ -1,6 +1,6 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/features/home/data/lg_service.dart';
 
@@ -90,10 +90,11 @@ class SSHController extends StateNotifier<SSHConnectionState> {
   Future<void> _loadSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      const secureStorage = FlutterSecureStorage();
       final host = prefs.getString(_keyHost) ?? '192.168.0.1';
       final port = prefs.getInt(_keyPort) ?? 22;
       final username = prefs.getString(_keyUsername) ?? 'lg';
-      final password = prefs.getString(_keyPassword) ?? 'lg';
+      final password = await secureStorage.read(key: _keyPassword) ?? '';
       final rigs = prefs.getInt(_keyRigs) ?? 3;
 
       state = SSHConnectionState(
@@ -119,10 +120,11 @@ class SSHController extends StateNotifier<SSHConnectionState> {
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      const secureStorage = FlutterSecureStorage();
       await prefs.setString(_keyHost, host);
       await prefs.setInt(_keyPort, port);
       await prefs.setString(_keyUsername, username);
-      await prefs.setString(_keyPassword, password);
+      await secureStorage.write(key: _keyPassword, value: password);
       await prefs.setInt(_keyRigs, rigs);
 
       state = state.copyWith(
