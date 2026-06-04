@@ -60,41 +60,41 @@ PRIMITIVE_TAGS = {
 # Core helpers
 # ---------------------------------------------------------------------------
 
-def _n_inputs(prim_el: etree._Element) -> int:
+def _get_vertex_index_stride(primitive_element: etree._Element) -> int:
     """
     Return the interleave stride: (max offset across all <input> children) + 1.
     A primitive with no <input> elements defaults to stride 1.
     """
-    inputs = prim_el.findall(f"{{{COLLADA_NS}}}input")
+    inputs = primitive_element.findall(f"{{{COLLADA_NS}}}input")
     if not inputs:
         return 1
     return max(int(inp.get("offset", "0")) for inp in inputs) + 1
 
 
-def _fan_triangulate(vcounts: list, pdata: list, n_inputs: int):
+def _fan_triangulate(face_vertex_counts: list, flat_indices: list, vertex_index_stride: int):
     """
     Fan-triangulate an interleaved index array.
 
     Parameters
     ----------
-    vcounts   : list[int]  -- vertex count per face
-    pdata     : list[int]  -- flat interleaved index array
-    n_inputs  : int        -- number of index slots per vertex (stride)
+    face_vertex_counts  : list[int]  -- vertex count per face
+    flat_indices        : list[int]  -- flat interleaved index array
+    vertex_index_stride : int        -- number of index slots per vertex (stride)
 
     Returns
     -------
-    (new_pdata: list[int], new_tri_count: int)
+    (triangulated_indices: list[int], new_tri_count: int)
     """
     out = []
     tri_count = 0
     pos = 0
 
-    for n_verts in vcounts:
-        # Gather one row (n_inputs wide) per vertex of this face
+    for n_verts in face_vertex_counts:
+        # Gather one row (vertex_index_stride wide) per vertex of this face
         rows = []
         for _ in range(n_verts):
-            rows.append(pdata[pos : pos + n_inputs])
-            pos += n_inputs
+            rows.append(flat_indices[pos : pos + vertex_index_stride])
+            pos += vertex_index_stride
 
         if n_verts < 3:
             # Degenerate face -- skip silently
@@ -120,62 +120,62 @@ def _fan_triangulate(vcounts: list, pdata: list, n_inputs: int):
 # Per-element conversion
 # ---------------------------------------------------------------------------
 
-def _convert_polylist(el: etree._Element):
+def _convert_polylist(primitive_element: etree._Element):
     """
     Convert a <polylist> element to <triangles> in-place.
 
     Returns (old_face_count, new_tri_count), or None if malformed.
     """
-    vcount_el = el.find(f"{{{COLLADA_NS}}}vcount")
-    p_el      = el.find(f"{{{COLLADA_NS}}}p")
+    vertex_count_element = primitive_element.find(f"{{{COLLADA_NS}}}vcount")
+    indices_element      = primitive_element.find(f"{{{COLLADA_NS}}}p")
 
     # Empty primitive
-    if p_el is None:
-        el.tag = f"{{{COLLADA_NS}}}triangles"
-        if vcount_el is not None:
-            el.remove(vcount_el)
-        el.set("count", "0")
+    if indices_element is None:
+        primitive_element.tag = f"{{{COLLADA_NS}}}triangles"
+        if vertex_count_element is not None:
+            primitive_element.remove(vertex_count_element)
+        primitive_element.set("count", "0")
         return (0, 0)
 
-    pdata   = list(map(int, p_el.text.split())) if (p_el.text or "").strip() else []
-    vcounts = (
-        list(map(int, vcount_el.text.split()))
-        if (vcount_el is not None and (vcount_el.text or "").strip())
+    flat_indices   = list(map(int, indices_element.text.split())) if (indices_element.text or "").strip() else []
+    face_vertex_counts = (
+        list(map(int, vertex_count_element.text.split()))
+        if (vertex_count_element is not None and (vertex_count_element.text or "").strip())
         else []
     )
-    old_count = len(vcounts)
-    n_inp     = _n_inputs(el)
+    old_count = len(face_vertex_counts)
+    vertex_index_stride = _get_vertex_index_stride(primitive_element)
 
     # If <vcount> is missing but <p> data exists, infer all-triangle faces
-    if not vcounts and pdata:
-        face_size = 3 * n_inp
-        if n_inp > 0 and len(pdata) % face_size == 0:
-            old_count = len(pdata) // face_size
-            vcounts   = [3] * old_count
+    if not face_vertex_counts and flat_indices:
+        face_size = 3 * vertex_index_stride
+        if vertex_index_stride > 0 and len(flat_indices) % face_size == 0:
+            old_count = len(flat_indices) // face_size
+            face_vertex_counts   = [3] * old_count
         else:
             # Cannot safely deduce face topology -- leave untouched
             return None
 
     # Already all triangles -- just retag and clean up
-    if all(v == 3 for v in vcounts):
-        if vcount_el is not None:
-            el.remove(vcount_el)
-        el.tag = f"{{{COLLADA_NS}}}triangles"
-        el.set("count", str(old_count))
+    if all(v == 3 for v in face_vertex_counts):
+        if vertex_count_element is not None:
+            primitive_element.remove(vertex_count_element)
+        primitive_element.tag = f"{{{COLLADA_NS}}}triangles"
+        primitive_element.set("count", str(old_count))
         return (old_count, old_count)
 
     # General case: fan-triangulate
-    new_pdata, new_tri_count = _fan_triangulate(vcounts, pdata, n_inp)
-    p_el.text = " ".join(map(str, new_pdata))
-    if vcount_el is not None:
-        el.remove(vcount_el)
+    triangulated_indices, new_tri_count = _fan_triangulate(face_vertex_counts, flat_indices, vertex_index_stride)
+    indices_element.text = " ".join(map(str, triangulated_indices))
+    if vertex_count_element is not None:
+        primitive_element.remove(vertex_count_element)
 
-    el.tag = f"{{{COLLADA_NS}}}triangles"
-    el.set("count", str(new_tri_count))
+    primitive_element.tag = f"{{{COLLADA_NS}}}triangles"
+    primitive_element.set("count", str(new_tri_count))
     return (old_count, new_tri_count)
 
 
-def _convert_polygons(el: etree._Element):
+def _convert_polygons(primitive_element: etree._Element):
     """
     Convert a <polygons> element to <triangles> in-place.
 
@@ -186,66 +186,66 @@ def _convert_polygons(el: etree._Element):
 
     Returns (old_face_count, new_tri_count).
     """
-    vcount_el   = el.find(f"{{{COLLADA_NS}}}vcount")
-    sub_p_list  = el.findall(f"{{{COLLADA_NS}}}p")
-    sub_ph_list = el.findall(f"{{{COLLADA_NS}}}ph")
+    vertex_count_element   = primitive_element.find(f"{{{COLLADA_NS}}}vcount")
+    sub_indices_list       = primitive_element.findall(f"{{{COLLADA_NS}}}p")
+    sub_polygon_holes_list = primitive_element.findall(f"{{{COLLADA_NS}}}ph")
 
-    if sub_ph_list:
-        print(f"    [WARN] {len(sub_ph_list)} <ph> (polygon-with-holes) element(s) found. "
+    if sub_polygon_holes_list:
+        print(f"    [WARN] {len(sub_polygon_holes_list)} <ph> (polygon-with-holes) element(s) found. "
               "Holes are not representable in <triangles> and will be dropped; "
               "only the outer contour is triangulated.")
 
     # Polylist-style variant: single <p> + <vcount>
-    if vcount_el is not None and len(sub_p_list) == 1 and not sub_ph_list:
-        return _convert_polylist(el)
+    if vertex_count_element is not None and len(sub_indices_list) == 1 and not sub_polygon_holes_list:
+        return _convert_polylist(primitive_element)
 
-    old_count = len(sub_p_list) + len(sub_ph_list)
-    n_inp     = _n_inputs(el)
-    new_flat  = []
+    old_count = len(sub_indices_list) + len(sub_polygon_holes_list)
+    vertex_index_stride = _get_vertex_index_stride(primitive_element)
+    triangulated_flat_indices  = []
     new_tri_count = 0
 
     # Process per-face <p> elements
-    for sp in sub_p_list:
-        row_data = list(map(int, sp.text.split())) if (sp.text or "").strip() else []
-        n_verts  = len(row_data) // n_inp if n_inp else 0
-        rows     = [row_data[i * n_inp : (i + 1) * n_inp] for i in range(n_verts)]
+    for sub_indices in sub_indices_list:
+        row_data = list(map(int, sub_indices.text.split())) if (sub_indices.text or "").strip() else []
+        n_verts  = len(row_data) // vertex_index_stride if vertex_index_stride else 0
+        rows     = [row_data[i * vertex_index_stride : (i + 1) * vertex_index_stride] for i in range(n_verts)]
         if n_verts >= 3:
             if n_verts == 3:
-                new_flat.extend(row_data)
+                triangulated_flat_indices.extend(row_data)
                 new_tri_count += 1
             else:
                 for i in range(1, n_verts - 1):
-                    new_flat.extend(rows[0])
-                    new_flat.extend(rows[i])
-                    new_flat.extend(rows[i + 1])
+                    triangulated_flat_indices.extend(rows[0])
+                    triangulated_flat_indices.extend(rows[i])
+                    triangulated_flat_indices.extend(rows[i + 1])
                     new_tri_count += 1
-        el.remove(sp)
+        primitive_element.remove(sub_indices)
 
     # Process <ph> (outer contour of polygon-with-holes; drop inner <h> rings)
-    for ph in sub_ph_list:
-        outer_p = ph.find(f"{{{COLLADA_NS}}}p")
-        if outer_p is not None and (outer_p.text or "").strip():
-            row_data = list(map(int, outer_p.text.split()))
-            n_verts  = len(row_data) // n_inp if n_inp else 0
-            rows     = [row_data[i * n_inp : (i + 1) * n_inp] for i in range(n_verts)]
+    for ph in sub_polygon_holes_list:
+        outer_indices = ph.find(f"{{{COLLADA_NS}}}p")
+        if outer_indices is not None and (outer_indices.text or "").strip():
+            row_data = list(map(int, outer_indices.text.split()))
+            n_verts  = len(row_data) // vertex_index_stride if vertex_index_stride else 0
+            rows     = [row_data[i * vertex_index_stride : (i + 1) * vertex_index_stride] for i in range(n_verts)]
             if n_verts >= 3:
                 for i in range(1, n_verts - 1):
-                    new_flat.extend(rows[0])
-                    new_flat.extend(rows[i])
-                    new_flat.extend(rows[i + 1])
+                    triangulated_flat_indices.extend(rows[0])
+                    triangulated_flat_indices.extend(rows[i])
+                    triangulated_flat_indices.extend(rows[i + 1])
                     new_tri_count += 1
-        el.remove(ph)
+        primitive_element.remove(ph)
 
     # Remove <vcount> if present
-    if vcount_el is not None:
-        el.remove(vcount_el)
+    if vertex_count_element is not None:
+        primitive_element.remove(vertex_count_element)
 
     # Add single merged flat <p>
-    p_new      = etree.SubElement(el, f"{{{COLLADA_NS}}}p")
-    p_new.text = " ".join(map(str, new_flat))
+    new_indices_element      = etree.SubElement(primitive_element, f"{{{COLLADA_NS}}}p")
+    new_indices_element.text = " ".join(map(str, triangulated_flat_indices))
 
-    el.tag = f"{{{COLLADA_NS}}}triangles"
-    el.set("count", str(new_tri_count))
+    primitive_element.tag = f"{{{COLLADA_NS}}}triangles"
+    primitive_element.set("count", str(new_tri_count))
     return (old_count, new_tri_count)
 
 
@@ -290,19 +290,19 @@ def convert_dae(input_path: str, output_path: str) -> int:
     total_new_tris   = 0
     total_skipped    = 0
 
-    for prim_el in primitives:
-        short_tag = prim_el.tag.split("}")[-1]      # "polylist" or "polygons"
-        mat       = prim_el.get("material", "<no material>")
+    for primitive_element in primitives:
+        short_tag = primitive_element.tag.split("}")[-1]      # "polylist" or "polygons"
+        mat       = primitive_element.get("material", "<no material>")
 
         # Walk up to find the geometry name for diagnostic output
-        geom_name = _find_geom_name(prim_el)
+        geom_name = _find_geom_name(primitive_element)
 
         print(f"  <{short_tag}>  geometry='{geom_name}'  material='{mat}'")
 
         if short_tag == "polylist":
-            result = _convert_polylist(prim_el)
+            result = _convert_polylist(primitive_element)
         else:
-            result = _convert_polygons(prim_el)
+            result = _convert_polygons(primitive_element)
 
         if result is None:
             print("    [WARN] Skipped — could not determine face topology (malformed element).")
@@ -332,9 +332,9 @@ def convert_dae(input_path: str, output_path: str) -> int:
     return total_converted
 
 
-def _find_geom_name(el: etree._Element) -> str:
+def _find_geom_name(element: etree._Element) -> str:
     """Walk up the element tree to find the nearest geometry id/name."""
-    node = el.getparent()
+    node = element.getparent()
     while node is not None:
         tag = node.tag.split("}")[-1] if "}" in node.tag else node.tag
         if tag == "geometry":
