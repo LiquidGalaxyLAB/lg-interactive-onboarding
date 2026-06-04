@@ -38,7 +38,7 @@ class ModelProject {
   final double heading;
 
   /// Tilt: rotation about the X-axis (0–90°).
-  /// Default 90° to correct Y_UP vs Z_UP orientation.
+  /// Default 0° (no correction). Adjust per-model as needed.
   final double tilt;
 
   /// Roll: rotation about the Y-axis (0–360°).
