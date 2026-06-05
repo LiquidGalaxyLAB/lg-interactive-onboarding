@@ -1,39 +1,30 @@
+// This is a basic Flutter widget test.
+//
+// To perform an interaction with a widget in your test, use the WidgetTester
+// utility in the flutter_test package. For example, you can send tap and scroll
+// gestures. You can also use WidgetTester to find child widgets in the widget
+// tree, read text, and verify that the values of widget properties are correct.
+
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
 import 'package:lg_interactive_onboarding/main.dart';
-import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
-import 'package:lg_interactive_onboarding/src/features/settings/presentation/settings_screen.dart';
 
 void main() {
-  testWidgets('Smoke test: App compiles and pumps SettingsScreen', (WidgetTester tester) async {
-    // Setup mock values for SharedPreferences
-    SharedPreferences.setMockInitialValues({});
-    final prefs = await SharedPreferences.getInstance();
+  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+    // Build our app and trigger a frame.
+    await tester.pumpWidget(const MyApp());
 
-    // Setup mock secure storage
-    FlutterSecureStorage.setMockInitialValues({});
-    const secureStorage = FlutterSecureStorage();
-    final initialPassword = await secureStorage.read(key: 'password') ?? '';
+    // Verify that our counter starts at 0.
+    expect(find.text('0'), findsOneWidget);
+    expect(find.text('1'), findsNothing);
 
-    // Build our app and trigger a frame
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          sharedPreferencesProvider.overrideWithValue(prefs),
-          secureStorageProvider.overrideWithValue(secureStorage),
-          initialPasswordProvider.overrideWithValue(initialPassword),
-        ],
-        child: const LGContentStudioApp(),
-      ),
-    );
+    // Tap the '+' icon and trigger a frame.
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pump();
 
-    await tester.pumpAndSettle();
-
-    // Verify that the app launches and the SettingsScreen is shown
-    expect(find.byType(SettingsScreen), findsOneWidget);
-    expect(find.text('Host IP'), findsOneWidget);
-    expect(find.text('Username'), findsOneWidget);
+    // Verify that our counter has incremented.
+    expect(find.text('0'), findsNothing);
+    expect(find.text('1'), findsOneWidget);
   });
 }

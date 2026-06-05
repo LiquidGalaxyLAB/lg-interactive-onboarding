@@ -1,47 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:lg_interactive_onboarding/src/features/home/presentation/home_screen.dart';
 
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:lg_interactive_onboarding/src/common/theme/app_theme.dart';
-import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
-import 'package:lg_interactive_onboarding/src/features/settings/presentation/settings_screen.dart';
-
-void main() async {
+void main() {
+  // Ensure Flutter binding is initialized
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize SharedPreferences for persistent settings
-  final prefs = await SharedPreferences.getInstance();
-  const secureStorage = FlutterSecureStorage();
-  final initialPassword = await secureStorage.read(key: 'password') ?? '';
-
+  
   runApp(
-    ProviderScope(
-      overrides: [
-        sharedPreferencesProvider.overrideWithValue(prefs),
-        secureStorageProvider.overrideWithValue(secureStorage),
-        initialPasswordProvider.overrideWithValue(initialPassword),
-      ],
-      child: const LGContentStudioApp(),
+    const ProviderScope(
+      child: MyApp(),
     ),
   );
 }
 
-/// Root application widget.
-class LGContentStudioApp extends ConsumerWidget {
-  const LGContentStudioApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final themeMode = ref.watch(themeModeProvider);
-
+  Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'LG Content Studio',
+      title: 'LG Controller',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: themeMode,
-      home: const SettingsScreen(),
+      themeMode: ThemeMode.dark,
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF0F172A),
+        colorScheme: ColorScheme.dark(
+          brightness: Brightness.dark,
+          surface: const Color(0xFF1E293B),
+          primary: Colors.cyanAccent[700]!,
+          secondary: Colors.cyanAccent,
+          error: Colors.redAccent,
+        ),
+        textTheme: const TextTheme(
+          titleLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+          bodyLarge: TextStyle(color: Colors.white, fontSize: 16),
+          bodyMedium: TextStyle(color: Colors.white70, fontSize: 14),
+        ),
+      ),
+      home: const HomeScreen(),
     );
   }
 }
