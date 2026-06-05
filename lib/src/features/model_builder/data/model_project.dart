@@ -3,6 +3,25 @@
 /// Tracks file info, map location, orientation (heading/tilt/roll),
 /// and scale (x/y/z) for KML generation.
 class ModelProject {
+  // ─── Supported 3D Formats ──────────────────────────────────────
+
+  /// All file extensions the model builder can accept.
+  /// Non-DAE formats are converted to DAE via assimp on the LG master.
+  static const supportedExtensions = [
+    // Common / Native formats
+    '.dae', '.obj', '.fbx', '.blend', '.gltf', '.glb', '.kmz', '.stl', '.ply', '.3ds',
+    // Extended Assimp formats
+    '.3d', '.ac', '.ac3d', '.acc', '.ase', '.ask', '.assbin', '.b3d', '.bvh',
+    '.cob', '.csm', '.dxf', '.enff', '.hmp', '.ifc', '.ifczip', '.irr', '.irrmesh',
+    '.lwo', '.lws', '.lxo', '.md2', '.md3', '.md5anim', '.md5camera', '.md5mesh',
+    '.mdc', '.mdl', '.mesh', '.mesh.xml', '.mot', '.ms3d', '.ndo', '.nff', '.off',
+    '.ogex', '.pk3', '.prj', '.q3o', '.q3s', '.raw', '.scn', '.smd', '.ter',
+    '.uc', '.vta', '.x', '.xgl', '.xml', '.zgl'
+  ];
+
+  /// The native format used by Google Earth / Liquid Galaxy.
+  static const nativeExtension = '.dae';
+
   /// Unique identifier for tracking deployed models on the LG rig.
   final String id;
 
@@ -87,9 +106,25 @@ class ModelProject {
     return ext == '.glb' || ext == '.gltf';
   }
 
+  /// Whether this file needs assimp conversion to DAE before deployment.
+  /// KMZ files have their own handling path and are excluded.
+  bool get requiresConversion {
+    final ext = fileExtension?.toLowerCase();
+    return ext != null && ext != nativeExtension && ext != '.kmz';
+  }
+
   /// The remote filename used on the LG server.
   /// Prefixed with the project ID to keep deployments isolated.
-  String get remoteModelFileName => '${id}_$fileName';
+  /// Non-KMZ files always get a .dae suffix since they are converted/triangulated.
+  String get remoteModelFileName {
+    final baseName = fileName ?? '';
+    if (requiresConversion) {
+      // Replace original extension with .dae (e.g., model.obj → {id}_model.dae)
+      final withoutExt = baseName.replaceAll(RegExp(r'\.[^.]+$'), '');
+      return '${id}_$withoutExt.dae';
+    }
+    return '${id}_$baseName';
+  }
 
   /// The remote KML filename.
   String get remoteKmlFileName =>

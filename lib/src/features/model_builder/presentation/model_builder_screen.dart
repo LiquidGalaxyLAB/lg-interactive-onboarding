@@ -272,7 +272,7 @@ class _ImportModelCard extends ConsumerWidget {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('Import 3D Model', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-                    Text('Supports .dae, .gltf, .glb, .kmz',
+                    Text('Supports .dae, .obj, .fbx, .blend, .gltf, .glb, .stl & more',
                       style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.5))),
                   ]),
                 ),
@@ -373,7 +373,13 @@ class _FileInfoTile extends StatelessWidget {
           ])),
           Consumer(builder: (context, ref, _) => IconButton(
             icon: const Icon(Icons.swap_horiz, size: 20), tooltip: 'Replace model',
-            onPressed: () => ref.read(modelBuilderProvider.notifier).importModel(),
+            onPressed: () async {
+              final error = await ref.read(modelBuilderProvider.notifier).importModel();
+              if (error != null && error != 'No file selected' && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(error), backgroundColor: Colors.orangeAccent));
+              }
+            },
           )),
         ]),
         vertexCount.when(
@@ -413,6 +419,8 @@ class _FileInfoTile extends StatelessWidget {
       case '.glb': case '.gltf': return Icons.view_in_ar;
       case '.dae': return Icons.architecture;
       case '.kmz': return Icons.folder_zip;
+      case '.obj': case '.fbx': case '.blend': return Icons.category;
+      case '.stl': case '.ply': case '.3ds': return Icons.grid_on;
       default: return Icons.insert_drive_file;
     }
   }
@@ -440,10 +448,10 @@ class _ImportButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return InkWell(
       onTap: () async {
-        final success = await ref.read(modelBuilderProvider.notifier).importModel();
-        if (!success && context.mounted) {
+        final error = await ref.read(modelBuilderProvider.notifier).importModel();
+        if (error != null && error != 'No file selected' && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No file selected or import failed'), backgroundColor: Colors.orangeAccent));
+            SnackBar(content: Text(error), backgroundColor: Colors.orangeAccent));
         }
       },
       borderRadius: BorderRadius.circular(12),
@@ -460,7 +468,7 @@ class _ImportButton extends ConsumerWidget {
           Text('Tap to import from device', style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.primary, fontWeight: FontWeight.w500)),
           const SizedBox(height: 2),
-          Text('.dae  ·  .gltf  ·  .glb  ·  .kmz', style: theme.textTheme.bodySmall?.copyWith(
+          Text('.dae · .obj · .fbx · .blend · .gltf · .glb · .stl & more', style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurface.withValues(alpha: 0.4))),
         ]),
       ),
