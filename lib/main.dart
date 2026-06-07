@@ -1,45 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lg_interactive_onboarding/src/features/home/presentation/home_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
-  // Ensure Flutter binding is initialized
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:lg_interactive_onboarding/src/common/theme/app_theme.dart';
+import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
+import 'package:lg_interactive_onboarding/src/features/settings/presentation/settings_screen.dart';
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
+  // Initialize SharedPreferences for persistent settings
+  final prefs = await SharedPreferences.getInstance();
+  const secureStorage = FlutterSecureStorage();
+  final initialPassword = await secureStorage.read(key: 'password') ?? '';
+
   runApp(
-    const ProviderScope(
-      child: MyApp(),
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        secureStorageProvider.overrideWithValue(secureStorage),
+        initialPasswordProvider.overrideWithValue(initialPassword),
+      ],
+      child: const LGContentStudioApp(),
     ),
   );
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+/// Root application widget.
+class LGContentStudioApp extends ConsumerWidget {
+  const LGContentStudioApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp(
-      title: 'LG Controller',
+      title: 'LG Content Studio',
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.dark,
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0F172A),
-        colorScheme: ColorScheme.dark(
-          brightness: Brightness.dark,
-          surface: const Color(0xFF1E293B),
-          primary: Colors.cyanAccent[700]!,
-          secondary: Colors.cyanAccent,
-          error: Colors.redAccent,
-        ),
-        textTheme: const TextTheme(
-          titleLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
-          bodyLarge: TextStyle(color: Colors.white, fontSize: 16),
-          bodyMedium: TextStyle(color: Colors.white70, fontSize: 14),
-        ),
-      ),
-      home: const HomeScreen(),
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
+      home: const SettingsScreen(),
     );
   }
 }
