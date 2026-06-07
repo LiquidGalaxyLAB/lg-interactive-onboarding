@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_project.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_repository.dart';
+import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -47,7 +48,7 @@ const bundledModels = [
 
 String _generateId() {
   final now = DateTime.now().millisecondsSinceEpoch;
-  final rand = Random().nextInt(9999).toString().padLeft(4, '0');
+  final rand = Random().nextInt(AppConstants.idMaxRandom).toString().padLeft(AppConstants.idPaddingLength, '0');
   return '${now}_$rand';
 }
 
@@ -230,10 +231,10 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
       heading: 0.0,
       tilt: 0.0,
       roll: 0.0,
-      scaleX: 100.0,
-      scaleY: 100.0,
-      scaleZ: 100.0,
-      altitude: 10.0,
+      scaleX: AppConstants.defaultScale,
+      scaleY: AppConstants.defaultScale,
+      scaleZ: AppConstants.defaultScale,
+      altitude: AppConstants.defaultAltitude,
     );
   }
 
@@ -347,7 +348,7 @@ class PushNotifier extends Notifier<PushState> {
     );
 
     // Auto-reset to idle after a delay
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(AppConstants.pushStateResetDelay);
     if (state.status != PushStatus.pushing) {
       state = const PushState();
     }
@@ -378,7 +379,7 @@ class PushNotifier extends Notifier<PushState> {
       message: result.message,
     );
 
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(AppConstants.pushStateResetDelay);
     if (state.status != PushStatus.pushing) {
       state = const PushState();
     }
@@ -407,7 +408,7 @@ class PushNotifier extends Notifier<PushState> {
       message: result.message,
     );
 
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(AppConstants.pushStateResetDelay);
     if (state.status != PushStatus.pushing) {
       state = const PushState();
     }
@@ -433,7 +434,7 @@ class PushNotifier extends Notifier<PushState> {
       message: result.success ? 'LG rig wiped successfully' : result.message,
     );
 
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(AppConstants.pushStateResetDelay);
     if (state.status != PushStatus.pushing) {
       state = const PushState();
     }
@@ -455,7 +456,7 @@ class PushNotifier extends Notifier<PushState> {
       message: result.success ? 'Master KML cleared' : result.message,
     );
 
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(AppConstants.pushStateResetDelay);
     if (state.status != PushStatus.pushing) {
       state = const PushState();
     }
@@ -482,7 +483,7 @@ class PushNotifier extends Notifier<PushState> {
       message: result.message,
     );
 
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(AppConstants.pushStateResetDelay);
     if (state.status != PushStatus.pushing) {
       state = const PushState();
     }

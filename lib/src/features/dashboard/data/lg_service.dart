@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
+import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 
 /// Service for controlling the Liquid Galaxy rig.
@@ -115,7 +116,7 @@ class LGService {
         'sed -i "s|<href>[^<]*master.kml<\\/href>|&<refreshMode>onInterval<\\/refreshMode><refreshInterval>1<\\/refreshInterval>|" ~/earth/kml/master/myplaces.kml',
       );
 
-      await Future.delayed(const Duration(seconds: 1));
+      await Future.delayed(AppConstants.kmlRefreshDelay);
 
       // Remove refresh interval (revert)
       await client.run(
@@ -150,7 +151,7 @@ class LGService {
       );
 
       // Delay before refresh to avoid SSH channel exhaustion
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(AppConstants.kmlClearDelay);
       await refreshMasterKml();
 
       debugPrint('LGService: KML cleared');

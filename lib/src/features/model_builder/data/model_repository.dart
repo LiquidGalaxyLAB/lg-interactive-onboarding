@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_project.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
+import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 import 'package:path/path.dart' as p;
 
 /// Repository for 3D model operations: KML generation, file handling, SSH push.
@@ -30,13 +31,13 @@ class ModelRepository {
   bool _lxmlVerified = false;
 
   // ─── Constants ───────────────────────────────────────────────────
-  static const _modelDir = '/var/www/html/model';
-  static const _wrapperDir = '/var/www/html/3d_model_wrapper';
-  static const _systemMasterKml = '/var/www/html/kml/master.kml';
-  static const _wrapperMasterKml = '/var/www/html/3d_model_wrapper/master.kml';
+  static const _modelDir = AppConstants.lgModelDir;
+  static const _wrapperDir = AppConstants.lgWrapperDir;
+  static const _systemMasterKml = AppConstants.lgSystemMasterKml;
+  static const _wrapperMasterKml = AppConstants.lgWrapperMasterKml;
 
   /// Small delay between SSH channel operations to avoid channel exhaustion.
-  Future<void> _channelDelay() => Future.delayed(const Duration(milliseconds: 500));
+  Future<void> _channelDelay() => Future.delayed(AppConstants.sshChannelDelay);
 
   // ─── KML Generation ──────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ class ModelRepository {
       <name>${project.fileName}</name>
       <Model>
         <Link>
-          <href>http://$masterIp:81/model/$remoteModelFile</href>
+          <href>http://$masterIp:${AppConstants.lgHttpPort}/model/$remoteModelFile</href>
         </Link>
         <Location>
           <latitude>${project.latitude ?? 0.0}</latitude>
@@ -85,7 +86,7 @@ class ModelRepository {
 
     return '''<Model>
   <Link>
-    <href>http://$masterIp:81/model/$remoteModelFile</href>
+    <href>http://$masterIp:${AppConstants.lgHttpPort}/model/$remoteModelFile</href>
   </Link>
   <Location>
     <latitude>${project.latitude ?? 0.0}</latitude>
@@ -316,7 +317,7 @@ class ModelRepository {
 
     final client = _sshService.client!;
     final triangulatedTempPath = '${remoteDaePath}_tri_tmp.dae';
-    const remoteScriptPath = '/tmp/dae_triangulate.py';
+    const remoteScriptPath = AppConstants.lgRemoteScriptPath;
 
     try {
       debugPrint('Triangulate: Processing $remoteDaePath...');
@@ -636,7 +637,7 @@ class ModelRepository {
     <NetworkLink>
       <name>$kmlFile</name>
       <Link>
-        <href>http://$masterIp:81/3d_model_wrapper/$kmlFile</href>
+        <href>http://$masterIp:${AppConstants.lgHttpPort}/3d_model_wrapper/$kmlFile</href>
       </Link>
     </NetworkLink>''').join('\n');
 
@@ -680,7 +681,7 @@ $networkLinks
     <NetworkLink>
       <name>3D Model Wrapper</name>
       <Link>
-        <href>http://$masterIp:81/3d_model_wrapper/master.kml</href>
+        <href>http://$masterIp:${AppConstants.lgHttpPort}/3d_model_wrapper/master.kml</href>
       </Link>
     </NetworkLink>
   </Document>

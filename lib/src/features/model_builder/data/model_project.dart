@@ -1,3 +1,5 @@
+import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
+
 /// Data class representing a placed 3D model with all adjustable parameters.
 ///
 /// Tracks file info, map location, orientation (heading/tilt/roll),
@@ -82,13 +84,13 @@ class ModelProject {
     this.assetPath,
     this.latitude,
     this.longitude,
-    this.altitude = 10.0,
+    this.altitude = AppConstants.defaultAltitude,
     this.heading = 0.0,
     this.tilt = 0.0,
     this.roll = 0.0,
-    this.scaleX = 100.0,
-    this.scaleY = 100.0,
-    this.scaleZ = 100.0,
+    this.scaleX = AppConstants.defaultScale,
+    this.scaleY = AppConstants.defaultScale,
+    this.scaleZ = AppConstants.defaultScale,
   });
 
   /// Whether a model file has been imported.
