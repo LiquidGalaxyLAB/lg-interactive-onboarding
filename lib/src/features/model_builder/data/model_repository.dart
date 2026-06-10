@@ -39,6 +39,22 @@ class ModelRepository {
   /// Small delay between SSH channel operations to avoid channel exhaustion.
   Future<void> _channelDelay() => Future.delayed(AppConstants.sshChannelDelay);
 
+  /// Executes an SSH command, optionally with sudo, and applies the channel delay.
+  /// Returns the trimmed output string.
+  Future<String> _execute(String command, {bool sudo = false}) async {
+    final client = _sshService.client!;
+    final Uint8List result;
+    if (sudo) {
+      final password = _settingsService.password;
+      result = await client.run('(echo $password; sleep 1) | sudo -S $command');
+    } else {
+      result = await client.run(command);
+    }
+    final output = String.fromCharCodes(result).trim();
+    await _channelDelay();
+    return output;
+  }
+
   // ─── KML Generation ──────────────────────────────────────────────
 
   /// Generates a complete KML document for the given model project.
@@ -136,58 +152,41 @@ class ModelRepository {
   /// Uses the `(echo password; sleep 1) | sudo -S` pattern established
   /// across the codebase — the sleep keeps the pipe open long enough for
   /// sudo to read the password from stdin.
-  Future<bool> _ensureAssimpInstalled() async {
-    if (_assimpVerified) return true;
-    if (!_sshService.isConnected) return false;
-
-    final client = _sshService.client!;
-    final password = _settingsService.password;
+  Future<void> _ensureAssimpInstalled() async {
+    if (_assimpVerified) return;
+    if (!_sshService.isConnected) throw Exception('SSH not connected.');
 
     try {
       // Check if assimp is already available
-      final whichResult = await client.run('which assimp');
-      final whichOutput = String.fromCharCodes(whichResult).trim();
-      await _channelDelay();
+      final whichOutput = await _execute('which assimp');
 
       if (whichOutput.isNotEmpty && !whichOutput.contains('not found')) {
         debugPrint('Assimp: Already installed at $whichOutput');
         _assimpVerified = true;
-        return true;
+        return;
       }
 
       // ── Step 1: apt update ──
       debugPrint('Assimp: Not found — installing assimp-utils...');
-      final updateResult = await client.run(
-        '(echo $password; sleep 1) | sudo -S apt update -qq 2>&1',
-      );
-      final updateOutput = String.fromCharCodes(updateResult).trim();
+      final updateOutput = await _execute('apt update -qq 2>&1', sudo: true);
       debugPrint('Assimp: apt update output: $updateOutput');
-      await _channelDelay();
 
       // ── Step 2: apt install ──
-      final installResult = await client.run(
-        '(echo $password; sleep 1) | sudo -S apt install assimp-utils -y -qq 2>&1',
-      );
-      final installOutput = String.fromCharCodes(installResult).trim();
+      final installOutput = await _execute('apt install assimp-utils -y -qq 2>&1', sudo: true);
       debugPrint('Assimp: apt install output: $installOutput');
-      await _channelDelay();
 
       // ── Step 3: Verify installation succeeded ──
-      final verifyResult = await client.run('which assimp');
-      final verifyOutput = String.fromCharCodes(verifyResult).trim();
-      await _channelDelay();
+      final verifyOutput = await _execute('which assimp');
 
       if (verifyOutput.isNotEmpty && !verifyOutput.contains('not found')) {
         debugPrint('Assimp: Installed successfully at $verifyOutput');
         _assimpVerified = true;
-        return true;
+        return;
       }
 
-      debugPrint('Assimp: Installation failed — assimp not found after apt install');
-      return false;
+      throw Exception('Installation failed — assimp not found after apt install.');
     } catch (e) {
-      debugPrint('Assimp: Prerequisite check failed: $e');
-      return false;
+      throw Exception('Prerequisite check failed: $e');
     }
   }
 
@@ -207,21 +206,14 @@ class ModelRepository {
     required String uploadedFilePath,
     required String targetDaePath,
   }) async {
-    final client = _sshService.client!;
 
     try {
       debugPrint('Assimp: Converting $uploadedFilePath → $targetDaePath');
 
-      final conversionResult = await client.run(
-        'assimp export "$uploadedFilePath" "$targetDaePath" 2>&1',
-      );
-      final conversionOutput = String.fromCharCodes(conversionResult).trim();
-      await _channelDelay();
+      final conversionOutput = await _execute('assimp export "$uploadedFilePath" "$targetDaePath" 2>&1');
 
       // Verify the .dae was actually created
-      final verifyResult = await client.run('test -f "$targetDaePath" && echo EXISTS');
-      final verifyOutput = String.fromCharCodes(verifyResult).trim();
-      await _channelDelay();
+      final verifyOutput = await _execute('test -f "$targetDaePath" && echo EXISTS');
 
       if (!verifyOutput.contains('EXISTS')) {
         throw Exception(
@@ -231,13 +223,12 @@ class ModelRepository {
       }
 
       // Cleanup: delete the original raw file to avoid clutter
-      await client.run('rm -f "$uploadedFilePath"');
-      await _channelDelay();
+      await _execute('rm -f "$uploadedFilePath"');
 
       debugPrint('Assimp: Conversion successful, raw file cleaned up');
     } catch (e) {
       // Cleanup on failure too — remove any partial output
-      await client.run('rm -f "$targetDaePath"').catchError((_) => Uint8List(0));
+      await _execute('rm -f "$targetDaePath"').catchError((_) => '');
       rethrow;
     }
   }
@@ -247,56 +238,39 @@ class ModelRepository {
   /// Ensures `lxml` (Python XML library) is installed on the LG master node.
   ///
   /// Checked once per session via [_lxmlVerified].
-  Future<bool> _ensureLxmlInstalled() async {
-    if (_lxmlVerified) return true;
-    if (!_sshService.isConnected) return false;
-
-    final client = _sshService.client!;
-    final password = _settingsService.password;
+  Future<void> _ensureLxmlInstalled() async {
+    if (_lxmlVerified) return;
+    if (!_sshService.isConnected) throw Exception('SSH not connected.');
 
     try {
       // Quick import check
-      final checkResult = await client.run(
-        'python3 -c "import lxml" 2>&1',
-      );
-      final checkOutput = String.fromCharCodes(checkResult).trim();
-      await _channelDelay();
+      final checkOutput = await _execute('python3 -c "import lxml" 2>&1');
 
       if (!checkOutput.contains('ModuleNotFoundError') &&
           !checkOutput.contains('No module named')) {
         debugPrint('Triangulate: lxml already installed');
         _lxmlVerified = true;
-        return true;
+        return;
       }
 
       // Install lxml via pip
       debugPrint('Triangulate: lxml not found — installing...');
-      final installResult = await client.run(
-        '(echo $password; sleep 1) | sudo -S pip3 install lxml 2>&1',
-      );
-      final installOutput = String.fromCharCodes(installResult).trim();
+      final installOutput = await _execute('pip3 install lxml 2>&1', sudo: true);
       debugPrint('Triangulate: pip3 install lxml output: $installOutput');
-      await _channelDelay();
 
       // Verify
-      final verifyResult = await client.run(
-        'python3 -c "import lxml" 2>&1',
-      );
-      final verifyOutput = String.fromCharCodes(verifyResult).trim();
-      await _channelDelay();
+      final verifyOutput = await _execute('python3 -c "import lxml" 2>&1');
 
       if (!verifyOutput.contains('ModuleNotFoundError') &&
           !verifyOutput.contains('No module named')) {
         debugPrint('Triangulate: lxml installed successfully');
         _lxmlVerified = true;
-        return true;
+        return;
       }
 
-      debugPrint('Triangulate: lxml installation failed');
-      return false;
+      throw Exception('lxml installation failed. pip3 output: $installOutput');
     } catch (e) {
-      debugPrint('Triangulate: lxml check failed: $e');
-      return false;
+      throw Exception('lxml check failed: $e');
     }
   }
 
@@ -312,10 +286,8 @@ class ModelRepository {
   ///   2. Ensure `lxml` (Python dependency) is installed.
   ///   3. Run the script: input → temp output.
   ///   4. Overwrite the original with the triangulated result.
-  Future<bool> _triangulateDaeWithScript(String remoteDaePath) async {
-    if (!_sshService.isConnected) return false;
-
-    final client = _sshService.client!;
+  Future<void> _triangulateDaeWithScript(String remoteDaePath) async {
+    if (!_sshService.isConnected) throw Exception('SSH not connected.');
     final triangulatedTempPath = '${remoteDaePath}_tri_tmp.dae';
     const remoteScriptPath = AppConstants.lgRemoteScriptPath;
 
@@ -333,45 +305,27 @@ class ModelRepository {
       await _channelDelay();
 
       // 2. Ensure lxml is available
-      final lxmlReady = await _ensureLxmlInstalled();
-      if (!lxmlReady) {
-        debugPrint('Triangulate: lxml unavailable — cannot triangulate');
-        return false;
-      }
+      await _ensureLxmlInstalled();
 
       // 3. Run the triangulation script
-      final triResult = await client.run(
-        'python3 $remoteScriptPath "$remoteDaePath" "$triangulatedTempPath" 2>&1',
-      );
-      final triOutput = String.fromCharCodes(triResult).trim();
+      final triOutput = await _execute('python3 $remoteScriptPath "$remoteDaePath" "$triangulatedTempPath" 2>&1');
       debugPrint('Triangulate: script output: $triOutput');
-      await _channelDelay();
 
       // 4. Verify the triangulated file was created
-      final verifyResult = await client.run(
-        'test -f "$triangulatedTempPath" && echo EXISTS',
-      );
-      final verifyOutput = String.fromCharCodes(verifyResult).trim();
-      await _channelDelay();
+      final verifyOutput = await _execute('test -f "$triangulatedTempPath" && echo EXISTS');
 
       if (!verifyOutput.contains('EXISTS')) {
-        debugPrint('Triangulate: Output file not created. Script output: $triOutput');
-        return false;
+        throw Exception('Output file not created. Script output: $triOutput');
       }
 
       // 5. Overwrite the original .dae with the triangulated version
-      await client.run(
-        'mv -f "$triangulatedTempPath" "$remoteDaePath"',
-      );
-      await _channelDelay();
+      await _execute('mv -f "$triangulatedTempPath" "$remoteDaePath"');
 
       debugPrint('Triangulate: Success — $remoteDaePath overwritten with triangulated version');
-      return true;
     } catch (e) {
-      debugPrint('Triangulate: Failed: $e');
       // Cleanup temp file on failure
-      await client.run('rm -f "$triangulatedTempPath"').catchError((_) => Uint8List(0));
-      return false;
+      await _execute('rm -f "$triangulatedTempPath"').catchError((_) => '');
+      throw Exception('Triangulate failed: $e');
     }
   }
 
@@ -388,14 +342,11 @@ class ModelRepository {
     if (!project.isReady) {
       return PushResult(success: false, message: 'Model or location not set.');
     }
-
-    final client = _sshService.client!;
     final ext = project.fileExtension?.toLowerCase() ?? '';
 
     try {
       // 1. Ensure directories exist (single command)
-      await client.run('mkdir -p $_modelDir && mkdir -p $_wrapperDir && mkdir -p /var/www/html/kml');
-      await _channelDelay();
+      await _execute('mkdir -p $_modelDir && mkdir -p $_wrapperDir && mkdir -p /var/www/html/kml');
 
       // 2. Upload and process model file
       if (ext == '.kmz') {
@@ -403,8 +354,7 @@ class ModelRepository {
         final entries = await extractKmz(project.filePath!);
         for (final entry in entries) {
           final remotePath = '$_modelDir/${project.id}_${entry.key}';
-          await client.run('mkdir -p ${p.posix.dirname(remotePath)}');
-          await _channelDelay();
+          await _execute('mkdir -p ${p.posix.dirname(remotePath)}');
           await _sshService.uploadBytes(bytes: entry.value, remotePath: remotePath);
           await _channelDelay();
         }
@@ -423,14 +373,14 @@ class ModelRepository {
           await _channelDelay();
 
           // Ensure assimp is available
-          final assimpReady = await _ensureAssimpInstalled();
-          if (!assimpReady) {
+          try {
+            await _ensureAssimpInstalled();
+          } catch (e) {
             // Cleanup the uploaded raw file
-            await client.run('rm -f "$rawUploadPath"');
+            await _execute('rm -f "$rawUploadPath"');
             return PushResult(
               success: false,
-              message: 'Failed to install assimp on LG rig. '
-                  'Please install assimp-utils manually.',
+              message: 'Failed to install assimp: $e',
             );
           }
 
@@ -455,15 +405,15 @@ class ModelRepository {
 
         // 3. Triangulate the .dae in-place using Python script
         //    (converts <polylist>/<polygons> → <triangles> for Google Earth)
-        final triangulated = await _triangulateDaeWithScript(remoteDaePath);
-        await _channelDelay();
-        if (!triangulated) {
+        try {
+          await _triangulateDaeWithScript(remoteDaePath);
+        } catch (e) {
           return PushResult(
             success: false,
-            message: 'DAE triangulation failed on LG rig. '
-                'Check that python3 and lxml are available.',
+            message: 'DAE triangulation failed: $e',
           );
         }
+        await _channelDelay();
       }
 
       // 5. Generate and upload this model's KML to wrapper directory
@@ -492,10 +442,7 @@ class ModelRepository {
       // 9. Relaunch if requested
       if (relaunch) {
         await _channelDelay();
-        final password = _settingsService.password;
-        await client.run(
-          '(echo $password; sleep 1) | sudo -S /usr/local/bin/lg-relaunch',
-        );
+        await _execute('/usr/local/bin/lg-relaunch', sudo: true);
       }
 
       return PushResult(success: true, message: 'Model and KML pushed successfully!');
@@ -515,15 +462,12 @@ class ModelRepository {
       return PushResult(success: false, message: 'SSH not connected. Please connect first.');
     }
 
-    final client = _sshService.client!;
-
     try {
       // 1 & 2. Remove model file AND KML file in one command
-      await client.run(
+      await _execute(
         'rm -f $_modelDir/${model.remoteModelFileName} && '
         'rm -f $_wrapperDir/${model.remoteKmlFileName}',
       );
-      await _channelDelay();
 
       // 3. Rewrite wrapper master.kml with only the remaining models
       final remainingKmlFiles =
@@ -557,11 +501,8 @@ class ModelRepository {
       return PushResult(success: false, message: 'SSH not connected.');
     }
 
-    final client = _sshService.client!;
-
     try {
-      await client.run('rm -f $_modelDir/* && rm -f $_wrapperDir/*');
-      await _channelDelay();
+      await _execute('rm -f $_modelDir/* && rm -f $_wrapperDir/*');
 
       await _writeEmptyWrapperMasterKml();
       await _channelDelay();
@@ -607,11 +548,8 @@ class ModelRepository {
       return PushResult(success: false, message: 'SSH not connected.');
     }
 
-    final client = _sshService.client!;
-
     try {
-      await client.run('rm -rf $_modelDir/* && rm -rf $_wrapperDir/*');
-      await _channelDelay();
+      await _execute('rm -rf $_modelDir/* && rm -rf $_wrapperDir/*');
 
       await _writeEmptyWrapperMasterKml();
       await _channelDelay();
@@ -697,10 +635,8 @@ $networkLinks
   /// Both sed commands are batched into a single call with a sleep between.
   Future<void> _forceRefresh() async {
     try {
-      final client = _sshService.client!;
-
       // Batch both sed commands with a sleep between them into ONE channel
-      await client.run(
+      await _execute(
         'sed -i "s|<href>[^<]*master.kml<\\/href>|&<refreshMode>onInterval<\\/refreshMode><refreshInterval>1<\\/refreshInterval>|" ~/earth/kml/master/myplaces.kml && '
         'sleep 1 && '
         'sed -i "s|<href>[^<]*master.kml<\\/href><refreshMode>onInterval<\\/refreshMode><refreshInterval>[0-9]\\+<\\/refreshInterval>|<href>##LG_PHPIFACE##kml/master.kml<\\/href>|" ~/earth/kml/master/myplaces.kml',
