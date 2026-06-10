@@ -253,6 +253,30 @@ def _convert_polygons(primitive_element):
     primitive_element.set("count", str(new_tri_count))
     return (old_count, new_tri_count)
 
+def _normalize_scale_unit(root):
+    """
+    Force normalize scale unit to 1.0 (Meters).
+    This fixes Google Earth's microscopic/massive model rendering bugs
+    which happen when CAD programs export with meter="0.001" etc.
+    """
+    asset = root.find(_ns("asset"))
+    if asset is None:
+        return
+
+    unit = asset.find(_ns("unit"))
+    if unit is None:
+        # If missing completely, safely inject it
+        etree.SubElement(asset, _ns("unit"), meter="1.0", name="meter")
+        print("NOTE  : Added missing <unit> tag (meter='1.0')")
+        return
+
+    old_meter = unit.get("meter")
+    if old_meter in ("1.0", "1"):
+        return
+
+    unit.set("meter", "1.0")
+    unit.set("name", "meter")
+    print("NOTE  : Normalized <unit> from meter='%s' to meter='1.0'" % old_meter)
 
 # ---------------------------------------------------------------------------
 # Main conversion
@@ -279,23 +303,7 @@ def convert_dae(input_path, output_path):
 
     root = tree.getroot()
 
-    # Force normalize scale unit to 1.0 (Meters)
-    # This fixes Google Earth's microscopic/massive model rendering bugs
-    # which happen when CAD programs export with meter="0.001" etc.
-    asset = root.find(_ns("asset"))
-    if asset is not None:
-        unit = asset.find(_ns("unit"))
-        if unit is not None:
-            old_meter = unit.get("meter")
-            if old_meter != "1.0" and old_meter != "1":
-                unit.set("meter", "1.0")
-                unit.set("name", "meter")
-                print("NOTE  : Normalized <unit> from meter='%s' to meter='1.0'" % old_meter)
-        else:
-            # If missing completely, safely inject it
-            etree.SubElement(asset, _ns("unit"), meter="1.0", name="meter")
-            print("NOTE  : Added missing <unit> tag (meter='1.0')")
-
+    _normalize_scale_unit(root)
     # Collect ALL polylist / polygons elements anywhere in the document
     primitives = []
     for tag in PRIMITIVE_TAGS:
