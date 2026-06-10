@@ -54,6 +54,23 @@ String _generateId() {
 
 // ─── Model Project State ─────────────────────────────────────────────
 
+sealed class ImportResult {
+  const ImportResult();
+}
+
+class ImportSuccess extends ImportResult {
+  const ImportSuccess();
+}
+
+class ImportFailure extends ImportResult {
+  final String message;
+  const ImportFailure(this.message);
+}
+
+class ImportCanceled extends ImportResult {
+  const ImportCanceled();
+}
+
 /// Manages the full state of the current 3D model builder project.
 class ModelBuilderNotifier extends Notifier<ModelProject> {
   @override
@@ -76,7 +93,7 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
   ///   2. Verifying [file.path] actually exists before using it.
   ///   3. Falling back to [file.readStream] to stream directly from the
   ///      content provider.
-  Future<String?> importModel() async {
+  Future<ImportResult> importModel() async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
@@ -85,7 +102,7 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
         withReadStream: true,
       );
 
-      if (result == null || result.files.isEmpty) return 'No file selected';
+      if (result == null || result.files.isEmpty) return const ImportCanceled();
 
       final file = result.files.first;
       final fileName = file.name;
@@ -93,8 +110,8 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
 
       // Validate extension in Dart (the OS picker is unfiltered)
       if (!ModelProject.supportedExtensions.contains(ext)) {
-        return 'Unsupported format "$ext". '
-            'Accepted: ${ModelProject.supportedExtensions.join(', ')}';
+        return ImportFailure('Unsupported format "$ext". '
+            'Accepted: ${ModelProject.supportedExtensions.join(', ')}');
       }
 
       // Persist the file into the app documents directory
@@ -117,13 +134,13 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
           chunks.addAll(chunk);
         }
         if (chunks.isEmpty) {
-          return 'File appears to be empty (0 bytes read from stream).';
+          return const ImportFailure('File appears to be empty (0 bytes read from stream).');
         }
         await persistentFile.writeAsBytes(Uint8List.fromList(chunks));
         debugPrint('Import: streamed ${chunks.length} bytes from content provider');
       } else {
-        return 'Could not read file data from device. '
-            'Try copying the file to internal storage and retry.';
+        return const ImportFailure('Could not read file data from device. '
+            'Try copying the file to internal storage and retry.');
       }
 
       final fileInfo = await persistentFile.stat();
@@ -140,15 +157,15 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
 
       debugPrint(
           'Model imported: ${state.fileName} (${state.fileSizeFormatted})');
-      return null; // success
+      return const ImportSuccess(); // success
     } catch (e) {
       debugPrint('File import failed: $e');
-      return 'File import failed: $e';
+      return ImportFailure('File import failed: $e');
     }
   }
 
   /// Loads a bundled asset model for testing. Returns null if successful, or error message.
-  Future<String?> loadBundledModel(BundledModel bundled) async {
+  Future<ImportResult> loadBundledModel(BundledModel bundled) async {
     try {
       // Copy asset to app documents directory so it can be read as a File and doesn't get pruned
       final byteData = await rootBundle.load(bundled.assetPath);
@@ -176,10 +193,10 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
       );
 
       debugPrint('Bundled model loaded: ${bundled.displayName}');
-      return null;
+      return const ImportSuccess();
     } catch (e) {
-      debugPrint('Bundled model load failed: $e');
-      return e.toString();
+      debugPrint('Bundled import failed: $e');
+      return ImportFailure('Failed to load bundled model: $e');
     }
   }
 

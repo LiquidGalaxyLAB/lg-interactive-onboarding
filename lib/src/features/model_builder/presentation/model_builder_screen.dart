@@ -309,10 +309,10 @@ class _ImportModelCard extends ConsumerWidget {
                 label: Text(b.displayName, style: const TextStyle(fontSize: 12)),
                 onPressed: () async {
                   try {
-                    final errorMsg = await ref.read(modelBuilderProvider.notifier).loadBundledModel(b);
-                    if (errorMsg != null && context.mounted) {
+                    final result = await ref.read(modelBuilderProvider.notifier).loadBundledModel(b);
+                    if (result is ImportFailure && context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Failed to load: $errorMsg'), backgroundColor: Colors.redAccent),
+                        SnackBar(content: Text('Failed to load: ${result.message}'), backgroundColor: Colors.redAccent),
                       );
                     }
                   } catch (e) {
@@ -374,10 +374,10 @@ class _FileInfoTile extends StatelessWidget {
           Consumer(builder: (context, ref, _) => IconButton(
             icon: const Icon(Icons.swap_horiz, size: 20), tooltip: 'Replace model',
             onPressed: () async {
-              final error = await ref.read(modelBuilderProvider.notifier).importModel();
-              if (error != null && error != 'No file selected' && context.mounted) {
+              final result = await ref.read(modelBuilderProvider.notifier).importModel();
+              if (result is ImportFailure && context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(error), backgroundColor: Colors.orangeAccent));
+                  SnackBar(content: Text(result.message), backgroundColor: Colors.orangeAccent));
               }
             },
           )),
@@ -448,10 +448,10 @@ class _ImportButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return InkWell(
       onTap: () async {
-        final error = await ref.read(modelBuilderProvider.notifier).importModel();
-        if (error != null && error != 'No file selected' && context.mounted) {
+        final result = await ref.read(modelBuilderProvider.notifier).importModel();
+        if (result is ImportFailure && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(error), backgroundColor: Colors.orangeAccent));
+            SnackBar(content: Text(result.message), backgroundColor: Colors.orangeAccent));
         }
       },
       borderRadius: BorderRadius.circular(12),
