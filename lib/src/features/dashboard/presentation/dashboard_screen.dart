@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lg_interactive_onboarding/src/common/curriculum/guided_mode_controller.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
+import 'package:lg_interactive_onboarding/src/features/architecture_explorer/presentation/architecture_explorer_screen.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/presentation/model_builder_screen.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
@@ -63,7 +65,21 @@ class DashboardScreen extends ConsumerWidget {
                   isDark: isDark,
                 ),
               ),
+              // Architecture Explorer shortcut
               IconButton(
+                icon: Icon(
+                  Icons.help_outline_rounded,
+                  color: isDark ? Colors.white60 : DashboardPalette.warmGrey,
+                ),
+                tooltip: 'Architecture Explorer',
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const ArchitectureExplorerScreen(),
+                  ),
+                ),
+              ),
+              IconButton(
+                key: GuidedModeController.spotlightKey('settings_btn'),
                 icon: Icon(
                   Icons.settings_outlined,
                   color: isDark ? Colors.white70 : DashboardPalette.warmGrey,
@@ -116,6 +132,7 @@ class DashboardScreen extends ConsumerWidget {
                   icon: Icons.view_in_ar_outlined,
                   accentColor: DashboardPalette.modelBuilderIndigo,
                   isDark: isDark,
+                  spotlightKey: 'model_builder_card',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const ModelBuilderScreen(),

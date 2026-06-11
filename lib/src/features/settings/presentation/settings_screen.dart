@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
-import 'package:lg_interactive_onboarding/src/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 
 /// Settings screen for managing SSH connection and app preferences.
@@ -71,10 +70,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() => _isConnecting = false);
 
     if (success) {
-      // Navigate to Dashboard on successful connection
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const DashboardScreen()),
-      );
+      // Navigate back to Dashboard (which is inside AppShell) on successful connection
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -166,11 +163,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   if (ssh.isConnected)
                     TextButton(
                       onPressed: () {
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(
-                            builder: (_) => const DashboardScreen(),
-                          ),
-                        );
+                        Navigator.of(context).popUntil((route) => route.isFirst);
                       },
                       child: const Text(
                         'Go to Dashboard →',

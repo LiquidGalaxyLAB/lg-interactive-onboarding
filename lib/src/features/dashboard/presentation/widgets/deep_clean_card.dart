@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lg_interactive_onboarding/src/common/curriculum/analytics_service.dart';
+import 'package:lg_interactive_onboarding/src/common/curriculum/guided_mode_controller.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
 import 'dashboard_palette.dart';
@@ -18,7 +20,10 @@ class DeepCleanCard extends ConsumerWidget {
 
     final surfaceColor = isDark ? const Color(0xFF1C2236) : Colors.white;
 
+    // Use a RepaintBoundary or similar to attach the spotlight key if guided mode is active.
+    // We attach it to the GestureDetector to make the whole card the hotspot.
     return GestureDetector(
+      key: GuidedModeController.spotlightKey('deep_clean_btn'),
       onTap: enabled ? () => _confirmDeepClean(context, ref) : null,
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -125,6 +130,9 @@ class DeepCleanCard extends ConsumerWidget {
             onPressed: () {
               Navigator.pop(ctx);
               ref.read(pushProvider.notifier).deepClean();
+              // Signal curriculum engine — Module 7 auto-verify listens here
+              ref.read(deepCleanConfirmedProvider.notifier).set(true);
+              ref.read(analyticsServiceProvider).recordDeepCleanConfirmed();
             },
             style: FilledButton.styleFrom(
               backgroundColor: DashboardPalette.deepCleanRed,
