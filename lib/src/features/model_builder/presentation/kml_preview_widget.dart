@@ -1,18 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lg_interactive_onboarding/src/common/curriculum/analytics_service.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
 
 /// Read-only KML code display widget with syntax highlighting and copy button.
-class KmlPreviewWidget extends ConsumerWidget {
+class KmlPreviewWidget extends ConsumerStatefulWidget {
   const KmlPreviewWidget({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<KmlPreviewWidget> createState() => _KmlPreviewWidgetState();
+}
+
+class _KmlPreviewWidgetState extends ConsumerState<KmlPreviewWidget> {
+  bool _hasSignaledOpened = false;
+
+  @override
+  Widget build(BuildContext context) {
     final kmlCode = ref.watch(kmlPreviewProvider);
     final project = ref.watch(modelBuilderProvider);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+
+    if (project.isReady && !_hasSignaledOpened) {
+      _hasSignaledOpened = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(kmlPreviewOpenedProvider.notifier).set(true);
+        ref.read(analyticsServiceProvider).recordKmlPreviewOpened();
+      });
+    }
 
     return Card(
       child: Padding(
