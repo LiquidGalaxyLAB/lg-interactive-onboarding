@@ -55,9 +55,17 @@ def _ns(tag):
     """Return a namespace-qualified tag string, e.g. '{http://...}triangles'."""
     return "{%s}%s" % (COLLADA_NS, tag)
 
+TAG_TRIANGLES = "triangles"
+TAG_POLYLIST  = "polylist"
+TAG_POLYGONS  = "polygons"
+TAG_P         = "p"
+TAG_PH        = "ph"
+TAG_VCOUNT    = "vcount"
+ATTR_COUNT    = "count"
+
 PRIMITIVE_TAGS = {
-    _ns("polylist"),
-    _ns("polygons"),
+    _ns(TAG_POLYLIST),
+    _ns(TAG_POLYGONS),
 }
 
 
@@ -131,15 +139,15 @@ def _convert_polylist(primitive_element):
 
     Returns (old_face_count, new_tri_count), or None if malformed.
     """
-    vertex_count_element = primitive_element.find(_ns("vcount"))
-    indices_element      = primitive_element.find(_ns("p"))
+    vertex_count_element = primitive_element.find(_ns(TAG_VCOUNT))
+    indices_element      = primitive_element.find(_ns(TAG_P))
 
     # Empty primitive
     if indices_element is None:
-        primitive_element.tag = _ns("triangles")
+        primitive_element.tag = _ns(TAG_TRIANGLES)
         if vertex_count_element is not None:
             primitive_element.remove(vertex_count_element)
-        primitive_element.set("count", "0")
+        primitive_element.set(ATTR_COUNT, "0")
         return (0, 0)
 
     flat_indices = list(map(int, indices_element.text.split())) if (indices_element.text or "").strip() else []
@@ -161,12 +169,11 @@ def _convert_polylist(primitive_element):
             # Cannot safely deduce face topology -- leave untouched
             return None
 
-    # Already all triangles -- just retag and clean up
     if all(v == 3 for v in face_vertex_counts):
         if vertex_count_element is not None:
             primitive_element.remove(vertex_count_element)
-        primitive_element.tag = _ns("triangles")
-        primitive_element.set("count", str(old_count))
+        primitive_element.tag = _ns(TAG_TRIANGLES)
+        primitive_element.set(ATTR_COUNT, str(old_count))
         return (old_count, old_count)
 
     # General case: fan-triangulate
@@ -175,8 +182,8 @@ def _convert_polylist(primitive_element):
     if vertex_count_element is not None:
         primitive_element.remove(vertex_count_element)
 
-    primitive_element.tag = _ns("triangles")
-    primitive_element.set("count", str(new_tri_count))
+    primitive_element.tag = _ns(TAG_TRIANGLES)
+    primitive_element.set(ATTR_COUNT, str(new_tri_count))
     return (old_count, new_tri_count)
 
 
@@ -191,9 +198,9 @@ def _convert_polygons(primitive_element):
 
     Returns (old_face_count, new_tri_count).
     """
-    vertex_count_element   = primitive_element.find(_ns("vcount"))
-    sub_indices_list       = primitive_element.findall(_ns("p"))
-    sub_polygon_holes_list = primitive_element.findall(_ns("ph"))
+    vertex_count_element   = primitive_element.find(_ns(TAG_VCOUNT))
+    sub_indices_list       = primitive_element.findall(_ns(TAG_P))
+    sub_polygon_holes_list = primitive_element.findall(_ns(TAG_PH))
 
     if sub_polygon_holes_list:
         print("    [WARN] %d <ph> (polygon-with-holes) element(s) found. "
@@ -226,9 +233,8 @@ def _convert_polygons(primitive_element):
                     new_tri_count += 1
         primitive_element.remove(sub_indices)
 
-    # Process <ph> (outer contour of polygon-with-holes; drop inner <h> rings)
     for ph in sub_polygon_holes_list:
-        outer_indices = ph.find(_ns("p"))
+        outer_indices = ph.find(_ns(TAG_P))
         if outer_indices is not None and (outer_indices.text or "").strip():
             row_data = list(map(int, outer_indices.text.split()))
             n_verts  = len(row_data) // vertex_index_stride if vertex_index_stride else 0
@@ -246,11 +252,11 @@ def _convert_polygons(primitive_element):
         primitive_element.remove(vertex_count_element)
 
     # Add single merged flat <p>
-    new_indices_element      = etree.SubElement(primitive_element, _ns("p"))
+    new_indices_element      = etree.SubElement(primitive_element, _ns(TAG_P))
     new_indices_element.text = " ".join(map(str, triangulated_flat_indices))
 
-    primitive_element.tag = _ns("triangles")
-    primitive_element.set("count", str(new_tri_count))
+    primitive_element.tag = _ns(TAG_TRIANGLES)
+    primitive_element.set(ATTR_COUNT, str(new_tri_count))
     return (old_count, new_tri_count)
 
 def _normalize_scale_unit(root):
@@ -329,7 +335,7 @@ def convert_dae(input_path, output_path):
 
         print("  <%s>  geometry='%s'  material='%s'" % (short_tag, geom_name, mat))
 
-        if short_tag == "polylist":
+        if short_tag == TAG_POLYLIST:
             result = _convert_polylist(primitive_element)
         else:
             result = _convert_polygons(primitive_element)
