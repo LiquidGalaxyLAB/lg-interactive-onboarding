@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_project.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
+import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 import 'package:path/path.dart' as p;
 
 /// Repository for 3D model operations: KML generation, file handling, SSH push.
@@ -24,14 +25,35 @@ class ModelRepository {
 
   ModelRepository(this._sshService, this._settingsService);
 
+  /// Session-level cache: avoids re-checking assimp installation on every push.
+  /// Also caches lxml (Python dependency for triangulation script).
+  bool _assimpVerified = false;
+  bool _lxmlVerified = false;
+
   // ─── Constants ───────────────────────────────────────────────────
-  static const _modelDir = '/var/www/html/model';
-  static const _wrapperDir = '/var/www/html/3d_model_wrapper';
-  static const _systemMasterKml = '/var/www/html/kml/master.kml';
-  static const _wrapperMasterKml = '/var/www/html/3d_model_wrapper/master.kml';
+  static const _modelDir = AppConstants.lgModelDir;
+  static const _wrapperDir = AppConstants.lgWrapperDir;
+  static const _systemMasterKml = AppConstants.lgSystemMasterKml;
+  static const _wrapperMasterKml = AppConstants.lgWrapperMasterKml;
 
   /// Small delay between SSH channel operations to avoid channel exhaustion.
-  Future<void> _channelDelay() => Future.delayed(const Duration(milliseconds: 500));
+  Future<void> _channelDelay() => Future.delayed(AppConstants.sshChannelDelay);
+
+  /// Executes an SSH command, optionally with sudo, and applies the channel delay.
+  /// Returns the trimmed output string.
+  Future<String> _execute(String command, {bool sudo = false}) async {
+    final client = _sshService.client!;
+    final Uint8List result;
+    if (sudo) {
+      final password = _settingsService.password;
+      result = await client.run('(echo $password; sleep 1) | sudo -S $command');
+    } else {
+      result = await client.run(command);
+    }
+    final output = String.fromCharCodes(result).trim();
+    await _channelDelay();
+    return output;
+  }
 
   // ─── KML Generation ──────────────────────────────────────────────
 
@@ -49,7 +71,7 @@ class ModelRepository {
       <name>${project.fileName}</name>
       <Model>
         <Link>
-          <href>http://$masterIp:81/model/$remoteModelFile</href>
+          <href>http://$masterIp:${AppConstants.lgHttpPort}/model/$remoteModelFile</href>
         </Link>
         <Location>
           <latitude>${project.latitude ?? 0.0}</latitude>
@@ -80,7 +102,7 @@ class ModelRepository {
 
     return '''<Model>
   <Link>
-    <href>http://$masterIp:81/model/$remoteModelFile</href>
+    <href>http://$masterIp:${AppConstants.lgHttpPort}/model/$remoteModelFile</href>
   </Link>
   <Location>
     <latitude>${project.latitude ?? 0.0}</latitude>
@@ -120,59 +142,190 @@ class ModelRepository {
     return results;
   }
 
-  // ─── DAE Triangulation ──────────────────────────────────────────
+  // ─── Assimp Prerequisite Check ─────────────────────────────────
 
-  /// Ensures `dae_triangulate.py` and its dependencies are available
-  /// on the LG master node, then triangulates the DAE file in-place.
-  Future<bool> _triangulateRemoteDae(String remoteModelPath) async {
-    if (!_sshService.isConnected) return false;
-
-    final client = _sshService.client!;
-    final remoteFileName = p.posix.basename(remoteModelPath);
+  /// Ensures `assimp` (assimp-utils) is installed on the LG master node.
+  ///
+  /// Checks once per session; subsequent calls return immediately.
+  /// If missing, installs via `apt` using the stored SSH password.
+  ///
+  /// Uses the `(echo password; sleep 1) | sudo -S` pattern established
+  /// across the codebase — the sleep keeps the pipe open long enough for
+  /// sudo to read the password from stdin.
+  Future<void> _ensureAssimpInstalled() async {
+    if (_assimpVerified) return;
+    if (!_sshService.isConnected) throw Exception('SSH not connected.');
 
     try {
-      // 1. Check script + lxml in a single command, upload/install only if needed
-      final checkResult = await client.run(
-        'echo "SCRIPT=\$(test -f /tmp/dae_triangulate.py && echo OK || echo MISSING)"; '
-        'echo "LXML=\$(python3 -c \'import lxml\' 2>&1 && echo OK || echo MISSING)"',
-      );
-      final checkOutput = String.fromCharCodes(checkResult).trim();
+      // Check if assimp is already available
+      final whichOutput = await _execute('which assimp');
 
+      if (whichOutput.isNotEmpty && !whichOutput.contains('not found')) {
+        debugPrint('Assimp: Already installed at $whichOutput');
+        _assimpVerified = true;
+        return;
+      }
+
+      // ── Step 1: apt update ──
+      debugPrint('Assimp: Not found — installing assimp-utils...');
+      final updateOutput = await _execute('apt update -qq 2>&1', sudo: true);
+      debugPrint('Assimp: apt update output: $updateOutput');
+
+      // ── Step 2: apt install ──
+      final installOutput = await _execute('apt install assimp-utils -y -qq 2>&1', sudo: true);
+      debugPrint('Assimp: apt install output: $installOutput');
+
+      // ── Step 3: Verify installation succeeded ──
+      final verifyOutput = await _execute('which assimp');
+
+      if (verifyOutput.isNotEmpty && !verifyOutput.contains('not found')) {
+        debugPrint('Assimp: Installed successfully at $verifyOutput');
+        _assimpVerified = true;
+        return;
+      }
+
+      throw Exception('Installation failed — assimp not found after apt install.');
+    } catch (e) {
+      throw Exception('Prerequisite check failed: $e');
+    }
+  }
+
+  // ─── Assimp Format Conversion ──────────────────────────────────
+
+  /// Converts a non-DAE model file to COLLADA (.dae) using assimp on the
+  /// LG master node.
+  ///
+  /// [uploadedFilePath] — the full remote path of the uploaded raw file
+  ///   (e.g., `/var/www/html/model/123_car.obj`).
+  /// [targetDaePath] — the desired output .dae path
+  ///   (e.g., `/var/www/html/model/123_car.dae`).
+  ///
+  /// On success: the raw file is deleted, only the .dae remains.
+  /// On failure: throws an [Exception] with a descriptive message.
+  Future<void> _convertToCollada({
+    required String uploadedFilePath,
+    required String targetDaePath,
+  }) async {
+
+    try {
+      debugPrint('Assimp: Converting $uploadedFilePath → $targetDaePath');
+
+      final conversionOutput = await _execute('assimp export "$uploadedFilePath" "$targetDaePath" 2>&1');
+
+      // Verify the .dae was actually created
+      final verifyOutput = await _execute('test -f "$targetDaePath" && echo EXISTS');
+
+      if (!verifyOutput.contains('EXISTS')) {
+        throw Exception(
+          'Conversion failed: unsupported format or corrupt file. '
+          'assimp output: $conversionOutput',
+        );
+      }
+
+      // Cleanup: delete the original raw file to avoid clutter
+      await _execute('rm -f "$uploadedFilePath"');
+
+      debugPrint('Assimp: Conversion successful, raw file cleaned up');
+    } catch (e) {
+      // Cleanup on failure too — remove any partial output
+      await _execute('rm -f "$targetDaePath"').catchError((_) => '');
+      rethrow;
+    }
+  }
+
+  // ─── Python-Based DAE Triangulation ─────────────────────────────
+
+  /// Ensures `lxml` (Python XML library) is installed on the LG master node.
+  ///
+  /// Checked once per session via [_lxmlVerified].
+  Future<void> _ensureLxmlInstalled() async {
+    if (_lxmlVerified) return;
+    if (!_sshService.isConnected) throw Exception('SSH not connected.');
+
+    try {
+      // Quick import check
+      final checkOutput = await _execute('python3 -c "import lxml" 2>&1');
+
+      if (!checkOutput.contains('ModuleNotFoundError') &&
+          !checkOutput.contains('No module named')) {
+        debugPrint('Triangulate: lxml already installed');
+        _lxmlVerified = true;
+        return;
+      }
+
+      // Install lxml via pip
+      debugPrint('Triangulate: lxml not found — installing...');
+      final installOutput = await _execute('pip3 install lxml 2>&1', sudo: true);
+      debugPrint('Triangulate: pip3 install lxml output: $installOutput');
+
+      // Verify
+      final verifyOutput = await _execute('python3 -c "import lxml" 2>&1');
+
+      if (!verifyOutput.contains('ModuleNotFoundError') &&
+          !verifyOutput.contains('No module named')) {
+        debugPrint('Triangulate: lxml installed successfully');
+        _lxmlVerified = true;
+        return;
+      }
+
+      throw Exception('lxml installation failed. pip3 output: $installOutput');
+    } catch (e) {
+      throw Exception('lxml check failed: $e');
+    }
+  }
+
+  /// Triangulates a remote .dae file in-place using the bundled Python script.
+  ///
+  /// The script converts all `<polylist>` and `<polygons>` primitives to
+  /// `<triangles>`, which is the only primitive type Google Earth / Liquid
+  /// Galaxy can render. Assimp's `-tri` flag doesn't do this — it
+  /// triangulates the mesh but still exports `<polylist>` elements.
+  ///
+  /// Steps:
+  ///   1. Upload `dae_triangulate.py` to `/tmp/` on the LG master.
+  ///   2. Ensure `lxml` (Python dependency) is installed.
+  ///   3. Run the script: input → temp output.
+  ///   4. Overwrite the original with the triangulated result.
+  Future<void> _triangulateDaeWithScript(String remoteDaePath) async {
+    if (!_sshService.isConnected) throw Exception('SSH not connected.');
+    final triangulatedTempPath = '${remoteDaePath}_tri_tmp.dae';
+    const remoteScriptPath = AppConstants.lgRemoteScriptPath;
+
+    try {
+      debugPrint('Triangulate: Processing $remoteDaePath...');
+
+      // 1. Upload the Python script from bundled assets
+      final scriptContent = await rootBundle.loadString(
+        'assets/scripts/dae_triangulate.py',
+      );
+      await _sshService.uploadFile(
+        localData: scriptContent,
+        remotePath: remoteScriptPath,
+      );
       await _channelDelay();
 
-      // Upload script if missing
-      if (checkOutput.contains('SCRIPT=MISSING') || !checkOutput.contains('SCRIPT=OK')) {
-        debugPrint('Triangulate: Uploading dae_triangulate.py to /tmp/...');
-        final scriptData = await rootBundle.loadString(
-          'assets/scripts/dae_triangulate.py',
-        );
-        await _sshService.uploadFile(
-          localData: scriptData,
-          remotePath: '/tmp/dae_triangulate.py',
-        );
-        await _channelDelay();
+      // 2. Ensure lxml is available
+      await _ensureLxmlInstalled();
+
+      // 3. Run the triangulation script
+      final triOutput = await _execute('python3 $remoteScriptPath "$remoteDaePath" "$triangulatedTempPath" 2>&1');
+      debugPrint('Triangulate: script output: $triOutput');
+
+      // 4. Verify the triangulated file was created
+      final verifyOutput = await _execute('test -f "$triangulatedTempPath" && echo EXISTS');
+
+      if (!verifyOutput.contains('EXISTS')) {
+        throw Exception('Output file not created. Script output: $triOutput');
       }
 
-      // Install lxml if missing
-      if (checkOutput.contains('LXML=MISSING') || !checkOutput.contains('LXML=OK')) {
-        debugPrint('Triangulate: Installing lxml...');
-        await client.run('pip3 install lxml 2>&1 || pip install lxml 2>&1 || true');
-        await _channelDelay();
-      }
+      // 5. Overwrite the original .dae with the triangulated version
+      await _execute('mv -f "$triangulatedTempPath" "$remoteDaePath"');
 
-      // 2. Triangulate + overwrite in a single command
-      final triOutputPath = '/tmp/${remoteFileName}_tri.dae';
-      debugPrint('Triangulate: Running on $remoteModelPath...');
-      await client.run(
-        'python3 /tmp/dae_triangulate.py "$remoteModelPath" "$triOutputPath" && '
-        'mv "$triOutputPath" "$remoteModelPath"',
-      );
-
-      debugPrint('Triangulate: Success — $remoteModelPath triangulated');
-      return true;
+      debugPrint('Triangulate: Success — $remoteDaePath overwritten with triangulated version');
     } catch (e) {
-      debugPrint('Triangulate: Failed: $e');
-      return false;
+      // Cleanup temp file on failure
+      await _execute('rm -f "$triangulatedTempPath"').catchError((_) => '');
+      throw Exception('Triangulate failed: $e');
     }
   }
 
@@ -189,42 +342,81 @@ class ModelRepository {
     if (!project.isReady) {
       return PushResult(success: false, message: 'Model or location not set.');
     }
-
-    final client = _sshService.client!;
     final ext = project.fileExtension?.toLowerCase() ?? '';
 
     try {
       // 1. Ensure directories exist (single command)
-      await client.run('mkdir -p $_modelDir && mkdir -p $_wrapperDir && mkdir -p /var/www/html/kml');
-      await _channelDelay();
+      await _execute('mkdir -p $_modelDir && mkdir -p $_wrapperDir && mkdir -p /var/www/html/kml');
 
-      // 2. Upload model file
+      // 2. Upload and process model file
       if (ext == '.kmz') {
+        // ── KMZ path: extract and upload contents (unchanged) ──
         final entries = await extractKmz(project.filePath!);
         for (final entry in entries) {
           final remotePath = '$_modelDir/${project.id}_${entry.key}';
-          await client.run('mkdir -p ${p.posix.dirname(remotePath)}');
-          await _channelDelay();
+          await _execute('mkdir -p ${p.posix.dirname(remotePath)}');
           await _sshService.uploadBytes(bytes: entry.value, remotePath: remotePath);
           await _channelDelay();
         }
       } else {
+        // ── All other formats (DAE, OBJ, FBX, GLTF, GLB, etc.) ──
         final fileBytes = await File(project.filePath!).readAsBytes();
-        final remoteModelPath = '$_modelDir/${project.remoteModelFileName}';
-        await _sshService.uploadBytes(bytes: fileBytes, remotePath: remoteModelPath);
-        await _channelDelay();
 
-        // 3. If DAE, triangulate in-place on the remote
-        if (ext == '.dae') {
-          final triangulated = await _triangulateRemoteDae(remoteModelPath);
+        // The final .dae path on the server (what KML will reference)
+        final remoteDaePath = '$_modelDir/${project.remoteModelFileName}';
+
+        if (project.requiresConversion) {
+          // Non-DAE file: upload with original extension, then convert
+          final rawUploadPath = '$_modelDir/${project.id}_${project.fileName}';
+
+          await _sshService.uploadBytes(bytes: fileBytes, remotePath: rawUploadPath);
           await _channelDelay();
-          if (!triangulated) {
-            return PushResult(success: false, message: 'DAE triangulation failed on LG rig.');
+
+          // Ensure assimp is available
+          try {
+            await _ensureAssimpInstalled();
+          } catch (e) {
+            // Cleanup the uploaded raw file
+            await _execute('rm -f "$rawUploadPath"');
+            return PushResult(
+              success: false,
+              message: 'Failed to install assimp: $e',
+            );
           }
+
+          // Convert to .dae (deletes the raw file on success)
+          try {
+            await _convertToCollada(
+              uploadedFilePath: rawUploadPath,
+              targetDaePath: remoteDaePath,
+            );
+          } catch (e) {
+            return PushResult(
+              success: false,
+              message: 'Model conversion failed: $e',
+            );
+          }
+          await _channelDelay();
+        } else {
+          // Already a .dae — upload directly to the final path
+          await _sshService.uploadBytes(bytes: fileBytes, remotePath: remoteDaePath);
+          await _channelDelay();
         }
+
+        // 3. Triangulate the .dae in-place using Python script
+        //    (converts <polylist>/<polygons> → <triangles> for Google Earth)
+        try {
+          await _triangulateDaeWithScript(remoteDaePath);
+        } catch (e) {
+          return PushResult(
+            success: false,
+            message: 'DAE triangulation failed: $e',
+          );
+        }
+        await _channelDelay();
       }
 
-      // 4. Generate and upload this model's KML to wrapper directory
+      // 5. Generate and upload this model's KML to wrapper directory
       final kml = generateKml(project);
       await _sshService.uploadFile(
         localData: kml,
@@ -232,7 +424,7 @@ class ModelRepository {
       );
       await _channelDelay();
 
-      // 5. Build wrapper master.kml with NetworkLinks for ALL deployed models
+      // 6. Build wrapper master.kml with NetworkLinks for ALL deployed models
       final allKmlFiles = <String>[
         ...existingDeployments.map((d) => d.remoteKmlFileName),
         project.remoteKmlFileName,
@@ -240,20 +432,17 @@ class ModelRepository {
       await _writeWrapperMasterKml(allKmlFiles);
       await _channelDelay();
 
-      // 6. Write system master.kml with NetworkLink to wrapper master
+      // 7. Write system master.kml with NetworkLink to wrapper master
       await _writeSystemMasterKml();
       await _channelDelay();
 
-      // 7. Force refresh
+      // 8. Force refresh
       await _forceRefresh();
 
-      // 8. Relaunch if requested
+      // 9. Relaunch if requested
       if (relaunch) {
         await _channelDelay();
-        final password = _settingsService.password;
-        await client.run(
-          '(echo $password; sleep 1) | sudo -S /usr/local/bin/lg-relaunch',
-        );
+        await _execute('/usr/local/bin/lg-relaunch', sudo: true);
       }
 
       return PushResult(success: true, message: 'Model and KML pushed successfully!');
@@ -273,15 +462,12 @@ class ModelRepository {
       return PushResult(success: false, message: 'SSH not connected. Please connect first.');
     }
 
-    final client = _sshService.client!;
-
     try {
       // 1 & 2. Remove model file AND KML file in one command
-      await client.run(
+      await _execute(
         'rm -f $_modelDir/${model.remoteModelFileName} && '
         'rm -f $_wrapperDir/${model.remoteKmlFileName}',
       );
-      await _channelDelay();
 
       // 3. Rewrite wrapper master.kml with only the remaining models
       final remainingKmlFiles =
@@ -315,11 +501,8 @@ class ModelRepository {
       return PushResult(success: false, message: 'SSH not connected.');
     }
 
-    final client = _sshService.client!;
-
     try {
-      await client.run('rm -f $_modelDir/* && rm -f $_wrapperDir/*');
-      await _channelDelay();
+      await _execute('rm -f $_modelDir/* && rm -f $_wrapperDir/*');
 
       await _writeEmptyWrapperMasterKml();
       await _channelDelay();
@@ -365,11 +548,8 @@ class ModelRepository {
       return PushResult(success: false, message: 'SSH not connected.');
     }
 
-    final client = _sshService.client!;
-
     try {
-      await client.run('rm -rf $_modelDir/* && rm -rf $_wrapperDir/*');
-      await _channelDelay();
+      await _execute('rm -rf $_modelDir/* && rm -rf $_wrapperDir/*');
 
       await _writeEmptyWrapperMasterKml();
       await _channelDelay();
@@ -395,7 +575,7 @@ class ModelRepository {
     <NetworkLink>
       <name>$kmlFile</name>
       <Link>
-        <href>http://$masterIp:81/3d_model_wrapper/$kmlFile</href>
+        <href>http://$masterIp:${AppConstants.lgHttpPort}/3d_model_wrapper/$kmlFile</href>
       </Link>
     </NetworkLink>''').join('\n');
 
@@ -439,7 +619,7 @@ $networkLinks
     <NetworkLink>
       <name>3D Model Wrapper</name>
       <Link>
-        <href>http://$masterIp:81/3d_model_wrapper/master.kml</href>
+        <href>http://$masterIp:${AppConstants.lgHttpPort}/3d_model_wrapper/master.kml</href>
       </Link>
     </NetworkLink>
   </Document>
@@ -455,10 +635,8 @@ $networkLinks
   /// Both sed commands are batched into a single call with a sleep between.
   Future<void> _forceRefresh() async {
     try {
-      final client = _sshService.client!;
-
       // Batch both sed commands with a sleep between them into ONE channel
-      await client.run(
+      await _execute(
         'sed -i "s|<href>[^<]*master.kml<\\/href>|&<refreshMode>onInterval<\\/refreshMode><refreshInterval>1<\\/refreshInterval>|" ~/earth/kml/master/myplaces.kml && '
         'sleep 1 && '
         'sed -i "s|<href>[^<]*master.kml<\\/href><refreshMode>onInterval<\\/refreshMode><refreshInterval>[0-9]\\+<\\/refreshInterval>|<href>##LG_PHPIFACE##kml/master.kml<\\/href>|" ~/earth/kml/master/myplaces.kml',

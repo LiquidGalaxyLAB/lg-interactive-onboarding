@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 
 /// Manages persistent SSH connection and app settings.
 class SettingsService {
@@ -21,11 +22,11 @@ class SettingsService {
   static const _keyThemeMode = 'themeMode';
 
   // ─── Getters ───────────────────────────────────────────────────────
-  String get host => _prefs.getString(_keyHost) ?? '192.168.0.10';
-  int get port => _prefs.getInt(_keyPort) ?? 22;
-  String get username => _prefs.getString(_keyUsername) ?? 'lg';
+  String get host => _prefs.getString(_keyHost) ?? AppConstants.defaultSshHost;
+  int get port => _prefs.getInt(_keyPort) ?? AppConstants.defaultSshPort;
+  String get username => _prefs.getString(_keyUsername) ?? AppConstants.defaultSshUsername;
   String get password => _cachedPassword;
-  int get rigs => _prefs.getInt(_keyRigs) ?? 3;
+  int get rigs => _prefs.getInt(_keyRigs) ?? AppConstants.defaultRigsCount;
   ThemeMode get themeMode => _parseThemeMode(_prefs.getString(_keyThemeMode));
 
   // ─── Setters ───────────────────────────────────────────────────────

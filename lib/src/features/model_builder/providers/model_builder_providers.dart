@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_project.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_repository.dart';
+import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -47,11 +48,28 @@ const bundledModels = [
 
 String _generateId() {
   final now = DateTime.now().millisecondsSinceEpoch;
-  final rand = Random().nextInt(9999).toString().padLeft(4, '0');
+  final rand = Random().nextInt(AppConstants.idMaxRandom).toString().padLeft(AppConstants.idPaddingLength, '0');
   return '${now}_$rand';
 }
 
 // ─── Model Project State ─────────────────────────────────────────────
+
+sealed class ImportResult {
+  const ImportResult();
+}
+
+class ImportSuccess extends ImportResult {
+  const ImportSuccess();
+}
+
+class ImportFailure extends ImportResult {
+  final String message;
+  const ImportFailure(this.message);
+}
+
+class ImportCanceled extends ImportResult {
+  const ImportCanceled();
+}
 
 /// Manages the full state of the current 3D model builder project.
 class ModelBuilderNotifier extends Notifier<ModelProject> {
@@ -61,32 +79,76 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
   // ─── File Import ─────────────────────────────────────────────────
 
   /// Opens file picker and imports a 3D model file.
-  Future<bool> importModel() async {
+  ///
+  /// Returns `null` on success, or an error message on failure.
+  ///
+  /// Uses [FileType.any] because Android lacks MIME-type mappings for most
+  /// 3D formats (.dae, .obj, .blend, etc.), causing [FileType.custom] to
+  /// grey-out or silently ignore taps. Extension validation is done in Dart.
+  ///
+  /// On Android emulators the file_picker cache can vanish before we read it
+  /// (the plugin logs "File not found" immediately after caching). We guard
+  /// against this by:
+  ///   1. Preferring [file.bytes] (in-memory, if available).
+  ///   2. Verifying [file.path] actually exists before using it.
+  ///   3. Falling back to [file.readStream] to stream directly from the
+  ///      content provider.
+  Future<ImportResult> importModel() async {
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['dae', 'gltf', 'glb', 'kmz'],
+        type: FileType.any,
         allowMultiple: false,
+        withData: true,
+        withReadStream: true,
       );
 
-      if (result == null || result.files.isEmpty) return false;
+      if (result == null || result.files.isEmpty) return const ImportCanceled();
 
       final file = result.files.first;
-      final filePath = file.path;
-      if (filePath == null) return false;
+      final fileName = file.name;
+      final ext = p.extension(fileName).toLowerCase();
 
-      // Copy picked file to application documents directory to prevent OS cache pruning
+      // Validate extension in Dart (the OS picker is unfiltered)
+      if (!ModelProject.supportedExtensions.contains(ext)) {
+        return ImportFailure('Unsupported format "$ext". '
+            'Accepted: ${ModelProject.supportedExtensions.join(', ')}');
+      }
+
+      // Persist the file into the app documents directory
       final appDir = await getApplicationDocumentsDirectory();
-      final persistentFile = File('${appDir.path}/${p.basename(filePath)}');
-      await File(filePath).copy(persistentFile.path);
+      final persistentFile = File('${appDir.path}/$fileName');
+
+      if (file.bytes != null && file.bytes!.isNotEmpty) {
+        // ── Strategy 1: in-memory bytes (best case) ──
+        await persistentFile.writeAsBytes(file.bytes!);
+        debugPrint('Import: wrote ${file.bytes!.length} bytes from memory');
+      } else if (file.path != null && await File(file.path!).exists()) {
+        // ── Strategy 2: cached file still exists on disk ──
+        await File(file.path!).copy(persistentFile.path);
+        debugPrint('Import: copied from cached path ${file.path}');
+      } else if (file.readStream != null) {
+        // ── Strategy 3: stream directly from the content provider ──
+        // This bypasses the vanishing-cache problem entirely.
+        final chunks = <int>[];
+        await for (final chunk in file.readStream!) {
+          chunks.addAll(chunk);
+        }
+        if (chunks.isEmpty) {
+          return const ImportFailure('File appears to be empty (0 bytes read from stream).');
+        }
+        await persistentFile.writeAsBytes(Uint8List.fromList(chunks));
+        debugPrint('Import: streamed ${chunks.length} bytes from content provider');
+      } else {
+        return const ImportFailure('Could not read file data from device. '
+            'Try copying the file to internal storage and retry.');
+      }
 
       final fileInfo = await persistentFile.stat();
-      final ext = p.extension(filePath).toLowerCase();
 
       state = state.copyWith(
         id: _generateId(),
         filePath: persistentFile.path,
-        fileName: p.basename(filePath),
+        fileName: fileName,
         fileSize: fileInfo.size,
         fileExtension: ext,
         isAsset: false,
@@ -95,15 +157,15 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
 
       debugPrint(
           'Model imported: ${state.fileName} (${state.fileSizeFormatted})');
-      return true;
+      return const ImportSuccess(); // success
     } catch (e) {
       debugPrint('File import failed: $e');
-      return false;
+      return ImportFailure('File import failed: $e');
     }
   }
 
   /// Loads a bundled asset model for testing. Returns null if successful, or error message.
-  Future<String?> loadBundledModel(BundledModel bundled) async {
+  Future<ImportResult> loadBundledModel(BundledModel bundled) async {
     try {
       // Copy asset to app documents directory so it can be read as a File and doesn't get pruned
       final byteData = await rootBundle.load(bundled.assetPath);
@@ -131,10 +193,10 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
       );
 
       debugPrint('Bundled model loaded: ${bundled.displayName}');
-      return null;
+      return const ImportSuccess();
     } catch (e) {
-      debugPrint('Bundled model load failed: $e');
-      return e.toString();
+      debugPrint('Bundled import failed: $e');
+      return ImportFailure('Failed to load bundled model: $e');
     }
   }
 
@@ -186,10 +248,10 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
       heading: 0.0,
       tilt: 0.0,
       roll: 0.0,
-      scaleX: 100.0,
-      scaleY: 100.0,
-      scaleZ: 100.0,
-      altitude: 10.0,
+      scaleX: AppConstants.defaultScale,
+      scaleY: AppConstants.defaultScale,
+      scaleZ: AppConstants.defaultScale,
+      altitude: AppConstants.defaultAltitude,
     );
   }
 
@@ -303,7 +365,7 @@ class PushNotifier extends Notifier<PushState> {
     );
 
     // Auto-reset to idle after a delay
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(AppConstants.pushStateResetDelay);
     if (state.status != PushStatus.pushing) {
       state = const PushState();
     }
@@ -334,7 +396,7 @@ class PushNotifier extends Notifier<PushState> {
       message: result.message,
     );
 
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(AppConstants.pushStateResetDelay);
     if (state.status != PushStatus.pushing) {
       state = const PushState();
     }
@@ -363,7 +425,7 @@ class PushNotifier extends Notifier<PushState> {
       message: result.message,
     );
 
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(AppConstants.pushStateResetDelay);
     if (state.status != PushStatus.pushing) {
       state = const PushState();
     }
@@ -389,7 +451,7 @@ class PushNotifier extends Notifier<PushState> {
       message: result.success ? 'LG rig wiped successfully' : result.message,
     );
 
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(AppConstants.pushStateResetDelay);
     if (state.status != PushStatus.pushing) {
       state = const PushState();
     }
@@ -411,7 +473,7 @@ class PushNotifier extends Notifier<PushState> {
       message: result.success ? 'Master KML cleared' : result.message,
     );
 
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(AppConstants.pushStateResetDelay);
     if (state.status != PushStatus.pushing) {
       state = const PushState();
     }
@@ -438,7 +500,7 @@ class PushNotifier extends Notifier<PushState> {
       message: result.message,
     );
 
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(AppConstants.pushStateResetDelay);
     if (state.status != PushStatus.pushing) {
       state = const PushState();
     }

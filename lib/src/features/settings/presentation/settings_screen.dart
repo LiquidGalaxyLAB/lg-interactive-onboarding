@@ -48,15 +48,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _saveAndConnect() async {
     final settings = ref.read(settingsServiceProvider);
+    final ssh = ref.read(sshServiceProvider);
+    
     await settings.setHost(_hostCtrl.text.trim());
     await settings.setPort(int.tryParse(_portCtrl.text) ?? 22);
     await settings.setUsername(_usernameCtrl.text.trim());
     await settings.setPassword(_passwordCtrl.text);
     await settings.setRigs(int.tryParse(_rigsCtrl.text) ?? 3);
 
+    if (!mounted) return;
     setState(() => _isConnecting = true);
 
-    final ssh = ref.read(sshServiceProvider);
     await ssh.disconnect();
     final success = await ssh.connect(
       host: _hostCtrl.text.trim(),
@@ -65,9 +67,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       password: _passwordCtrl.text,
     );
 
-    setState(() => _isConnecting = false);
-
     if (!mounted) return;
+    setState(() => _isConnecting = false);
 
     if (success) {
       // Navigate to Dashboard on successful connection

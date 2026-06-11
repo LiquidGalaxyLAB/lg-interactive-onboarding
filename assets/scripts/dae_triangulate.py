@@ -8,7 +8,7 @@ and Liquid Galaxy (which only support the <triangles> primitive type).
 
 Strategy
 --------
-Pure XML manipulation via lxml — no pycollada object model involved.
+Pure XML manipulation via lxml -- no pycollada object model involved.
 This avoids all pycollada API fragility and handles any conforming
 COLLADA 1.4 / 1.5 file generically.
 
@@ -36,9 +36,9 @@ Usage
 
 Dependencies
 ------------
-    pip install lxml          # that is all — no pycollada needed
+    pip install lxml          # that is all -- no pycollada needed
 
-Cross-platform: works on Windows, Linux, macOS with Python 3.8+.
+Compatible with Python 3.4+.
 """
 
 import sys
@@ -49,10 +49,23 @@ from lxml import etree
 # ---------------------------------------------------------------------------
 # COLLADA XML namespace
 # ---------------------------------------------------------------------------
-COLLADA_NS     = "http://www.collada.org/2005/11/COLLADASchema"
+COLLADA_NS = "http://www.collada.org/2005/11/COLLADASchema"
+
+def _ns(tag):
+    """Return a namespace-qualified tag string, e.g. '{http://...}triangles'."""
+    return "{%s}%s" % (COLLADA_NS, tag)
+
+TAG_TRIANGLES = "triangles"
+TAG_POLYLIST  = "polylist"
+TAG_POLYGONS  = "polygons"
+TAG_P         = "p"
+TAG_PH        = "ph"
+TAG_VCOUNT    = "vcount"
+ATTR_COUNT    = "count"
+
 PRIMITIVE_TAGS = {
-    f"{{{COLLADA_NS}}}polylist",
-    f"{{{COLLADA_NS}}}polygons",
+    _ns(TAG_POLYLIST),
+    _ns(TAG_POLYGONS),
 }
 
 
@@ -60,30 +73,30 @@ PRIMITIVE_TAGS = {
 # Core helpers
 # ---------------------------------------------------------------------------
 
-def _get_vertex_index_stride(primitive_element: etree._Element) -> int:
+def _get_vertex_index_stride(primitive_element):
     """
     Return the interleave stride: (max offset across all <input> children) + 1.
     A primitive with no <input> elements defaults to stride 1.
     """
-    inputs = primitive_element.findall(f"{{{COLLADA_NS}}}input")
+    inputs = primitive_element.findall(_ns("input"))
     if not inputs:
         return 1
     return max(int(inp.get("offset", "0")) for inp in inputs) + 1
 
 
-def _fan_triangulate(face_vertex_counts: list, flat_indices: list, vertex_index_stride: int):
+def _fan_triangulate(face_vertex_counts, flat_indices, vertex_index_stride):
     """
     Fan-triangulate an interleaved index array.
 
     Parameters
     ----------
-    face_vertex_counts  : list[int]  -- vertex count per face
-    flat_indices        : list[int]  -- flat interleaved index array
-    vertex_index_stride : int        -- number of index slots per vertex (stride)
+    face_vertex_counts  : list of int  -- vertex count per face
+    flat_indices        : list of int  -- flat interleaved index array
+    vertex_index_stride : int          -- number of index slots per vertex (stride)
 
     Returns
     -------
-    (triangulated_indices: list[int], new_tri_count: int)
+    (triangulated_indices, new_tri_count)
     """
     out = []
     tri_count = 0
@@ -120,24 +133,24 @@ def _fan_triangulate(face_vertex_counts: list, flat_indices: list, vertex_index_
 # Per-element conversion
 # ---------------------------------------------------------------------------
 
-def _convert_polylist(primitive_element: etree._Element):
+def _convert_polylist(primitive_element):
     """
     Convert a <polylist> element to <triangles> in-place.
 
     Returns (old_face_count, new_tri_count), or None if malformed.
     """
-    vertex_count_element = primitive_element.find(f"{{{COLLADA_NS}}}vcount")
-    indices_element      = primitive_element.find(f"{{{COLLADA_NS}}}p")
+    vertex_count_element = primitive_element.find(_ns(TAG_VCOUNT))
+    indices_element      = primitive_element.find(_ns(TAG_P))
 
     # Empty primitive
     if indices_element is None:
-        primitive_element.tag = f"{{{COLLADA_NS}}}triangles"
+        primitive_element.tag = _ns(TAG_TRIANGLES)
         if vertex_count_element is not None:
             primitive_element.remove(vertex_count_element)
-        primitive_element.set("count", "0")
+        primitive_element.set(ATTR_COUNT, "0")
         return (0, 0)
 
-    flat_indices   = list(map(int, indices_element.text.split())) if (indices_element.text or "").strip() else []
+    flat_indices = list(map(int, indices_element.text.split())) if (indices_element.text or "").strip() else []
     face_vertex_counts = (
         list(map(int, vertex_count_element.text.split()))
         if (vertex_count_element is not None and (vertex_count_element.text or "").strip())
@@ -151,17 +164,16 @@ def _convert_polylist(primitive_element: etree._Element):
         face_size = 3 * vertex_index_stride
         if vertex_index_stride > 0 and len(flat_indices) % face_size == 0:
             old_count = len(flat_indices) // face_size
-            face_vertex_counts   = [3] * old_count
+            face_vertex_counts = [3] * old_count
         else:
             # Cannot safely deduce face topology -- leave untouched
             return None
 
-    # Already all triangles -- just retag and clean up
     if all(v == 3 for v in face_vertex_counts):
         if vertex_count_element is not None:
             primitive_element.remove(vertex_count_element)
-        primitive_element.tag = f"{{{COLLADA_NS}}}triangles"
-        primitive_element.set("count", str(old_count))
+        primitive_element.tag = _ns(TAG_TRIANGLES)
+        primitive_element.set(ATTR_COUNT, str(old_count))
         return (old_count, old_count)
 
     # General case: fan-triangulate
@@ -170,12 +182,12 @@ def _convert_polylist(primitive_element: etree._Element):
     if vertex_count_element is not None:
         primitive_element.remove(vertex_count_element)
 
-    primitive_element.tag = f"{{{COLLADA_NS}}}triangles"
-    primitive_element.set("count", str(new_tri_count))
+    primitive_element.tag = _ns(TAG_TRIANGLES)
+    primitive_element.set(ATTR_COUNT, str(new_tri_count))
     return (old_count, new_tri_count)
 
 
-def _convert_polygons(primitive_element: etree._Element):
+def _convert_polygons(primitive_element):
     """
     Convert a <polygons> element to <triangles> in-place.
 
@@ -186,14 +198,14 @@ def _convert_polygons(primitive_element: etree._Element):
 
     Returns (old_face_count, new_tri_count).
     """
-    vertex_count_element   = primitive_element.find(f"{{{COLLADA_NS}}}vcount")
-    sub_indices_list       = primitive_element.findall(f"{{{COLLADA_NS}}}p")
-    sub_polygon_holes_list = primitive_element.findall(f"{{{COLLADA_NS}}}ph")
+    vertex_count_element   = primitive_element.find(_ns(TAG_VCOUNT))
+    sub_indices_list       = primitive_element.findall(_ns(TAG_P))
+    sub_polygon_holes_list = primitive_element.findall(_ns(TAG_PH))
 
     if sub_polygon_holes_list:
-        print(f"    [WARN] {len(sub_polygon_holes_list)} <ph> (polygon-with-holes) element(s) found. "
+        print("    [WARN] %d <ph> (polygon-with-holes) element(s) found. "
               "Holes are not representable in <triangles> and will be dropped; "
-              "only the outer contour is triangulated.")
+              "only the outer contour is triangulated." % len(sub_polygon_holes_list))
 
     # Polylist-style variant: single <p> + <vcount>
     if vertex_count_element is not None and len(sub_indices_list) == 1 and not sub_polygon_holes_list:
@@ -201,7 +213,7 @@ def _convert_polygons(primitive_element: etree._Element):
 
     old_count = len(sub_indices_list) + len(sub_polygon_holes_list)
     vertex_index_stride = _get_vertex_index_stride(primitive_element)
-    triangulated_flat_indices  = []
+    triangulated_flat_indices = []
     new_tri_count = 0
 
     # Process per-face <p> elements
@@ -221,9 +233,8 @@ def _convert_polygons(primitive_element: etree._Element):
                     new_tri_count += 1
         primitive_element.remove(sub_indices)
 
-    # Process <ph> (outer contour of polygon-with-holes; drop inner <h> rings)
     for ph in sub_polygon_holes_list:
-        outer_indices = ph.find(f"{{{COLLADA_NS}}}p")
+        outer_indices = ph.find(_ns(TAG_P))
         if outer_indices is not None and (outer_indices.text or "").strip():
             row_data = list(map(int, outer_indices.text.split()))
             n_verts  = len(row_data) // vertex_index_stride if vertex_index_stride else 0
@@ -241,39 +252,64 @@ def _convert_polygons(primitive_element: etree._Element):
         primitive_element.remove(vertex_count_element)
 
     # Add single merged flat <p>
-    new_indices_element      = etree.SubElement(primitive_element, f"{{{COLLADA_NS}}}p")
+    new_indices_element      = etree.SubElement(primitive_element, _ns(TAG_P))
     new_indices_element.text = " ".join(map(str, triangulated_flat_indices))
 
-    primitive_element.tag = f"{{{COLLADA_NS}}}triangles"
-    primitive_element.set("count", str(new_tri_count))
+    primitive_element.tag = _ns(TAG_TRIANGLES)
+    primitive_element.set(ATTR_COUNT, str(new_tri_count))
     return (old_count, new_tri_count)
 
+def _normalize_scale_unit(root):
+    """
+    Force normalize scale unit to 1.0 (Meters).
+    This fixes Google Earth's microscopic/massive model rendering bugs
+    which happen when CAD programs export with meter="0.001" etc.
+    """
+    asset = root.find(_ns("asset"))
+    if asset is None:
+        return
+
+    unit = asset.find(_ns("unit"))
+    if unit is None:
+        # If missing completely, safely inject it
+        etree.SubElement(asset, _ns("unit"), meter="1.0", name="meter")
+        print("NOTE  : Added missing <unit> tag (meter='1.0')")
+        return
+
+    old_meter = unit.get("meter")
+    if old_meter in ("1.0", "1"):
+        return
+
+    unit.set("meter", "1.0")
+    unit.set("name", "meter")
+    print("NOTE  : Normalized <unit> from meter='%s' to meter='1.0'" % old_meter)
 
 # ---------------------------------------------------------------------------
 # Main conversion
 # ---------------------------------------------------------------------------
 
-def convert_dae(input_path: str, output_path: str) -> int:
+def convert_dae(input_path, output_path):
     """
     Parse input_path, triangulate all polylist/polygons primitives,
     write result to output_path.
 
     Returns the number of primitive elements converted.
     """
-    print(f"Parsing  : {input_path}")
+    print("Parsing  : %s" % input_path)
 
     try:
         parser = etree.XMLParser(remove_comments=False, recover=True)
         tree   = etree.parse(input_path, parser)
     except OSError as exc:
-        print(f"ERROR: Cannot open input file: {exc}")
+        print("ERROR: Cannot open input file: %s" % exc)
         sys.exit(1)
     except etree.XMLSyntaxError as exc:
-        print(f"ERROR: XML syntax error in input file: {exc}")
+        print("ERROR: XML syntax error in input file: %s" % exc)
         sys.exit(1)
 
     root = tree.getroot()
 
+    _normalize_scale_unit(root)
     # Collect ALL polylist / polygons elements anywhere in the document
     primitives = []
     for tag in PRIMITIVE_TAGS:
@@ -285,10 +321,10 @@ def convert_dae(input_path: str, output_path: str) -> int:
         _write_tree(tree, output_path)
         return 0
 
-    total_converted  = 0
-    total_old_faces  = 0
-    total_new_tris   = 0
-    total_skipped    = 0
+    total_converted = 0
+    total_old_faces = 0
+    total_new_tris  = 0
+    total_skipped   = 0
 
     for primitive_element in primitives:
         short_tag = primitive_element.tag.split("}")[-1]      # "polylist" or "polygons"
@@ -297,21 +333,21 @@ def convert_dae(input_path: str, output_path: str) -> int:
         # Walk up to find the geometry name for diagnostic output
         geom_name = _find_geom_name(primitive_element)
 
-        print(f"  <{short_tag}>  geometry='{geom_name}'  material='{mat}'")
+        print("  <%s>  geometry='%s'  material='%s'" % (short_tag, geom_name, mat))
 
-        if short_tag == "polylist":
+        if short_tag == TAG_POLYLIST:
             result = _convert_polylist(primitive_element)
         else:
             result = _convert_polygons(primitive_element)
 
         if result is None:
-            print("    [WARN] Skipped — could not determine face topology (malformed element).")
+            print("    [WARN] Skipped -- could not determine face topology (malformed element).")
             total_skipped += 1
             continue
 
         old_faces, new_tris = result
-        note = " (already all triangles — retagged only)" if old_faces == new_tris else ""
-        print(f"    {old_faces} faces  ->  {new_tris} triangles{note}")
+        note = " (already all triangles -- retagged only)" if old_faces == new_tris else ""
+        print("    %d faces  ->  %d triangles%s" % (old_faces, new_tris, note))
 
         total_old_faces += old_faces
         total_new_tris  += new_tris
@@ -319,20 +355,20 @@ def convert_dae(input_path: str, output_path: str) -> int:
 
     _write_tree(tree, output_path)
 
-    print()
+    print("")
     print("=" * 62)
-    print(f"  Primitives converted : {total_converted}")
+    print("  Primitives converted : %d" % total_converted)
     if total_skipped:
-        print(f"  Primitives skipped   : {total_skipped}  (malformed — see warnings)")
-    print(f"  Total input faces    : {total_old_faces}")
-    print(f"  Total output tris    : {total_new_tris}")
-    print(f"  Output written to    : {output_path}")
+        print("  Primitives skipped   : %d  (malformed -- see warnings)" % total_skipped)
+    print("  Total input faces    : %d" % total_old_faces)
+    print("  Total output tris    : %d" % total_new_tris)
+    print("  Output written to    : %s" % output_path)
     print("=" * 62)
 
     return total_converted
 
 
-def _find_geom_name(element: etree._Element) -> str:
+def _find_geom_name(element):
     """Walk up the element tree to find the nearest geometry id/name."""
     node = element.getparent()
     while node is not None:
@@ -343,9 +379,9 @@ def _find_geom_name(element: etree._Element) -> str:
     return "(unknown)"
 
 
-def _write_tree(tree: etree._ElementTree, output_path: str) -> None:
+def _write_tree(tree, output_path):
     """Serialise the lxml ElementTree, preserving the XML declaration."""
-    print(f"Writing  : {output_path}")
+    print("Writing  : %s" % output_path)
     try:
         tree.write(
             output_path,
@@ -354,7 +390,7 @@ def _write_tree(tree: etree._ElementTree, output_path: str) -> None:
             pretty_print=True,
         )
     except OSError as exc:
-        print(f"ERROR: Cannot write output file: {exc}")
+        print("ERROR: Cannot write output file: %s" % exc)
         sys.exit(1)
 
 
@@ -362,7 +398,7 @@ def _write_tree(tree: etree._ElementTree, output_path: str) -> None:
 # CLI
 # ---------------------------------------------------------------------------
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser():
     p = argparse.ArgumentParser(
         description=(
             "Triangulate a COLLADA (.dae) file.\n"
@@ -377,7 +413,7 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def main() -> None:
+def main():
     parser = build_parser()
     args   = parser.parse_args()
 
@@ -385,7 +421,7 @@ def main() -> None:
     output_path = os.path.abspath(args.output)
 
     if not os.path.isfile(input_path):
-        print(f"ERROR: Input file not found: {input_path}")
+        print("ERROR: Input file not found: %s" % input_path)
         sys.exit(1)
 
     if input_path == output_path:

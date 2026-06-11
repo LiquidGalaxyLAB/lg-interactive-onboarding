@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 
 /// Core SSH service for connecting to the Liquid Galaxy master node.
 ///
@@ -26,7 +27,7 @@ class SSHService {
       final socket = await SSHSocket.connect(
         host,
         port,
-        timeout: const Duration(seconds: 10),
+        timeout: AppConstants.sshConnectionTimeout,
       );
       _client = SSHClient(
         socket,
