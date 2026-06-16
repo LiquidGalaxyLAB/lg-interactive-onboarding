@@ -152,9 +152,10 @@ class _ModuleCompletionScreenState extends ConsumerState<ModuleCompletionScreen>
                           ],
                         ),
                         child: Center(
-                          child: Text(
-                            widget.completedModule.iconEmoji ?? '✅',
-                            style: const TextStyle(fontSize: 42),
+                          child: const Icon(
+                            Icons.verified_rounded,
+                            size: 42,
+                            color: Colors.white,
                           ),
                         ),
                       ),

@@ -21,7 +21,7 @@ class CurriculumRepository {
 
   /// Returns the persisted [ModuleStatus] for [moduleId].
   ///
-  /// Defaults to [ModuleStatus.locked] if no value has been saved.
+  /// Defaults to [ModuleStatus.available] if no value has been saved.
   ModuleStatus getModuleStatus(String moduleId) {
     final raw = _prefs.getString(_key(moduleId));
     return _parse(raw);
@@ -49,7 +49,7 @@ class CurriculumRepository {
   ModuleStatus _parse(String? raw) {
     return ModuleStatus.values.firstWhere(
       (s) => s.name == raw,
-      orElse: () => ModuleStatus.locked,
+      orElse: () => ModuleStatus.available,
     );
   }
 }
