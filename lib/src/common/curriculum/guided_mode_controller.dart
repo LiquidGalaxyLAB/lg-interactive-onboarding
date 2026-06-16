@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'learning_module.dart';
 
+import 'package:lg_interactive_onboarding/src/features/curriculum_engine/providers/verification_providers.dart';
+
 // ─── Guided Mode State ───────────────────────────────────────────────────────
 
 /// Immutable snapshot of the current guided-mode session.
@@ -23,6 +25,9 @@ class GuidedModeState {
   });
 
   bool get isActive => phase != GuidedModePhase.idle;
+
+  /// Whether the current step requires manual confirmation (no auto-polling).
+  bool get isManualStep => currentStep?.requiresManualConfirmation ?? false;
 
   ModuleStep? get currentStep {
     final mod = activeModule;
@@ -123,11 +128,21 @@ class GuidedModeController extends Notifier<GuidedModeState> {
     );
 
     _insertOverlay();
-    _beginPolling();
+    // Only poll if the first step supports auto-verification.
+    if (!state.isManualStep) {
+      _beginPolling();
+    }
   }
 
   /// Manually skips the current step (does not mark it verified).
   void skipCurrentStep() {
+    _cancelPoll();
+    _advance();
+  }
+
+  /// Manually confirms the current step (used for steps where
+  /// [ModuleStep.requiresManualConfirmation] is `true`).
+  void manualConfirm() {
     _cancelPoll();
     _advance();
   }
@@ -161,6 +176,9 @@ class GuidedModeController extends Notifier<GuidedModeState> {
     final step = state.currentStep;
     if (step == null) return;
 
+    // Manual-confirm steps are never auto-polled.
+    if (step.requiresManualConfirmation) return;
+
     // Timeout guard
     final elapsed = DateTime.now().difference(_pollStart!);
     if (elapsed > _maxPollDuration) {
@@ -173,13 +191,22 @@ class GuidedModeController extends Notifier<GuidedModeState> {
     }
 
     try {
-      final done = await step.autoVerify();
+      final checkMap = ref.read(verificationCheckProvider);
+      final check = checkMap[step.verificationKey];
+      if (check == null) {
+        debugPrint(
+          'GuidedModeController: no verification check for '
+          'key "${step.verificationKey}"',
+        );
+        return;
+      }
+      final done = check(ref);
       if (done) {
         _cancelPoll();
         _advance();
       }
     } catch (e) {
-      debugPrint('GuidedModeController: autoVerify error: $e');
+      debugPrint('GuidedModeController: verification error: $e');
     }
   }
 
@@ -199,7 +226,11 @@ class GuidedModeController extends Notifier<GuidedModeState> {
         phase: GuidedModePhase.running,
         phaseMessage: null,
       );
-      _beginPolling();
+      // Only poll for auto-verifiable steps.
+      final nextStep = mod.steps[nextIndex];
+      if (!nextStep.requiresManualConfirmation) {
+        _beginPolling();
+      }
       _updateOverlay();
     }
   }

@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:lg_interactive_onboarding/src/common/curriculum/guided_mode_controller.dart';
 import 'package:lg_interactive_onboarding/src/common/curriculum/learning_module.dart';
+import 'package:lg_interactive_onboarding/src/common/tts/tts_service.dart';
 
 /// The floating instructional overlay that appears during guided mode.
 ///
@@ -28,10 +29,13 @@ class _GuidedModeOverlayState extends ConsumerState<GuidedModeOverlay>
     with SingleTickerProviderStateMixin {
   late AnimationController _slideCtrl;
   late Animation<Offset> _slideAnim;
+  late final TTSService _tts;
+  int _lastSpokenStepIndex = -1;
 
   @override
   void initState() {
     super.initState();
+    _tts = ref.read(ttsServiceProvider);
     _slideCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -46,6 +50,7 @@ class _GuidedModeOverlayState extends ConsumerState<GuidedModeOverlay>
   @override
   void dispose() {
     _slideCtrl.dispose();
+    _tts.stop();
     super.dispose();
   }
 
@@ -64,6 +69,14 @@ class _GuidedModeOverlayState extends ConsumerState<GuidedModeOverlay>
     final step = state.currentStep;
     final module = state.activeModule;
     if (step == null || module == null) return const SizedBox.shrink();
+
+    // Auto-speak the step instruction when the step index changes.
+    if (state.currentStepIndex != _lastSpokenStepIndex) {
+      _lastSpokenStepIndex = state.currentStepIndex;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(ttsServiceProvider).speak(step.instruction);
+      });
+    }
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -101,12 +114,24 @@ class _GuidedModeOverlayState extends ConsumerState<GuidedModeOverlay>
                 totalSteps: state.totalSteps,
                 phaseMessage: state.phaseMessage,
                 isDark: isDark,
+                isManualStep: state.isManualStep,
+                ttsService: ref.read(ttsServiceProvider),
                 onSkip: () => ref
                     .read(guidedModeControllerProvider.notifier)
                     .skipCurrentStep(),
                 onExit: () => ref
                     .read(guidedModeControllerProvider.notifier)
                     .cancelModule(),
+                onManualConfirm: () => ref
+                    .read(guidedModeControllerProvider.notifier)
+                    .manualConfirm(),
+                onTtsMuteToggle: () {
+                  final tts = ref.read(ttsServiceProvider);
+                  tts.setEnabled(!tts.isEnabled);
+                },
+                onTtsReplay: () {
+                  ref.read(ttsServiceProvider).speak(step.instruction);
+                },
               ),
             ),
           ),
@@ -125,8 +150,13 @@ class _InstructionCard extends StatelessWidget {
   final int totalSteps;
   final String? phaseMessage;
   final bool isDark;
+  final bool isManualStep;
+  final TTSService ttsService;
   final VoidCallback onSkip;
   final VoidCallback onExit;
+  final VoidCallback onManualConfirm;
+  final VoidCallback onTtsMuteToggle;
+  final VoidCallback onTtsReplay;
 
   const _InstructionCard({
     required this.module,
@@ -135,8 +165,13 @@ class _InstructionCard extends StatelessWidget {
     required this.totalSteps,
     required this.phaseMessage,
     required this.isDark,
+    required this.isManualStep,
+    required this.ttsService,
     required this.onSkip,
     required this.onExit,
+    required this.onManualConfirm,
+    required this.onTtsMuteToggle,
+    required this.onTtsReplay,
   });
 
   @override
@@ -176,9 +211,10 @@ class _InstructionCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Center(
-                        child: Text(
-                          module.iconEmoji ?? '📚',
-                          style: const TextStyle(fontSize: 18),
+                        child: const Icon(
+                          Icons.menu_book_rounded,
+                          size: 18,
+                          color: Color(0xFF6C5CE7),
                         ),
                       ),
                     ),
@@ -289,6 +325,41 @@ class _InstructionCard extends StatelessWidget {
 
                 const SizedBox(height: 14),
 
+                // ── TTS controls ────────────────────────────────────────────
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    ListenableBuilder(
+                      listenable: ttsService,
+                      builder: (context, _) {
+                        final isTtsEnabled = ttsService.isEnabled;
+                        return IconButton(
+                          onPressed: onTtsMuteToggle,
+                          icon: Icon(
+                            isTtsEnabled ? Icons.volume_up : Icons.volume_off,
+                            size: 18,
+                          ),
+                          tooltip: isTtsEnabled ? 'Mute narration' : 'Unmute narration',
+                          color: isDark ? Colors.white38 : Colors.black38,
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(4),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      onPressed: onTtsReplay,
+                      icon: const Icon(Icons.replay_rounded, size: 18),
+                      tooltip: 'Replay narration',
+                      color: isDark ? Colors.white38 : Colors.black38,
+                      constraints: const BoxConstraints(),
+                      padding: const EdgeInsets.all(4),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 6),
+
                 // ── Action buttons ──────────────────────────────────────────
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -306,20 +377,39 @@ class _InstructionCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    // Verification pulse indicator
-                    Row(
-                      children: [
-                        _PulseDot(isDark: isDark),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Waiting for action...',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: isDark ? Colors.white38 : Colors.black38,
+                    // Manual confirm button OR auto-verification pulse
+                    if (isManualStep)
+                      ElevatedButton.icon(
+                        onPressed: onManualConfirm,
+                        icon: const Icon(Icons.check_circle_outline, size: 16),
+                        label: const Text('Done — Continue'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: accent,
+                          foregroundColor: Colors.white,
+                          textStyle: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
                           ),
                         ),
-                      ],
-                    ),
+                      )
+                    else
+                      Row(
+                        children: [
+                          _PulseDot(isDark: isDark),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Waiting for action...',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: isDark ? Colors.white38 : Colors.black38,
+                            ),
+                          ),
+                        ],
+                      ),
                     TextButton.icon(
                       onPressed: onSkip,
                       icon: const Icon(Icons.skip_next_rounded, size: 16),
