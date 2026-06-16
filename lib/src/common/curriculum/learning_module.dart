@@ -39,17 +39,25 @@ class ModuleStep {
   /// If non-null, the overlay punches a hole around that widget.
   final String? targetWidgetKey;
 
-  /// Async predicate that returns `true` when this step is considered done.
+  /// Key into [verificationCheckProvider] that maps this step to a
+  /// provider-reading check function.
   ///
-  /// The [GuidedModeController] polls this every second; if it throws, the
-  /// step stays pending and the error is logged but not surfaced to the user.
-  final Future<bool> Function() autoVerify;
+  /// The [GuidedModeController] polls the corresponding check every second.
+  /// If no mapping exists for this key, the step falls back to manual
+  /// confirmation.
+  final String verificationKey;
+
+  /// When `true`, the guided overlay shows a "Done — Continue" button
+  /// instead of polling a provider. Use this for navigation-only steps
+  /// (e.g., "Open the Settings tab") that cannot be auto-detected.
+  final bool requiresManualConfirmation;
 
   ModuleStep({
     required this.id,
     required this.instruction,
-    required this.autoVerify,
+    required this.verificationKey,
     this.targetWidgetKey,
+    this.requiresManualConfirmation = false,
   });
 }
 
@@ -76,9 +84,6 @@ class LearningModule {
   /// Ordered list of verifiable steps.
   final List<ModuleStep> steps;
 
-  /// Short emoji or icon codepoint to display alongside the title.
-  final String? iconEmoji;
-
   /// Prerequisite module IDs that must be [ModuleStatus.completed] before
   /// this module becomes [ModuleStatus.available].
   ///
@@ -96,7 +101,6 @@ class LearningModule {
     required this.estimatedTime,
     required this.targetFeatureRoute,
     required this.steps,
-    this.iconEmoji,
     this.prerequisites = const [],
     this.status = ModuleStatus.locked,
   });

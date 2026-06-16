@@ -163,7 +163,7 @@ abstract class DiagramPainter extends CustomPainter {
       isDark ? Colors.white54 : Colors.black54;
 
   Paint get _linePaint => Paint()
-    ..color = accent.withValues(alpha: 0.4)
+    ..color = accent.withValues(alpha: 0.8)
     ..strokeWidth = 1.5
     ..style = PaintingStyle.stroke;
 
@@ -172,7 +172,7 @@ abstract class DiagramPainter extends CustomPainter {
     ..style = PaintingStyle.fill;
 
   Paint get _nodeBorderPaint => Paint()
-    ..color = accent.withValues(alpha: 0.5)
+    ..color = accent.withValues(alpha: 0.8)
     ..strokeWidth = 1.5
     ..style = PaintingStyle.stroke;
 
@@ -182,15 +182,8 @@ abstract class DiagramPainter extends CustomPainter {
     String? label,
     String? sublabel,
     IconData? icon,
-    double radius = 12,
+    double radius = 2,
   }) {
-    // Shadow
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect.inflate(2), Radius.circular(radius + 2)),
-      Paint()
-        ..color = Colors.black.withValues(alpha: 0.15)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
-    );
     // Body
     canvas.drawRRect(
       RRect.fromRectAndRadius(rect, Radius.circular(radius)),
@@ -201,6 +194,16 @@ abstract class DiagramPainter extends CustomPainter {
       RRect.fromRectAndRadius(rect, Radius.circular(radius)),
       _nodeBorderPaint,
     );
+
+    // UML style divider line
+    final lineY = rect.top + 24.0;
+    if (rect.height > 30) {
+      canvas.drawLine(
+        Offset(rect.left, lineY),
+        Offset(rect.right, lineY),
+        _nodeBorderPaint..strokeWidth = 1.0,
+      );
+    }
 
     // Label
     if (label != null) {
@@ -217,47 +220,65 @@ abstract class DiagramPainter extends CustomPainter {
       )..layout();
       tp.paint(
         canvas,
-        rect.center - Offset(tp.width / 2, sublabel != null ? tp.height : tp.height / 2),
+        Offset(rect.center.dx - tp.width / 2, rect.top + 6),
       );
 
-      if (sublabel != null) {
+      // Sublabel
+      if (sublabel != null && rect.height > 30) {
         final sub = TextPainter(
           text: TextSpan(
             text: sublabel,
-            style: TextStyle(fontSize: 9, color: subtextColor),
+            style: TextStyle(fontSize: 9, color: subtextColor, fontFamily: 'monospace'),
           ),
           textDirection: TextDirection.ltr,
-        )..layout();
+          maxLines: 2,
+        )..layout(maxWidth: rect.width - 8);
         sub.paint(
           canvas,
-          rect.center - Offset(sub.width / 2, -4),
+          Offset(rect.left + 6, lineY + 6),
         );
       }
     }
   }
 
-  void drawArrow(Canvas canvas, Offset from, Offset to, {Paint? paint}) {
+  void drawArrow(Canvas canvas, Offset from, Offset to, {Paint? paint, bool isDashed = false}) {
     final p = paint ?? _linePaint;
-    canvas.drawLine(from, to, p);
-    // Arrowhead
+    
+    if (isDashed) {
+      final double distance = (to - from).distance;
+      final double dashWidth = 5.0;
+      final double dashSpace = 4.0;
+      double startX = from.dx;
+      double startY = from.dy;
+      final double dirX = (to.dx - from.dx) / distance;
+      final double dirY = (to.dy - from.dy) / distance;
+      double currentDistance = 0;
+      while (currentDistance < distance) {
+        final endX = startX + dirX * dashWidth;
+        final endY = startY + dirY * dashWidth;
+        canvas.drawLine(Offset(startX, startY), Offset(endX, endY), p);
+        startX = endX + dirX * dashSpace;
+        startY = endY + dirY * dashSpace;
+        currentDistance += dashWidth + dashSpace;
+      }
+    } else {
+      canvas.drawLine(from, to, p);
+    }
+
+    // Arrowhead (sharp, open UML style)
     final angle = (to - from).direction;
-    const arrowSize = 8.0;
+    const arrowSize = 6.0;
     final path = Path()
-      ..moveTo(to.dx, to.dy)
-      ..lineTo(
-        to.dx - arrowSize * cos(angle - 0.4),
-        to.dy - arrowSize * sin(angle - 0.4),
-      )
-      ..lineTo(
-        to.dx - arrowSize * cos(angle + 0.4),
-        to.dy - arrowSize * sin(angle + 0.4),
-      )
-      ..close();
+      ..moveTo(to.dx - arrowSize * cos(angle - 0.5), to.dy - arrowSize * sin(angle - 0.5))
+      ..lineTo(to.dx, to.dy)
+      ..lineTo(to.dx - arrowSize * cos(angle + 0.5), to.dy - arrowSize * sin(angle + 0.5));
+      
     canvas.drawPath(
       path,
       Paint()
         ..color = p.color
-        ..style = PaintingStyle.fill,
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
     );
   }
 
@@ -416,6 +437,7 @@ class ViewSyncPainter extends DiagramPainter {
         canvas,
         Offset(sx, h * 0.44),
         Offset(sx, sr.top),
+        isDashed: true,
         paint: Paint()
           ..color = accent.withValues(alpha: 0.35)
           ..strokeWidth = 1.2
@@ -481,7 +503,7 @@ class SshFlowPainter extends DiagramPainter {
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
     drawArrow(canvas, Offset(endX, returnY), Offset(startX, returnY),
-        paint: returnPaint);
+        paint: returnPaint, isDashed: true);
     drawLabel(canvas, Offset(w * 0.5, returnY + 10), 'stdout / stderr',
         fontSize: 9);
 
@@ -576,6 +598,7 @@ class KmlPropagationPainter extends DiagramPainter {
         canvas,
         Offset(w * 0.5, kmlRect.bottom),
         Offset(sx, sr.top),
+        isDashed: true,
         paint: Paint()
           ..color = accent.withValues(alpha: 0.4)
           ..strokeWidth = 1.3

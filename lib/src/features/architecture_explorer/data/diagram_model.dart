@@ -51,7 +51,7 @@ class DiagramDefinition {
 
   final String title;
   final String subtitle;
-  final String emoji;
+  final IconData icon;
 
   /// Accent color used for diagram chrome.
   final Color accentColor;
@@ -62,8 +62,10 @@ class DiagramDefinition {
     required this.id,
     required this.title,
     required this.subtitle,
-    required this.emoji,
+    required this.icon,
     required this.accentColor,
     required this.hotspots,
   });
+
+
 }

@@ -31,8 +31,8 @@ class DiagramRepository {
     id: 'master_slave',
     title: 'Master-Slave Topology',
     subtitle: 'How nodes are physically connected in the LG rig',
-    emoji: '🖥️',
-    accentColor: Color(0xFF6C5CE7),
+    icon: Icons.schema_outlined,
+    accentColor: Color(0xFF4A6572), // Slate Blue
     hotspots: [
       HotspotDefinition(
         id: 'master_node',
@@ -80,8 +80,8 @@ class DiagramRepository {
     id: 'view_sync',
     title: 'ViewSync Protocol',
     subtitle: 'How camera positions are synchronized across all screens',
-    emoji: '📡',
-    accentColor: Color(0xFF00D2FF),
+    icon: Icons.sync_alt_rounded,
+    accentColor: Color(0xFF34495E), // Dark Slate
     hotspots: [
       HotspotDefinition(
         id: 'viewsync_packet',
@@ -128,8 +128,8 @@ class DiagramRepository {
     id: 'ssh_flow',
     title: 'SSH Communication Flow',
     subtitle: 'How the tablet app talks to the LG master node',
-    emoji: '🔐',
-    accentColor: Color(0xFFFD79A8),
+    icon: Icons.security_rounded,
+    accentColor: Color(0xFF5D6D7E), // Steel Gray
     hotspots: [
       HotspotDefinition(
         id: 'mobile_app',
@@ -179,8 +179,8 @@ class DiagramRepository {
     id: 'kml_propagation',
     title: 'KML Propagation',
     subtitle: 'How KML content reaches every Google Earth instance',
-    emoji: '📂',
-    accentColor: Color(0xFF55EFC4),
+    icon: Icons.account_tree_outlined,
+    accentColor: Color(0xFF2C3E50), // Midnight Blue
     hotspots: [
       HotspotDefinition(
         id: 'web_server',

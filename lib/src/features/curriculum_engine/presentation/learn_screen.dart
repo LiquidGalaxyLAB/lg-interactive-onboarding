@@ -224,7 +224,7 @@ class _ProgressCard extends StatelessWidget {
               children: [
                 Text(
                   completed == total && total > 0
-                      ? 'All modules complete! 🎉'
+                      ? 'All modules complete!'
                       : completed == 0
                           ? 'Ready to start learning?'
                           : 'Keep it up!',
@@ -354,7 +354,7 @@ class _ModuleCard extends ConsumerWidget {
           ),
           child: Row(
             children: [
-              // Status icon / emoji
+              // Status icon
               Container(
                 width: 42,
                 height: 42,
@@ -370,9 +370,12 @@ class _ModuleCard extends ConsumerWidget {
                       : isCompleted
                           ? const Icon(Icons.check_circle_rounded,
                               size: 22, color: Color(0xFF55EFC4))
-                          : Text(
-                              module.iconEmoji ?? '📚',
-                              style: const TextStyle(fontSize: 20),
+                          : Icon(
+                              Icons.play_circle_outline_rounded,
+                              size: 20,
+                                color: isDark
+                                    ? Colors.white70
+                                    : const Color(0xFF1A1A2E),
                             ),
                 ),
               ),

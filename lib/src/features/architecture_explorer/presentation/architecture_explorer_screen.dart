@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:lg_interactive_onboarding/src/common/curriculum/analytics_service.dart';
+import 'package:lg_interactive_onboarding/src/common/tts/tts_service.dart';
 import 'package:lg_interactive_onboarding/src/features/architecture_explorer/data/diagram_model.dart';
 import 'package:lg_interactive_onboarding/src/features/architecture_explorer/providers/architecture_providers.dart';
 import 'package:lg_interactive_onboarding/src/features/architecture_explorer/presentation/diagram_viewer.dart';
@@ -127,7 +128,7 @@ class _DiagramTabRow extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(d.emoji, style: const TextStyle(fontSize: 14)),
+                  Icon(d.icon, size: 14, color: isSelected ? d.accentColor : (isDark ? Colors.white60 : Colors.black54)),
                   const SizedBox(width: 6),
                   Text(
                     d.title,
@@ -166,7 +167,7 @@ class _DiagramBody extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: Row(
             children: [
-              Text(diagram.emoji, style: const TextStyle(fontSize: 20)),
+              Icon(diagram.icon, size: 22, color: diagram.accentColor),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -267,6 +268,9 @@ class _DiagramBody extends ConsumerWidget {
     // Also record per-hotspot view for finer-grained analytics
     ref.read(analyticsServiceProvider).recordDiagramView('${diagram.id}_${hotspot.id}');
 
+    // Auto-speak the hotspot description
+    ref.read(ttsServiceProvider).speak(hotspot.detailBody);
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -282,7 +286,7 @@ class _DiagramBody extends ConsumerWidget {
 
 // ─── Hotspot Detail Bottom Sheet ─────────────────────────────────────────────
 
-class _HotspotDetailSheet extends StatelessWidget {
+class _HotspotDetailSheet extends ConsumerWidget {
   final HotspotDefinition hotspot;
   final DiagramDefinition diagram;
   final bool isDark;
@@ -294,7 +298,7 @@ class _HotspotDetailSheet extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final bg = isDark ? const Color(0xFF1A1F33) : Colors.white;
 
     return DraggableScrollableSheet(
@@ -367,6 +371,35 @@ class _HotspotDetailSheet extends StatelessWidget {
                             ),
                           ],
                         ),
+                      ),
+                      // TTS controls
+                      ListenableBuilder(
+                        listenable: ref.read(ttsServiceProvider),
+                        builder: (context, _) {
+                          final tts = ref.read(ttsServiceProvider);
+                          final isTtsEnabled = tts.isEnabled;
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                onPressed: () => tts.setEnabled(!isTtsEnabled),
+                                icon: Icon(
+                                  isTtsEnabled ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                                ),
+                                color: diagram.accentColor,
+                                tooltip: isTtsEnabled ? 'Mute narration' : 'Unmute narration',
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.replay_rounded),
+                                color: diagram.accentColor,
+                                tooltip: 'Replay narration',
+                                onPressed: () {
+                                  tts.speak(hotspot.detailBody);
+                                },
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),
