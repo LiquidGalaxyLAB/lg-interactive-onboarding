@@ -1,15 +1,17 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 
 /// Core SSH service for connecting to the Liquid Galaxy master node.
 ///
 /// Follows the GOLDEN RULE: Always use client!.run() directly for
 /// simple commands. For complex flows, access the client directly.
-class SSHService {
+class SSHService extends ChangeNotifier {
   SSHClient? _client;
 
   SSHClient? get client => _client;
@@ -35,9 +37,11 @@ class SSHService {
         onPasswordRequest: () => password,
       );
       debugPrint('SSH: Connected to $host');
+      notifyListeners();
       return true;
     } catch (e) {
       debugPrint('SSH: Connection failed: $e');
+      notifyListeners();
       return false;
     }
   }
@@ -47,6 +51,7 @@ class SSHService {
     _client?.close();
     _client = null;
     debugPrint('SSH: Disconnected');
+    notifyListeners();
   }
 
   /// Executes a command on the remote server and returns stdout.

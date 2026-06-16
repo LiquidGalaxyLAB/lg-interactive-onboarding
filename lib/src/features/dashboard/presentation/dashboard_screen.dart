@@ -46,7 +46,7 @@ class DashboardScreen extends ConsumerWidget {
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
               title: Text(
-                'LG Content Studio',
+                'LG Interactive Onboarding',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
@@ -59,10 +59,13 @@ class DashboardScreen extends ConsumerWidget {
               // Connection indicator
               Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: ConnectionChip(
-                  isConnected: ssh.isConnected,
-                  host: settings.host,
-                  isDark: isDark,
+                child: ListenableBuilder(
+                  listenable: ssh,
+                  builder: (context, _) => ConnectionChip(
+                    isConnected: ssh.isConnected,
+                    host: settings.host,
+                    isDark: isDark,
+                  ),
                 ),
               ),
               // Architecture Explorer shortcut

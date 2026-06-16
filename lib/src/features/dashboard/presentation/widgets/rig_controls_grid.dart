@@ -11,129 +11,133 @@ class RigControlsGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ssh = ref.watch(sshServiceProvider);
-    final isConnected = ssh.isConnected;
-
-    return Column(
-      children: [
-        // Row 1: Shutdown + Reboot (wider shutdown)
-        Row(
+    return ListenableBuilder(
+      listenable: ssh,
+      builder: (context, _) {
+        final isConnected = ssh.isConnected;
+        return Column(
           children: [
-            Expanded(
-              flex: 3,
-              child: RigControlCard(
-                title: 'Shutdown',
-                icon: Icons.power_settings_new_rounded,
-                accentColor: DashboardPalette.terracotta,
-                isDark: isDark,
-                enabled: isConnected,
-                onTap: () => _confirmDangerous(
-                  context,
-                  ref,
-                  title: 'Shutdown All Rigs',
-                  message: 'This will power off all Liquid Galaxy rigs. Continue?',
-                  action: () => ref.read(lgServiceProvider).shutdown(),
-                  actionLabel: 'Shutdown',
+            // Row 1: Shutdown + Reboot (wider shutdown)
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: RigControlCard(
+                    title: 'Shutdown',
+                    icon: Icons.power_settings_new_rounded,
+                    accentColor: DashboardPalette.terracotta,
+                    isDark: isDark,
+                    enabled: isConnected,
+                    onTap: () => _confirmDangerous(
+                      context,
+                      ref,
+                      title: 'Shutdown All Rigs',
+                      message: 'This will power off all Liquid Galaxy rigs. Continue?',
+                      action: () => ref.read(lgServiceProvider).shutdown(),
+                      actionLabel: 'Shutdown',
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: RigControlCard(
+                    title: 'Reboot',
+                    icon: Icons.restart_alt_rounded,
+                    accentColor: DashboardPalette.warmAmber,
+                    isDark: isDark,
+                    enabled: isConnected,
+                    onTap: () => _confirmDangerous(
+                      context,
+                      ref,
+                      title: 'Reboot All Rigs',
+                      message: 'This will reboot all Liquid Galaxy rigs. Continue?',
+                      action: () => ref.read(lgServiceProvider).reboot(),
+                      actionLabel: 'Reboot',
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 2,
-              child: RigControlCard(
-                title: 'Reboot',
-                icon: Icons.restart_alt_rounded,
-                accentColor: DashboardPalette.warmAmber,
-                isDark: isDark,
-                enabled: isConnected,
-                onTap: () => _confirmDangerous(
-                  context,
-                  ref,
-                  title: 'Reboot All Rigs',
-                  message: 'This will reboot all Liquid Galaxy rigs. Continue?',
-                  action: () => ref.read(lgServiceProvider).reboot(),
-                  actionLabel: 'Reboot',
+            const SizedBox(height: 12),
+
+            // Row 2: Relaunch + Refresh Master KML + Clear KML
+            Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: RigControlCard(
+                    title: 'Relaunch',
+                    icon: Icons.refresh_rounded,
+                    accentColor: DashboardPalette.sage,
+                    isDark: isDark,
+                    enabled: isConnected,
+                    onTap: () async {
+                      await ref.read(lgServiceProvider).relaunch();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Relaunching LG...'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 3,
+                  child: RigControlCard(
+                    title: 'Refresh KML',
+                    icon: Icons.sync_rounded,
+                    accentColor: DashboardPalette.dustyBlue,
+                    isDark: isDark,
+                    enabled: isConnected,
+                    onTap: () async {
+                      final ok = await ref.read(lgServiceProvider).refreshMasterKml();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(ok
+                                ? 'Master KML refreshed'
+                                : 'Refresh failed'),
+                            backgroundColor: ok ? DashboardPalette.sage : DashboardPalette.terracotta,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: RigControlCard(
+                    title: 'Clear KML',
+                    icon: Icons.layers_clear_rounded,
+                    accentColor: DashboardPalette.warmGrey,
+                    isDark: isDark,
+                    enabled: isConnected,
+                    onTap: () async {
+                      final ok = await ref.read(lgServiceProvider).clearKml();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(ok ? 'KML cleared' : 'Clear failed'),
+                            backgroundColor: ok ? DashboardPalette.sage : DashboardPalette.terracotta,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ],
             ),
           ],
-        ),
-        const SizedBox(height: 12),
-
-        // Row 2: Relaunch + Refresh Master KML + Clear KML
-        Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: RigControlCard(
-                title: 'Relaunch',
-                icon: Icons.refresh_rounded,
-                accentColor: DashboardPalette.sage,
-                isDark: isDark,
-                enabled: isConnected,
-                onTap: () async {
-                  await ref.read(lgServiceProvider).relaunch();
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Relaunching LG...'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  }
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 3,
-              child: RigControlCard(
-                title: 'Refresh KML',
-                icon: Icons.sync_rounded,
-                accentColor: DashboardPalette.dustyBlue,
-                isDark: isDark,
-                enabled: isConnected,
-                onTap: () async {
-                  final ok = await ref.read(lgServiceProvider).refreshMasterKml();
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(ok
-                            ? 'Master KML refreshed'
-                            : 'Refresh failed'),
-                        backgroundColor: ok ? DashboardPalette.sage : DashboardPalette.terracotta,
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  }
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 2,
-              child: RigControlCard(
-                title: 'Clear KML',
-                icon: Icons.layers_clear_rounded,
-                accentColor: DashboardPalette.warmGrey,
-                isDark: isDark,
-                enabled: isConnected,
-                onTap: () async {
-                  final ok = await ref.read(lgServiceProvider).clearKml();
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(ok ? 'KML cleared' : 'Clear failed'),
-                        backgroundColor: ok ? DashboardPalette.sage : DashboardPalette.terracotta,
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  }
-                },
-              ),
-            ),
-          ],
-        ),
-      ],
+        );
+      },
     );
   }
 
