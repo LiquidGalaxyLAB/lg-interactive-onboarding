@@ -52,6 +52,9 @@ dependencies:
   # SVG rendering (Architecture Explorer diagrams)
   flutter_svg: ^2.0.10+1
 
+  # Text-to-speech (voice narration for guided mode & Architecture Explorer)
+  flutter_tts: ^3.8.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

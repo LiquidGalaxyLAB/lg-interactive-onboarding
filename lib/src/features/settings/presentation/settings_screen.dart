@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
+import 'package:lg_interactive_onboarding/src/common/tts/tts_service.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 
 /// Settings screen for managing SSH connection and app preferences.
@@ -23,6 +24,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   bool _isConnecting = false;
   bool _obscurePassword = true;
+  late bool _voiceNarration;
 
   @override
   void initState() {
@@ -33,6 +35,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _usernameCtrl = TextEditingController(text: settings.username);
     _passwordCtrl = TextEditingController(text: settings.password);
     _rigsCtrl = TextEditingController(text: settings.rigs.toString());
+    _voiceNarration = settings.voiceNarration;
+    // Sync TTS service with persisted preference on screen load.
+    ref.read(ttsServiceProvider).setEnabled(_voiceNarration);
   }
 
   @override
@@ -316,6 +321,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               onSelectionChanged: (modes) {
                 ref.read(themeModeProvider.notifier).setThemeMode(modes.first);
               },
+            ),
+
+            const SizedBox(height: 32),
+
+            // ─── Accessibility ───────────────────────────────────
+            _SectionLabel(label: 'ACCESSIBILITY', isDark: isDark),
+            const SizedBox(height: 14),
+
+            SwitchListTile(
+              title: const Text('Voice Narration'),
+              subtitle: const Text('Read aloud guided-mode steps and diagram descriptions'),
+              secondary: Icon(
+                _voiceNarration ? Icons.record_voice_over : Icons.voice_over_off,
+                color: _voiceNarration ? sage : warmGrey,
+              ),
+              value: _voiceNarration,
+              onChanged: (value) async {
+                setState(() => _voiceNarration = value);
+                final settings = ref.read(settingsServiceProvider);
+                await settings.setVoiceNarration(value);
+                ref.read(ttsServiceProvider).setEnabled(value);
+              },
+              activeThumbColor: sage,
+              contentPadding: EdgeInsets.zero,
             ),
 
             const SizedBox(height: 32),

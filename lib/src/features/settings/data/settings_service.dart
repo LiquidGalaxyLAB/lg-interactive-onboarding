@@ -20,6 +20,7 @@ class SettingsService {
   static const _keyPassword = 'password';
   static const _keyRigs = 'rigs';
   static const _keyThemeMode = 'themeMode';
+  static const _keyVoiceNarration = 'voiceNarration';
 
   // ─── Getters ───────────────────────────────────────────────────────
   String get host => _prefs.getString(_keyHost) ?? AppConstants.defaultSshHost;
@@ -28,6 +29,7 @@ class SettingsService {
   String get password => _cachedPassword;
   int get rigs => _prefs.getInt(_keyRigs) ?? AppConstants.defaultRigsCount;
   ThemeMode get themeMode => _parseThemeMode(_prefs.getString(_keyThemeMode));
+  bool get voiceNarration => _prefs.getBool(_keyVoiceNarration) ?? true;
 
   // ─── Setters ───────────────────────────────────────────────────────
   Future<void> setHost(String value) => _prefs.setString(_keyHost, value);
@@ -41,6 +43,8 @@ class SettingsService {
   Future<void> setRigs(int value) => _prefs.setInt(_keyRigs, value);
   Future<void> setThemeMode(ThemeMode value) =>
       _prefs.setString(_keyThemeMode, value.name);
+  Future<void> setVoiceNarration(bool value) =>
+      _prefs.setBool(_keyVoiceNarration, value);
 
   ThemeMode _parseThemeMode(String? value) {
     switch (value) {
