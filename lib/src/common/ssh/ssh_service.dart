@@ -4,16 +4,23 @@ import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
 import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 
 /// Core SSH service for connecting to the Liquid Galaxy master node.
 ///
-/// Follows the GOLDEN RULE: Always use client!.run() directly for
-/// simple commands. For complex flows, access the client directly.
+/// All command execution is serialized through [execute] to prevent
+/// SSH channel exhaustion. All file transfers go through the cached
+/// SFTP channel via [sftp]. Never call `client!.run()` directly from
+/// outside this class.
 class SSHService extends ChangeNotifier {
   SSHClient? _client;
-  SftpClient? _sftp;
+  Future<SftpClient>? _sftpFuture;
+
+  /// Serialization lock for exec channels — ensures only ONE exec session
+  /// channel is open at a time. Each `client.run()` opens a new SSH session
+  /// channel; without serialization, rapid repeated operations exhaust the
+  /// server's MaxSessions limit (default 10).
+  Future<void> _execQueue = Future.value();
 
   SSHClient? get client => _client;
 
@@ -23,10 +30,14 @@ class SSHService extends ChangeNotifier {
   /// Reusing the client prevents SSH channel exhaustion when pushing multiple files.
   Future<SftpClient?> get sftp async {
     if (!isConnected) return null;
-    if (_sftp == null) {
-      _sftp = await _client!.sftp();
+    _sftpFuture ??= _client!.sftp();
+    try {
+      return await _sftpFuture;
+    } catch (e) {
+      _sftpFuture = null;
+      debugPrint('SSH: Failed to open SFTP channel: $e');
+      return null;
     }
-    return _sftp;
   }
 
   /// Connects to the SSH server.
@@ -47,6 +58,8 @@ class SSHService extends ChangeNotifier {
         username: username,
         onPasswordRequest: () => password,
       );
+      // Reset execution queue for the new connection.
+      _execQueue = Future.value();
       debugPrint('SSH: Connected to $host');
       notifyListeners();
       return true;
@@ -59,29 +72,57 @@ class SSHService extends ChangeNotifier {
 
   /// Disconnects from the SSH server.
   Future<void> disconnect() async {
-    _sftp?.close();
-    _sftp = null;
+    try {
+      final sftpClient = await _sftpFuture;
+      sftpClient?.close();
+    } catch (_) {}
+    _sftpFuture = null;
     _client?.close();
     _client = null;
+    _execQueue = Future.value();
     debugPrint('SSH: Disconnected');
     notifyListeners();
   }
 
   /// Executes a command on the remote server and returns stdout.
+  ///
+  /// All calls are serialized: the next command waits until the previous
+  /// one finishes AND a short cooldown elapses. This prevents the server
+  /// from running out of session channel slots (OpenSSH MaxSessions=10).
   Future<SSHResult?> execute(String command) async {
     if (!isConnected) {
       debugPrint('SSH: Not connected, cannot execute: $command');
       return null;
     }
 
+    final completer = Completer<SSHResult?>();
+
+    // Chain onto the queue — this call waits until all previous calls finish.
+    final previous = _execQueue;
+    _execQueue = completer.future.then((_) async {
+      // Post-command cooldown: give the server time to release the channel.
+      await Future.delayed(const Duration(milliseconds: 200));
+    });
+
+    // Wait for the previous command to finish (including its cooldown).
+    await previous;
+
+    if (!isConnected) {
+      completer.complete(null);
+      return null;
+    }
+
     try {
       final result = await _client!.run(command);
-      return SSHResult(
+      final sshResult = SSHResult(
         stdout: String.fromCharCodes(result),
         stderr: '',
       );
+      completer.complete(sshResult);
+      return sshResult;
     } catch (e) {
       debugPrint('SSH: Execution failed: $e');
+      completer.complete(null);
       return null;
     }
   }

@@ -162,16 +162,13 @@ class LogoOverlayService {
   /// in the slave myplaces.kml.
   Future<void> _forceRefreshSlave(String kmlFileName) async {
     try {
-      final client = _sshService.client!;
-
       // Batch both sed commands with a sleep between them into ONE channel
       // Target: ~/earth/kml/slave/myplaces.kml (slave screens)
-      await client.run(
+      await _sshService.execute(
         'sed -i "s|<href>[^<]*$kmlFileName<\\/href>|&<refreshMode>onInterval<\\/refreshMode><refreshInterval>1<\\/refreshInterval>|" ~/earth/kml/slave/myplaces.kml && '
         'sleep 1 && '
         'sed -i "s|<href>[^<]*$kmlFileName<\\/href><refreshMode>onInterval<\\/refreshMode><refreshInterval>[0-9]\\+<\\/refreshInterval>|<href>##LG_PHPIFACE##kml/$kmlFileName<\\/href>|" ~/earth/kml/slave/myplaces.kml',
       );
-      await _channelDelay();
     } catch (e) {
       debugPrint('LogoOverlay: Force refresh failed: $e');
     }
