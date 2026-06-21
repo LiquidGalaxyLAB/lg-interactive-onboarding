@@ -335,7 +335,7 @@ class _ModuleCard extends ConsumerWidget {
       opacity: isLocked ? 0.5 : 1.0,
       duration: const Duration(milliseconds: 250),
       child: GestureDetector(
-        onTap: isAvailable || isActiveModule
+        onTap: isAvailable || isActiveModule || isCompleted
             ? () => _startModule(context, ref)
             : null,
         child: Container(
