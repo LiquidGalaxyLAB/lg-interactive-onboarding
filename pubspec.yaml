@@ -72,6 +72,7 @@ flutter:
     - assets/scripts/dae_triangulate.py
     - assets/diagrams/
     - assets/logos/logo_banner.png
+    - assets/logos/apk_logo.png
 
 flutter_launcher_icons:
   android: "launcher_icon"
