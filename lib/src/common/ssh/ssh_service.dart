@@ -13,10 +13,21 @@ import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dar
 /// simple commands. For complex flows, access the client directly.
 class SSHService extends ChangeNotifier {
   SSHClient? _client;
+  SftpClient? _sftp;
 
   SSHClient? get client => _client;
 
   bool get isConnected => _client != null && !(_client!.isClosed);
+
+  /// Gets or creates a reusable SFTP client for the current session.
+  /// Reusing the client prevents SSH channel exhaustion when pushing multiple files.
+  Future<SftpClient?> get sftp async {
+    if (!isConnected) return null;
+    if (_sftp == null) {
+      _sftp = await _client!.sftp();
+    }
+    return _sftp;
+  }
 
   /// Connects to the SSH server.
   Future<bool> connect({
@@ -48,6 +59,8 @@ class SSHService extends ChangeNotifier {
 
   /// Disconnects from the SSH server.
   Future<void> disconnect() async {
+    _sftp?.close();
+    _sftp = null;
     _client?.close();
     _client = null;
     debugPrint('SSH: Disconnected');
@@ -83,10 +96,11 @@ class SSHService extends ChangeNotifier {
       return false;
     }
 
-    SftpClient? sftp;
     try {
-      sftp = await _client!.sftp();
-      final file = await sftp.open(
+      final sftpClient = await sftp;
+      if (sftpClient == null) return false;
+
+      final file = await sftpClient.open(
         remotePath,
         mode: SftpFileOpenMode.create |
             SftpFileOpenMode.truncate |
@@ -100,8 +114,6 @@ class SSHService extends ChangeNotifier {
     } catch (e) {
       debugPrint('SSH: SFTP upload failed: $e');
       return false;
-    } finally {
-      sftp?.close();
     }
   }
 
@@ -115,10 +127,11 @@ class SSHService extends ChangeNotifier {
       return false;
     }
 
-    SftpClient? sftp;
     try {
-      sftp = await _client!.sftp();
-      final file = await sftp.open(
+      final sftpClient = await sftp;
+      if (sftpClient == null) return false;
+
+      final file = await sftpClient.open(
         remotePath,
         mode: SftpFileOpenMode.create |
             SftpFileOpenMode.truncate |
@@ -131,8 +144,6 @@ class SSHService extends ChangeNotifier {
     } catch (e) {
       debugPrint('SSH: SFTP bytes upload failed: $e');
       return false;
-    } finally {
-      sftp?.close();
     }
   }
 }
