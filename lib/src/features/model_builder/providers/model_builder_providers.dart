@@ -29,14 +29,19 @@ class BundledModel {
 
 const bundledModels = [
   BundledModel(
-    displayName: '3D Model (Triangulated)',
+    displayName: 'Tree',
     assetPath: 'assets/models/3dmodel_tri.dae',
     fileName: '3dmodel_tri.dae',
   ),
   BundledModel(
-    displayName: 'Car (Triangulated)',
-    assetPath: 'assets/models/car_tri.dae',
-    fileName: 'car_tri.dae',
+    displayName: 'Football',
+    assetPath: 'assets/models/Ball DAE.dae',
+    fileName: 'Ball DAE.dae',
+  ),
+  BundledModel(
+    displayName: 'Car',
+    assetPath: 'assets/models/Car.dae',
+    fileName: 'Car.dae',
   ),
   BundledModel(
     displayName: 'Pyramid',
