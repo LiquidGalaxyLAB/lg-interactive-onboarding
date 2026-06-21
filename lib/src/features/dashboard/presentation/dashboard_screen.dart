@@ -15,6 +15,7 @@ import 'widgets/section_header.dart';
 import 'widgets/rig_controls_grid.dart';
 import 'widgets/feature_card.dart';
 import 'widgets/deep_clean_card.dart';
+import 'widgets/clear_logo_card.dart';
 
 /// Main dashboard — the hub after connecting to the LG rig.
 ///
@@ -155,6 +156,11 @@ class DashboardScreen extends ConsumerWidget {
 
                 // Deep Clean card
                 DeepCleanCard(isDark: isDark),
+
+                const SizedBox(height: 12),
+
+                // Clear Logo card
+                ClearLogoCard(isDark: isDark),
 
                 const SizedBox(height: 32),
               ]),
