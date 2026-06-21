@@ -81,10 +81,26 @@ class LogoOverlayService {
     }
   }
 
+  /// Executes an SSH command, optionally with sudo, and applies the channel delay.
+  Future<String> _execute(String command, {bool sudo = false}) async {
+    final String finalCommand;
+    if (sudo) {
+      final password = _settingsService.password;
+      finalCommand = '(echo $password; sleep 1) | sudo -S $command';
+    } else {
+      finalCommand = command;
+    }
+    
+    final result = await _sshService.execute(finalCommand);
+    if (result == null) throw Exception('Execution failed: $command');
+    
+    return result.stdout.trim();
+  }
+
   // ─── Clear Logo ───────────────────────────────────────────────────
 
   /// Clears the logo overlay by writing an empty KML to the leftmost
-  /// slave screen file.
+  /// slave screen file and removes the logo PNG from the master.
   Future<void> clearLogo() async {
     if (!_sshService.isConnected) {
       debugPrint('LogoOverlay: SSH not connected, skipping clearLogo');
@@ -105,7 +121,11 @@ class LogoOverlayService {
 
       await _forceRefreshSlave('slave_$leftScreen.kml');
 
-      debugPrint('LogoOverlay: Logo cleared from slave_$leftScreen');
+      // Remove the logo image from the master to keep the file system clean. Use sudo to ensure it removes properly.
+      await _execute('rm -f ${AppConstants.lgLogoRemotePath}', sudo: true);
+      _logoUploaded = false;
+
+      debugPrint('LogoOverlay: Logo cleared from slave_$leftScreen and file removed from master');
     } catch (e) {
       debugPrint('LogoOverlay: clearLogo failed: $e');
     }
