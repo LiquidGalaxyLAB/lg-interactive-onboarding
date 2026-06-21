@@ -71,6 +71,7 @@ flutter:
     - assets/models/model_pyramid.dae
     - assets/scripts/dae_triangulate.py
     - assets/diagrams/
+    - assets/logos/logo_banner.png
 
 flutter_launcher_icons:
   android: "launcher_icon"
