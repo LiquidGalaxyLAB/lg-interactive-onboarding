@@ -37,11 +37,15 @@ class _ModuleCompletionScreenState extends ConsumerState<ModuleCompletionScreen>
     super.initState();
 
     // Mark module completed in the status notifier
+    final curriculumStatusNotifier = ref.read(curriculumStatusProvider.notifier);
+    final guidedModeNotifier = ref.read(guidedModeControllerProvider.notifier);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref
-          .read(curriculumStatusProvider.notifier)
-          .setStatus(widget.completedModule.id, ModuleStatus.completed);
-      ref.read(guidedModeControllerProvider.notifier).acknowledgeCompletion();
+      if (!mounted) return;
+      curriculumStatusNotifier.setStatus(
+        widget.completedModule.id,
+        ModuleStatus.completed,
+      );
+      guidedModeNotifier.acknowledgeCompletion();
     });
 
     // Generate confetti particles

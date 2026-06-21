@@ -24,9 +24,12 @@ class _KmlPreviewWidgetState extends ConsumerState<KmlPreviewWidget> {
 
     if (project.isReady && !_hasSignaledOpened) {
       _hasSignaledOpened = true;
+      final previewOpenedNotifier = ref.read(kmlPreviewOpenedProvider.notifier);
+      final analytics = ref.read(analyticsServiceProvider);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(kmlPreviewOpenedProvider.notifier).set(true);
-        ref.read(analyticsServiceProvider).recordKmlPreviewOpened();
+        if (!mounted) return;
+        previewOpenedNotifier.set(true);
+        analytics.recordKmlPreviewOpened();
       });
     }
 
