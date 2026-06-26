@@ -49,6 +49,12 @@ dependencies:
   archive: ^4.0.4
   flutter_secure_storage: ^10.3.1
 
+  # SVG rendering (Architecture Explorer diagrams)
+  flutter_svg: ^2.0.10+1
+
+  # Text-to-speech (voice narration for guided mode & Architecture Explorer)
+  flutter_tts: ^3.8.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -63,3 +69,4 @@ flutter:
     - assets/models/car_tri.dae
     - assets/models/model_pyramid.dae
     - assets/scripts/dae_triangulate.py
+    - assets/diagrams/

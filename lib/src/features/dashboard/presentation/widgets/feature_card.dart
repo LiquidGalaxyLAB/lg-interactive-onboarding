@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lg_interactive_onboarding/src/common/curriculum/guided_mode_controller.dart';
 import 'dashboard_palette.dart';
 
 class FeatureCard extends StatefulWidget {
@@ -7,6 +8,7 @@ class FeatureCard extends StatefulWidget {
   final IconData icon;
   final Color accentColor;
   final bool isDark;
+  final String? spotlightKey;
   final VoidCallback onTap;
 
   const FeatureCard({
@@ -16,6 +18,7 @@ class FeatureCard extends StatefulWidget {
     required this.icon,
     required this.accentColor,
     required this.isDark,
+    this.spotlightKey,
     required this.onTap,
   });
 
@@ -33,6 +36,7 @@ class _FeatureCardState extends State<FeatureCard> {
         : Colors.white;
 
     return GestureDetector(
+      key: widget.spotlightKey != null ? GuidedModeController.spotlightKey(widget.spotlightKey!) : null,
       onTapDown: (_) => setState(() => _pressed = true),
       onTapUp: (_) => setState(() => _pressed = false),
       onTapCancel: () => setState(() => _pressed = false),

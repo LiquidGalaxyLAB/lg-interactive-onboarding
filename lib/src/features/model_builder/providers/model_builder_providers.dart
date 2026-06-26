@@ -357,6 +357,8 @@ class PushNotifier extends Notifier<PushState> {
       ref.read(deployedModelsProvider.notifier).addDeployment(project);
       // Regenerate ID for current state so next adjustments/pushes deploy as a new model
       ref.read(modelBuilderProvider.notifier).regenerateId();
+      // Signal curriculum engine — Module 2 auto-verify listens here
+      ref.read(modelPushSuccessProvider.notifier).set(true);
     }
 
     state = PushState(
@@ -524,3 +526,50 @@ final vertexCountProvider = FutureProvider<int?>((ref) async {
   final repo = ref.read(modelRepositoryProvider);
   return repo.extractDaeVertexCount(project.filePath!);
 });
+
+// ─── Curriculum Engine Integration Hooks ──────────────────────────────────────
+// These lightweight providers expose observable state flags that the Curriculum
+// Engine uses for auto-verification without coupling it to specific widgets.
+
+class ModelPushSuccessNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+  void set(bool value) => state = value;
+}
+
+/// Set to `true` after a model push completes successfully.
+///
+/// The Curriculum Engine watches this to auto-verify Module 2.
+/// Reset to `false` automatically 5 seconds after being set so the next
+/// push attempt starts fresh.
+final modelPushSuccessProvider = NotifierProvider<ModelPushSuccessNotifier, bool>(
+  ModelPushSuccessNotifier.new,
+);
+
+class KmlPreviewOpenedNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+  void set(bool value) => state = value;
+}
+
+/// Set to `true` when the user expands the KML Preview panel.
+///
+/// The Curriculum Engine watches this to auto-verify Module 3.
+/// Backed by [AnalyticsService] for persistence across restarts.
+final kmlPreviewOpenedProvider = NotifierProvider<KmlPreviewOpenedNotifier, bool>(
+  KmlPreviewOpenedNotifier.new,
+);
+
+class DeepCleanConfirmedNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+  void set(bool value) => state = value;
+}
+
+/// Set to `true` when the user confirms the Deep Clean dialog.
+///
+/// The Curriculum Engine watches this to auto-verify Module 7.
+/// Backed by [AnalyticsService] for persistence across restarts.
+final deepCleanConfirmedProvider = NotifierProvider<DeepCleanConfirmedNotifier, bool>(
+  DeepCleanConfirmedNotifier.new,
+);
