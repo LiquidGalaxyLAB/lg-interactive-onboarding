@@ -156,6 +156,39 @@ class LGService {
       return false;
     }
   }
+
+  /// Commands Liquid Galaxy to fly to a specific coordinate and orientation.
+  Future<bool> flyTo({
+    required double latitude,
+    required double longitude,
+    required double altitude,
+    required double heading,
+    required double tilt,
+    double range = 1000,
+  }) async {
+    if (!_isReady) return false;
+
+    try {
+      final lookAt = '<LookAt>'
+          '<longitude>$longitude</longitude>'
+          '<latitude>$latitude</latitude>'
+          '<altitude>$altitude</altitude>'
+          '<heading>$heading</heading>'
+          '<tilt>$tilt</tilt>'
+          '<range>$range</range>'
+          '<gx:altitudeMode>relativeToGround</gx:altitudeMode>'
+          '</LookAt>';
+          
+      final command = 'echo "flytoview=$lookAt" > /tmp/query.txt';
+      await _sshService.execute(command);
+      
+      debugPrint('LGService: Flew to $latitude, $longitude');
+      return true;
+    } catch (e) {
+      debugPrint('LGService: FlyTo failed: $e');
+      return false;
+    }
+  }
 }
 
 // ─── Provider ──────────────────────────────────────────────────────────

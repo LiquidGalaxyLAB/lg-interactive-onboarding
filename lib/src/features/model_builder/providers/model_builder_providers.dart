@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_project.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_repository.dart';
 import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
+import 'package:lg_interactive_onboarding/src/common/lg/lg_service.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -364,6 +365,23 @@ class PushNotifier extends Notifier<PushState> {
       ref.read(modelBuilderProvider.notifier).regenerateId();
       // Signal curriculum engine — Module 2 auto-verify listens here
       ref.read(modelPushSuccessProvider.notifier).set(true);
+
+      // Fly to the newly pushed model's location
+      if (project.hasLocation) {
+        // The 'range' parameter dictates how far the camera pulls back from the object.
+        // We increase the multiplier here so the camera doesn't end up inside very large models.
+        final range = (project.altitude + (project.scaleX * 15)).clamp(1000.0, 100000.0);
+        
+        ref.read(lgServiceProvider).flyTo(
+          latitude: project.latitude!,
+          longitude: project.longitude!,
+          altitude: project.altitude,
+          heading: project.heading,
+          // We use a fixed camera tilt for a nice bird's-eye 3D perspective.
+          tilt: AppConstants.defaultCameraTilt, 
+          range: range,
+        );
+      }
     }
 
     state = PushState(

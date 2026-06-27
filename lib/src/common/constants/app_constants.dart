@@ -23,6 +23,7 @@ class AppConstants {
   // ─── Model Builder Defaults ──────────────────────────────────────────
   static const double defaultScale = 1000.0;
   static const double defaultAltitude = 10.0;
+  static const double defaultCameraTilt = 60.0;
   static const int idMaxRandom = 9999;
   static const int idPaddingLength = 4;
 
