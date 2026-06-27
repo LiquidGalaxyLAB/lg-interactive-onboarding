@@ -75,8 +75,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() => _isConnecting = false);
 
     if (success) {
-      // Navigate back to Dashboard (which is inside AppShell) on successful connection
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Connected to Liquid Galaxy successfully!'),
+          backgroundColor: Color(0xFF7FB069),
+        ),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
