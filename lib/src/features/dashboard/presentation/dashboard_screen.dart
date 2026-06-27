@@ -12,7 +12,6 @@ import 'widgets/dashboard_palette.dart';
 import 'widgets/connection_chip.dart';
 import 'widgets/status_banner.dart';
 import 'widgets/section_header.dart';
-import 'widgets/rig_controls_grid.dart';
 import 'widgets/feature_card.dart';
 import 'widgets/deep_clean_card.dart';
 
@@ -106,19 +105,6 @@ class DashboardScreen extends ConsumerWidget {
                   StatusBanner(pushState: pushState, isDark: isDark),
                   const SizedBox(height: 16),
                 ],
-
-                // ─── Section: Rig Controls ─────────────────────
-                SectionHeader(
-                  label: 'RIG CONTROLS',
-                  icon: Icons.gamepad_outlined,
-                  isDark: isDark,
-                ),
-                const SizedBox(height: 12),
-
-                // Asymmetric grid of rig controls
-                RigControlsGrid(isDark: isDark),
-
-                const SizedBox(height: 28),
 
                 // ─── Section: Tools ────────────────────────────
                 SectionHeader(

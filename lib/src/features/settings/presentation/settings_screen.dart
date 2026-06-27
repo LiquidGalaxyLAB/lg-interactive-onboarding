@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/common/tts/tts_service.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
+import 'widgets/rig_controls_grid.dart';
 
 /// Settings screen for managing SSH connection and app preferences.
 ///
@@ -296,6 +297,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ],
+
+            const SizedBox(height: 32),
+
+            // ─── Rig Controls ─────────────────────────────────────
+            _SectionLabel(label: 'RIG CONTROLS', isDark: isDark),
+            const SizedBox(height: 14),
+            RigControlsGrid(isDark: isDark),
 
             const SizedBox(height: 32),
 
