@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/features/dashboard/data/lg_service.dart';
+import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
 import 'dashboard_palette.dart';
 
 class RigControlsGrid extends ConsumerWidget {
@@ -110,7 +111,13 @@ class RigControlsGrid extends ConsumerWidget {
                     },
                   ),
                 ),
-                const SizedBox(width: 12),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Row 3: Clear KML + Clear Logo
+            Row(
+              children: [
                 Expanded(
                   flex: 2,
                   child: RigControlCard(
@@ -131,6 +138,28 @@ class RigControlsGrid extends ConsumerWidget {
                         );
                       }
                     },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 3,
+                  child: RigControlCard(
+                    title: 'Clear Logo',
+                    icon: Icons.hide_image_outlined,
+                    accentColor: DashboardPalette.dustyBlue,
+                    isDark: isDark,
+                    enabled: isConnected,
+                    onTap: () => _confirmDangerous(
+                      context,
+                      ref,
+                      title: 'Clear Logo',
+                      message: 'Remove the logo overlay from the leftmost LG screen?',
+                      action: () async {
+                        await ref.read(logoOverlayServiceProvider).clearLogo();
+                        return true;
+                      },
+                      actionLabel: 'Clear Logo',
+                    ),
                   ),
                 ),
               ],
