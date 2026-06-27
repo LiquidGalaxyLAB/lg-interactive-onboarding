@@ -71,7 +71,6 @@ flutter:
     - assets/models/Car.dae
     - assets/models/model_pyramid.dae
     - assets/scripts/dae_triangulate.py
-    - assets/diagrams/
     - assets/logos/logo_banner.png
     - assets/logos/apk_logo.png
 
