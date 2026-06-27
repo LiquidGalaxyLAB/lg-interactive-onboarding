@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
+import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
 import 'package:lg_interactive_onboarding/src/common/tts/tts_service.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 import 'widgets/rig_controls_grid.dart';
@@ -64,6 +65,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!mounted) return;
     setState(() => _isConnecting = true);
 
+    // Clear logo while SSH is still connected, then disconnect.
+    if (ssh.isConnected) {
+      await ref.read(logoOverlayServiceProvider).clearLogo();
+    }
     await ssh.disconnect();
     final success = await ssh.connect(
       host: _hostCtrl.text.trim(),
@@ -285,6 +290,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 height: 52,
                 child: OutlinedButton.icon(
                   onPressed: () async {
+                    // Clear logo while SSH is still connected, then disconnect.
+                    await ref.read(logoOverlayServiceProvider).clearLogo();
                     await ssh.disconnect();
                     setState(() {});
                   },

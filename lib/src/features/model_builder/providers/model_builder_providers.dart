@@ -8,7 +8,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_project.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_repository.dart';
 import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
-import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -365,8 +364,6 @@ class PushNotifier extends Notifier<PushState> {
       ref.read(modelBuilderProvider.notifier).regenerateId();
       // Signal curriculum engine — Module 2 auto-verify listens here
       ref.read(modelPushSuccessProvider.notifier).set(true);
-      // Show logo overlay on the leftmost LG screen
-      ref.read(logoOverlayServiceProvider).sendLogo();
     }
 
     state = PushState(
@@ -399,11 +396,6 @@ class PushNotifier extends Notifier<PushState> {
 
     if (result.success) {
       ref.read(deployedModelsProvider.notifier).removeDeployment(model.id);
-      // Clear logo if this was the last deployed model
-      final remainingAfter = ref.read(deployedModelsProvider);
-      if (remainingAfter.isEmpty) {
-        ref.read(logoOverlayServiceProvider).clearLogo();
-      }
     }
 
     state = PushState(
@@ -433,8 +425,6 @@ class PushNotifier extends Notifier<PushState> {
 
     if (result.success) {
       ref.read(deployedModelsProvider.notifier).clearAll();
-      // Clear logo — all models removed
-      ref.read(logoOverlayServiceProvider).clearLogo();
     }
 
     state = PushState(
@@ -461,8 +451,6 @@ class PushNotifier extends Notifier<PushState> {
 
     if (result.success) {
       ref.read(deployedModelsProvider.notifier).clearAll();
-      // Clear logo — rig wiped
-      ref.read(logoOverlayServiceProvider).clearLogo();
     }
 
     state = PushState(
@@ -487,9 +475,8 @@ class PushNotifier extends Notifier<PushState> {
 
     final result = await repo.writeEmptyMasterKml();
 
-    // Clear logo — master KML cleared
+    // no logo action — logo lifecycle is managed by the SSH connection watcher
     if (result.success) {
-      ref.read(logoOverlayServiceProvider).clearLogo();
     }
 
     state = PushState(
@@ -517,8 +504,6 @@ class PushNotifier extends Notifier<PushState> {
 
     if (result.success) {
       ref.read(deployedModelsProvider.notifier).clearAll();
-      // Clear logo — deep clean
-      ref.read(logoOverlayServiceProvider).clearLogo();
     }
 
     state = PushState(
