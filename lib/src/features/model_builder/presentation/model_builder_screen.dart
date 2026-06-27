@@ -6,7 +6,6 @@ import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_
 import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/presentation/map_placement_widget.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/presentation/orientation_sliders.dart';
-import 'package:lg_interactive_onboarding/src/features/model_builder/presentation/kml_preview_widget.dart';
 
 /// Main 3D Model Builder screen.
 class ModelBuilderScreen extends ConsumerWidget {
@@ -88,8 +87,6 @@ class ModelBuilderScreen extends ConsumerWidget {
           const MapPlacementWidget(),
           const SizedBox(height: 16),
           const OrientationSlidersWidget(),
-          const SizedBox(height: 16),
-          const KmlPreviewWidget(),
           const SizedBox(height: 16),
           _PushToLGCard(
             theme: theme, pushState: pushState,
