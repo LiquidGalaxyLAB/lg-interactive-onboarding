@@ -250,7 +250,7 @@ class _RigControlCardState extends State<RigControlCard> {
   @override
   Widget build(BuildContext context) {
     final surfaceColor = widget.isDark
-        ? const Color(0xFF1C2236)
+        ? const Color(0xFF2A2A2D)   // M3 dark surface variant
         : Colors.white;
 
     return GestureDetector(

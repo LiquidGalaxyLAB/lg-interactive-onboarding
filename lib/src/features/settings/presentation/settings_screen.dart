@@ -84,14 +84,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Connected to Liquid Galaxy successfully!'),
-          backgroundColor: Color(0xFF7FB069),
+          backgroundColor: Color(0xFF1E8E3E),
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Connection failed — check your settings'),
-          backgroundColor: Color(0xFFC0392B),
+          backgroundColor: Color(0xFFB3261E),
         ),
       );
     }
@@ -103,11 +103,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final ssh = ref.watch(sshServiceProvider);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Warm palette
-    const sage = Color(0xFF7FB069);
-    const terracotta = Color(0xFFC0392B);
-    const warmGrey = Color(0xFF8E8D8A);
-    const inkDark = Color(0xFF2C2C2C);
+    // M3 semantic palette
+    const success     = Color(0xFF1E8E3E);  // M3 success green
+    const error       = Color(0xFFB3261E);  // M3 error red
+    const outline     = Color(0xFF747775);  // M3 outline
+    const onSurface   = Color(0xFF1F1F1F);  // M3 on-surface
+    // Dark-mode overrides
+    final successEff  = isDark ? const Color(0xFF72DD87) : success;
+    final errorEff    = isDark ? const Color(0xFFF2B8B5) : error;
+    final outlineEff  = isDark ? const Color(0xFF9AA0A6) : outline;
+    final onSurfaceEff = isDark ? const Color(0xFFE3E3E3) : onSurface;
 
     return Scaffold(
       body: SafeArea(
@@ -124,7 +129,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 fontWeight: FontWeight.w800,
                 height: 1.2,
                 letterSpacing: -0.5,
-                color: isDark ? Colors.white : inkDark,
+                color: onSurfaceEff,
               ),
             ),
             const SizedBox(height: 8),
@@ -132,7 +137,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               'Enter your rig\'s SSH details to get started',
               style: TextStyle(
                 fontSize: 14,
-                color: isDark ? Colors.white54 : warmGrey,
+                color: outlineEff,
               ),
             ),
 
@@ -145,12 +150,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(14),
                 color: ssh.isConnected
-                    ? sage.withValues(alpha: isDark ? 0.15 : 0.08)
-                    : terracotta.withValues(alpha: isDark ? 0.1 : 0.05),
+                    ? successEff.withValues(alpha: isDark ? 0.15 : 0.08)
+                    : errorEff.withValues(alpha: isDark ? 0.10 : 0.05),
                 border: Border.all(
                   color: ssh.isConnected
-                      ? sage.withValues(alpha: 0.3)
-                      : terracotta.withValues(alpha: 0.15),
+                      ? successEff.withValues(alpha: 0.30)
+                      : errorEff.withValues(alpha: 0.20),
                 ),
               ),
               child: Row(
@@ -160,7 +165,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     height: 8,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: ssh.isConnected ? sage : terracotta.withValues(alpha: 0.6),
+                      color: ssh.isConnected ? successEff : errorEff.withValues(alpha: 0.6),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -170,8 +175,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                       color: ssh.isConnected
-                          ? sage
-                          : (isDark ? Colors.white54 : warmGrey),
+                          ? successEff
+                          : outlineEff,
                     ),
                   ),
                   const Spacer(),
@@ -298,8 +303,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   icon: const Icon(Icons.link_off),
                   label: const Text('Disconnect'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: terracotta,
-                    side: BorderSide(color: terracotta.withValues(alpha: 0.5)),
+                    foregroundColor: errorEff,
+                    side: BorderSide(color: errorEff.withValues(alpha: 0.5)),
                   ),
                 ),
               ),
@@ -353,7 +358,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               subtitle: const Text('Read aloud guided-mode steps and diagram descriptions'),
               secondary: Icon(
                 _voiceNarration ? Icons.record_voice_over : Icons.voice_over_off,
-                color: _voiceNarration ? sage : warmGrey,
+                color: _voiceNarration
+                    ? const Color(0xFF1A73E8)
+                    : outlineEff,
               ),
               value: _voiceNarration,
               onChanged: (value) async {
@@ -362,7 +369,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 await settings.setVoiceNarration(value);
                 ref.read(ttsServiceProvider).setEnabled(value);
               },
-              activeThumbColor: sage,
+              activeThumbColor: const Color(0xFF1A73E8),
               contentPadding: EdgeInsets.zero,
             ),
 
@@ -389,8 +396,8 @@ class _SectionLabel extends StatelessWidget {
         fontWeight: FontWeight.w700,
         letterSpacing: 1.8,
         color: isDark
-            ? Colors.white.withValues(alpha: 0.35)
-            : const Color(0xFF8E8D8A).withValues(alpha: 0.7),
+            ? const Color(0xFF9AA0A6)
+            : const Color(0xFF747775),
       ),
     );
   }

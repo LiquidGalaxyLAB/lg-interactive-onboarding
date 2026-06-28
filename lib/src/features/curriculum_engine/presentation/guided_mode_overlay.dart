@@ -176,11 +176,11 @@ class _InstructionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = isDark ? const Color(0xFF1A1F33) : Colors.white;
+    final bg = isDark ? const Color(0xFF2A2A2D) : Colors.white;
     final border = isDark
         ? Colors.white.withValues(alpha: 0.08)
         : Colors.black.withValues(alpha: 0.06);
-    const accent = Color(0xFF6C5CE7);
+    const accent = Color(0xFF1A73E8);
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -214,7 +214,7 @@ class _InstructionCard extends StatelessWidget {
                         child: const Icon(
                           Icons.menu_book_rounded,
                           size: 18,
-                          color: Color(0xFF6C5CE7),
+                          color: Color(0xFF1A73E8),
                         ),
                       ),
                     ),
@@ -472,7 +472,7 @@ class _PulseDotState extends State<_PulseDot>
         width: 7,
         height: 7,
         decoration: const BoxDecoration(
-          color: Color(0xFF6C5CE7),
+          color: Color(0xFF1A73E8),
           shape: BoxShape.circle,
         ),
       ),

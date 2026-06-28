@@ -87,12 +87,12 @@ class _ModuleCompletionScreenState extends ConsumerState<ModuleCompletionScreen>
   }
 
   static const _confettiColors = [
-    Color(0xFF6C5CE7),
-    Color(0xFF00D2FF),
-    Color(0xFFFD79A8),
-    Color(0xFF55EFC4),
-    Color(0xFFFDCB6E),
-    Color(0xFFE17055),
+    Color(0xFF1A73E8),
+    Color(0xFF4A6785),
+    Color(0xFFB3261E),
+    Color(0xFF1E8E3E),
+    Color(0xFFE37400),
+    Color(0xFF1A73E8),
   ];
 
   @override
@@ -108,7 +108,7 @@ class _ModuleCompletionScreenState extends ConsumerState<ModuleCompletionScreen>
     final canStartNext = nextModule?.status == ModuleStatus.available;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F6FA),
+      backgroundColor: isDark ? const Color(0xFF131314) : const Color(0xFFF8F9FA),
       body: Stack(
         children: [
           // ── Confetti animation ─────────────────────────────────────────────
@@ -144,11 +144,11 @@ class _ModuleCompletionScreenState extends ConsumerState<ModuleCompletionScreen>
                           gradient: const LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: [Color(0xFF6C5CE7), Color(0xFF00D2FF)],
+                            colors: [Color(0xFF1A73E8), Color(0xFF4A6785)],
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF6C5CE7)
+                              color: const Color(0xFF1A73E8)
                                   .withValues(alpha: 0.4),
                               blurRadius: 30,
                               spreadRadius: 2,
@@ -173,7 +173,7 @@ class _ModuleCompletionScreenState extends ConsumerState<ModuleCompletionScreen>
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.5,
-                        color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                        color: isDark ? Colors.white : const Color(0xFF1F1F1F),
                       ),
                     ),
 

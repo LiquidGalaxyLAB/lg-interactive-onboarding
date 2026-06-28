@@ -40,7 +40,7 @@ class DashboardScreen extends ConsumerWidget {
             pinned: true,
             automaticallyImplyLeading: false,
             backgroundColor: isDark
-                ? const Color(0xFF141929)
+                ? const Color(0xFF1E1E20)    // M3 dark surface
                 : DashboardPalette.parchment,
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
@@ -70,7 +70,7 @@ class DashboardScreen extends ConsumerWidget {
               // About / Help shortcut
               IconButton(
                 icon: Icon(
-                  Icons.help_outline_rounded,
+                  Icons.info_outline_rounded,
                   color: isDark ? Colors.white60 : DashboardPalette.warmGrey,
                 ),
                 tooltip: 'About / Help',

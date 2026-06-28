@@ -49,12 +49,12 @@ class LearnScreen extends ConsumerWidget {
             pinned: true,
             automaticallyImplyLeading: false,
             backgroundColor: isDark
-                ? const Color(0xFF141929)
+                ? const Color(0xFF1E1E20)
                 : Colors.white,
             actions: [
               IconButton(
                 icon: Icon(
-                  Icons.help_outline_rounded,
+                  Icons.info_outline_rounded,
                   color: isDark ? Colors.white60 : Colors.black54,
                 ),
                 tooltip: 'About',
@@ -72,7 +72,7 @@ class LearnScreen extends ConsumerWidget {
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.5,
-                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                  color: isDark ? Colors.white : const Color(0xFF1F1F1F),
                 ),
               ),
             ),
@@ -154,8 +154,8 @@ class _ProgressCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final progress = total > 0 ? completed / total : 0.0;
-    final bg = isDark ? const Color(0xFF1A1F33) : Colors.white;
-    const accent = Color(0xFF6C5CE7);
+    final bg = isDark ? const Color(0xFF2A2A2D) : Colors.white;
+    const accent = Color(0xFF1A73E8);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -167,7 +167,7 @@ class _ProgressCard extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [
             accent.withValues(alpha: isDark ? 0.18 : 0.06),
-            const Color(0xFF00D2FF).withValues(alpha: isDark ? 0.08 : 0.04),
+            const Color(0xFFD3E3FD).withValues(alpha: isDark ? 0.08 : 0.04),
           ],
         ),
         border: Border.all(
@@ -232,7 +232,7 @@ class _ProgressCard extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    color: isDark ? Colors.white : const Color(0xFF1F1F1F),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -277,16 +277,16 @@ class _ActiveModuleBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF6C5CE7).withValues(alpha: 0.12),
+        color: const Color(0xFF1A73E8).withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFF6C5CE7).withValues(alpha: 0.3),
+          color: const Color(0xFF1A73E8).withValues(alpha: 0.3),
         ),
       ),
       child: Row(
         children: [
           const Icon(Icons.play_circle_outline_rounded,
-              color: Color(0xFF6C5CE7), size: 18),
+              color: Color(0xFF1A73E8), size: 18),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -294,7 +294,7 @@ class _ActiveModuleBanner extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: const Color(0xFF6C5CE7),
+                color: const Color(0xFF1A73E8),
               ),
             ),
           ),
@@ -324,9 +324,9 @@ class _ModuleCard extends ConsumerWidget {
     final isAvailable = module.status == ModuleStatus.available ||
         module.status == ModuleStatus.inProgress;
 
-    final bg = isDark ? const Color(0xFF1A1F33) : Colors.white;
+    final bg = isDark ? const Color(0xFF2A2A2D) : Colors.white;
     final border = isActiveModule
-        ? const Color(0xFF6C5CE7).withValues(alpha: 0.5)
+        ? const Color(0xFF1A73E8).withValues(alpha: 0.5)
         : isDark
             ? Colors.white.withValues(alpha: isLocked ? 0.04 : 0.07)
             : Colors.black.withValues(alpha: isLocked ? 0.04 : 0.06);
@@ -347,7 +347,7 @@ class _ModuleCard extends ConsumerWidget {
             boxShadow: isActiveModule
                 ? [
                     BoxShadow(
-                      color: const Color(0xFF6C5CE7).withValues(alpha: 0.15),
+                      color: const Color(0xFF1A73E8).withValues(alpha: 0.15),
                       blurRadius: 12,
                     )
                   ]
@@ -370,14 +370,14 @@ class _ModuleCard extends ConsumerWidget {
                           color: isDark ? Colors.white30 : Colors.black38)
                       : isCompleted
                           ? const Icon(Icons.check_circle_rounded,
-                              size: 22, color: Color(0xFF55EFC4))
+                              size: 22, color: Color(0xFF1E8E3E))
                           : Icon(
-                              Icons.play_circle_outline_rounded,
-                              size: 20,
-                                color: isDark
-                                    ? Colors.white70
-                                    : const Color(0xFF1A1A2E),
-                            ),
+                                Icons.play_circle_outline_rounded,
+                                size: 20,
+                                  color: isDark
+                                      ? Colors.white70
+                                      : const Color(0xFF1F1F1F),
+                              ),
                 ),
               ),
 
@@ -395,7 +395,7 @@ class _ModuleCard extends ConsumerWidget {
                         fontWeight: FontWeight.w700,
                         color: isLocked
                             ? (isDark ? Colors.white38 : Colors.black38)
-                            : (isDark ? Colors.white : const Color(0xFF1A1A2E)),
+                            : (isDark ? Colors.white : const Color(0xFF1F1F1F)),
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -484,11 +484,11 @@ class _ModuleCard extends ConsumerWidget {
       case ModuleStatus.locked:
         return Colors.grey;
       case ModuleStatus.available:
-        return const Color(0xFF6C5CE7);
+        return const Color(0xFF1A73E8);
       case ModuleStatus.inProgress:
-        return const Color(0xFFFDCB6E);
+        return const Color(0xFFE37400);
       case ModuleStatus.completed:
-        return const Color(0xFF55EFC4);
+        return const Color(0xFF1E8E3E);
     }
   }
 
@@ -506,9 +506,9 @@ class _StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final (label, color) = switch (status) {
       ModuleStatus.locked => ('Locked', Colors.grey),
-      ModuleStatus.available => ('Available', const Color(0xFF6C5CE7)),
-      ModuleStatus.inProgress => ('In Progress', const Color(0xFFFDCB6E)),
-      ModuleStatus.completed => ('Completed', const Color(0xFF55EFC4)),
+      ModuleStatus.available => ('Available', const Color(0xFF1A73E8)),
+      ModuleStatus.inProgress => ('In Progress', const Color(0xFFE37400)),
+      ModuleStatus.completed => ('Completed', const Color(0xFF1E8E3E)),
     };
 
     return Container(
@@ -550,11 +550,11 @@ class _ExplorerCard extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: isDark
-                ? [const Color(0xFF141929), const Color(0xFF1C2236)]
-                : [const Color(0xFFEEF0F7), Colors.white],
+                ? [const Color(0xFF1E1E20), const Color(0xFF2A2A2D)]
+                : [const Color(0xFFF8F9FA), Colors.white],
           ),
           border: Border.all(
-            color: const Color(0xFF00D2FF).withValues(alpha: 0.25),
+            color: const Color(0xFF4A6785).withValues(alpha: 0.25),
           ),
         ),
         child: Row(
@@ -564,7 +564,7 @@ class _ExplorerCard extends StatelessWidget {
               height: 48,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF6C5CE7), Color(0xFF00D2FF)],
+                  colors: [Color(0xFF1A73E8), Color(0xFF4A6785)],
                 ),
                 borderRadius: BorderRadius.circular(14),
               ),
@@ -584,7 +584,7 @@ class _ExplorerCard extends StatelessWidget {
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                      color: isDark ? Colors.white : const Color(0xFF1F1F1F),
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -600,7 +600,7 @@ class _ExplorerCard extends StatelessWidget {
               ),
             ),
             const Icon(Icons.chevron_right_rounded,
-                color: Color(0xFF00D2FF)),
+                color: Color(0xFF4A6785)),
           ],
         ),
       ),

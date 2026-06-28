@@ -61,7 +61,7 @@ class _DiagramViewerState extends State<DiagramViewer>
             // ── Animated diagram painter ──────────────────────────────────
             AnimatedBuilder(
               animation: _animCtrl,
-              builder: (_, __) => CustomPaint(
+              builder: (context, child) => CustomPaint(
                 size: size,
                 painter: _painterFor(
                   widget.diagram,
@@ -154,11 +154,11 @@ abstract class DiagramPainter extends CustomPainter {
       {required this.t, required this.isDark, required this.accent});
 
   Color get bg =>
-      isDark ? const Color(0xFF141929) : const Color(0xFFEEF0F7);
+      isDark ? const Color(0xFF131314) : const Color(0xFFF8F9FA);
   Color get nodeColor =>
-      isDark ? const Color(0xFF1C2236) : Colors.white;
+      isDark ? const Color(0xFF2A2A2D) : Colors.white;
   Color get textColor =>
-      isDark ? Colors.white : const Color(0xFF1A1A2E);
+      isDark ? Colors.white : const Color(0xFF1F1F1F);
   Color get subtextColor =>
       isDark ? Colors.white54 : Colors.black54;
 
@@ -499,7 +499,7 @@ class SshFlowPainter extends DiagramPainter {
 
     // Return arrow (stdout)
     final returnPaint = Paint()
-      ..color = const Color(0xFF55EFC4).withValues(alpha: 0.6)
+      ..color = const Color(0xFF72DD87).withValues(alpha: 0.6)
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
     drawArrow(canvas, Offset(endX, returnY), Offset(startX, returnY),
@@ -512,7 +512,7 @@ class SshFlowPainter extends DiagramPainter {
     canvas.drawCircle(
       Offset(retDotX, returnY),
       5,
-      Paint()..color = const Color(0xFF55EFC4),
+      Paint()..color = const Color(0xFF72DD87),
     );
 
     // ── SFTP label (bottom) ───────────────────────────────────────────────
@@ -614,7 +614,7 @@ class KmlPropagationPainter extends DiagramPainter {
         dotPos,
         4,
         Paint()
-          ..color = const Color(0xFF55EFC4).withValues(alpha: 0.8),
+          ..color = const Color(0xFF72DD87).withValues(alpha: 0.8),
       );
     }
 

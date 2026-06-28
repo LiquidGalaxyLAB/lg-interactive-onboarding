@@ -60,7 +60,7 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
     final guidedState = ref.watch(guidedModeControllerProvider);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    const accent = Color(0xFF6C5CE7);
+    const accent = Color(0xFF1A73E8);
 
     return Scaffold(
       body: Stack(
@@ -84,7 +84,7 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (i) => setState(() => _selectedIndex = i),
-        backgroundColor: isDark ? const Color(0xFF141929) : Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E1E20) : Colors.white,
         indicatorColor: accent.withValues(alpha: 0.15),
         shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
@@ -97,13 +97,13 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
                   ? accent
                   : (isDark ? Colors.white38 : Colors.black38),
             ),
-            selectedIcon: const Icon(Icons.home_rounded, color: Color(0xFF6C5CE7)),
+            selectedIcon: const Icon(Icons.home_rounded, color: Color(0xFF1A73E8)),
             label: 'Home',
           ),
           NavigationDestination(
             icon: Badge(
               isLabelVisible: guidedState.isActive && _selectedIndex != 1,
-              backgroundColor: const Color(0xFFFD79A8),
+              backgroundColor: const Color(0xFFB3261E),
               child: Icon(
                 Icons.school_outlined,
                 color: _selectedIndex == 1
@@ -112,7 +112,7 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
               ),
             ),
             selectedIcon:
-                const Icon(Icons.school_rounded, color: Color(0xFF6C5CE7)),
+                const Icon(Icons.school_rounded, color: Color(0xFF1A73E8)),
             label: 'Learn',
           ),
         ],
