@@ -28,7 +28,7 @@ class LGService {
     final password = _settingsService.password;
 
     try {
-      for (int i = 1; i <= rigs; i++) {
+      for (int i = rigs; i >= 1; i--) {
         final command =
             'sshpass -p "$password" ssh -o StrictHostKeyChecking=no lg$i '
             '"(echo $password; sleep 1) | sudo -S poweroff"';
@@ -50,7 +50,7 @@ class LGService {
     final password = _settingsService.password;
 
     try {
-      for (int i = 1; i <= rigs; i++) {
+      for (int i = rigs; i >= 1; i--) {
         final command =
             'sshpass -p "$password" ssh -o StrictHostKeyChecking=no lg$i '
             '"(echo $password; sleep 1) | sudo -S reboot"';
@@ -89,7 +89,7 @@ class LGService {
     """;
 
     try {
-      for (var i = rigs; i >= 1; i--) {
+      for (int i = rigs; i >= 1; i--) {
         final command = 'sshpass -p "$password" ssh -o StrictHostKeyChecking=no lg$i "$relaunchScript"';
         debugPrint('LGService: Relaunch lg$i...');
         await _sshService.execute(command);

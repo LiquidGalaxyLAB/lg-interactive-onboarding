@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
@@ -58,6 +57,21 @@ class SSHService extends ChangeNotifier {
         username: username,
         onPasswordRequest: () => password,
       );
+
+      // Wait for the SSH handshake and authentication to complete.
+      // Without this, connection drops or bad passwords throw unhandled async exceptions.
+      await _client!.authenticated;
+
+      // Listen for unexpected connection drops (e.g., when rig reboots).
+      _client!.done.whenComplete(() {
+        if (_client != null) {
+          debugPrint('SSH: Connection closed unexpectedly');
+          _client = null;
+          _sftpFuture = null;
+          notifyListeners();
+        }
+      });
+
       // Reset execution queue for the new connection.
       _execQueue = Future.value();
       debugPrint('SSH: Connected to $host');
@@ -143,7 +157,8 @@ class SSHService extends ChangeNotifier {
 
       final file = await sftpClient.open(
         remotePath,
-        mode: SftpFileOpenMode.create |
+        mode:
+            SftpFileOpenMode.create |
             SftpFileOpenMode.truncate |
             SftpFileOpenMode.write,
       );
@@ -174,7 +189,8 @@ class SSHService extends ChangeNotifier {
 
       final file = await sftpClient.open(
         remotePath,
-        mode: SftpFileOpenMode.create |
+        mode:
+            SftpFileOpenMode.create |
             SftpFileOpenMode.truncate |
             SftpFileOpenMode.write,
       );
