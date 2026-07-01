@@ -63,7 +63,10 @@ class SSHService extends ChangeNotifier {
       await _client!.authenticated;
 
       // Listen for unexpected connection drops (e.g., when rig reboots).
-      _client!.done.whenComplete(() {
+      // We must catch errors on the done future, otherwise socket aborts will crash the app.
+      _client!.done.catchError((e) {
+        debugPrint('SSH: Socket error: $e');
+      }).whenComplete(() {
         if (_client != null) {
           debugPrint('SSH: Connection closed unexpectedly');
           _client = null;
