@@ -166,7 +166,7 @@ class SSHService extends ChangeNotifier {
             SftpFileOpenMode.write,
       );
       final bytes = Uint8List.fromList(localData.codeUnits);
-      await file.write(Stream.value(bytes));
+      await file.write(_chunkedStream(bytes));
       await file.close();
       debugPrint('SSH: File uploaded to $remotePath');
       return true;
@@ -197,13 +197,24 @@ class SSHService extends ChangeNotifier {
             SftpFileOpenMode.truncate |
             SftpFileOpenMode.write,
       );
-      await file.write(Stream.value(bytes));
+      await file.write(_chunkedStream(bytes));
       await file.close();
       debugPrint('SSH: Bytes uploaded to $remotePath (${bytes.length} bytes)');
       return true;
     } catch (e) {
       debugPrint('SSH: SFTP bytes upload failed: $e');
       return false;
+    }
+  }
+
+  /// Helper to split large files into safe SFTP chunks (32KB is standard max)
+  /// to prevent the SSH server from forcibly dropping the connection.
+  Stream<Uint8List> _chunkedStream(Uint8List bytes, [int chunkSize = 32768]) async* {
+    int offset = 0;
+    while (offset < bytes.length) {
+      final int length = (bytes.length - offset < chunkSize) ? bytes.length - offset : chunkSize;
+      yield bytes.sublist(offset, offset + length);
+      offset += length;
     }
   }
 }
