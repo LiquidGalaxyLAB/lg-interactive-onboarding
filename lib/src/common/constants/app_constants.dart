@@ -25,4 +25,11 @@ class AppConstants {
   static const double defaultAltitude = 10.0;
   static const int idMaxRandom = 9999;
   static const int idPaddingLength = 4;
+
+  // ─── Logo Overlay ────────────────────────────────────────────────────
+  static const String lgLogoRemotePath = '/var/www/html/kml/logo_banner.png';
+  static const String lgLogoAssetPath = 'assets/logos/logo_banner.png';
+  static const int logoOverlayWidth = 554;
+  static const int logoOverlayHeight = 500;
+  static const String lgSlaveKmlDir = '/var/www/html/kml';
 }

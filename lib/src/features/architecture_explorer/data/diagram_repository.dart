@@ -140,8 +140,8 @@ class DiagramRepository {
         detailBody:
             'The tablet app uses the `dartssh2` Dart package to establish '
             'an SSH session with the master node over port 22.\n\n'
-            'GOLDEN RULE: Always use `client.run()` for simple commands. '
-            'SFTP is used only for file uploads (model files, scripts).',
+            'GOLDEN RULE: Always use `SSHService.execute()` to prevent channel '
+            'exhaustion. SFTP is used only for file uploads.',
         relatedModuleId: 'connect_lg',
       ),
       HotspotDefinition(

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/curriculum/guided_mode_controller.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
-import 'package:lg_interactive_onboarding/src/features/architecture_explorer/presentation/architecture_explorer_screen.dart';
+import 'package:lg_interactive_onboarding/src/features/about/presentation/about_screen.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/presentation/model_builder_screen.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
@@ -15,6 +15,7 @@ import 'widgets/section_header.dart';
 import 'widgets/rig_controls_grid.dart';
 import 'widgets/feature_card.dart';
 import 'widgets/deep_clean_card.dart';
+import 'widgets/clear_logo_card.dart';
 
 /// Main dashboard — the hub after connecting to the LG rig.
 ///
@@ -68,16 +69,16 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                 ),
               ),
-              // Architecture Explorer shortcut
+              // About / Help shortcut
               IconButton(
                 icon: Icon(
                   Icons.help_outline_rounded,
                   color: isDark ? Colors.white60 : DashboardPalette.warmGrey,
                 ),
-                tooltip: 'Architecture Explorer',
+                tooltip: 'About / Help',
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => const ArchitectureExplorerScreen(),
+                    builder: (_) => const AboutScreen(),
                   ),
                 ),
               ),
@@ -155,6 +156,11 @@ class DashboardScreen extends ConsumerWidget {
 
                 // Deep Clean card
                 DeepCleanCard(isDark: isDark),
+
+                const SizedBox(height: 12),
+
+                // Clear Logo card
+                ClearLogoCard(isDark: isDark),
 
                 const SizedBox(height: 32),
               ]),

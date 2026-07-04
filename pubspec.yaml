@@ -60,13 +60,22 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
 
   assets:
     - assets/models/3dmodel_tri.dae
-    - assets/models/car_tri.dae
+    - assets/models/Ball DAE.dae
+    - assets/models/Car.dae
     - assets/models/model_pyramid.dae
     - assets/scripts/dae_triangulate.py
     - assets/diagrams/
+    - assets/logos/logo_banner.png
+    - assets/logos/apk_logo.png
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/logos/apk_logo.png"

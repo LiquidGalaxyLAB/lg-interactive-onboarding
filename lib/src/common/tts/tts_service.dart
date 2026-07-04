@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 
 /// Text-to-speech service for voice narration throughout the app.
 ///
@@ -70,5 +71,8 @@ class TTSService extends ChangeNotifier {
 /// Singleton TTS service — use [ChangeNotifierProvider] so widgets can
 /// reactively watch [TTSService.isEnabled] and [TTSService.isSpeaking].
 final ttsServiceProvider = Provider<TTSService>((ref) {
-  return TTSService();
+  final settings = ref.read(settingsServiceProvider);
+  final tts = TTSService();
+  tts.setEnabled(settings.voiceNarration);
+  return tts;
 });

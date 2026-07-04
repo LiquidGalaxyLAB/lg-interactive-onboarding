@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:lg_interactive_onboarding/src/common/curriculum/guided_mode_controller.dart';
 import 'package:lg_interactive_onboarding/src/common/curriculum/learning_module.dart';
+import 'package:lg_interactive_onboarding/src/features/about/presentation/about_screen.dart';
 import 'package:lg_interactive_onboarding/src/features/architecture_explorer/presentation/architecture_explorer_screen.dart';
 import 'package:lg_interactive_onboarding/src/features/curriculum_engine/presentation/module_completion_screen.dart';
 import 'package:lg_interactive_onboarding/src/features/curriculum_engine/providers/curriculum_providers.dart';
@@ -56,9 +57,9 @@ class LearnScreen extends ConsumerWidget {
                   Icons.help_outline_rounded,
                   color: isDark ? Colors.white60 : Colors.black54,
                 ),
-                tooltip: 'Architecture Explorer',
+                tooltip: 'About',
                 onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => const ArchitectureExplorerScreen(),
+                  builder: (_) => const AboutScreen(),
                 )),
               ),
               const SizedBox(width: 8),
@@ -334,7 +335,7 @@ class _ModuleCard extends ConsumerWidget {
       opacity: isLocked ? 0.5 : 1.0,
       duration: const Duration(milliseconds: 250),
       child: GestureDetector(
-        onTap: isAvailable || isActiveModule
+        onTap: isAvailable || isActiveModule || isCompleted
             ? () => _startModule(context, ref)
             : null,
         child: Container(

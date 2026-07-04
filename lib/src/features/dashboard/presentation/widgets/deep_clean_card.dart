@@ -23,7 +23,7 @@ class DeepCleanCard extends ConsumerWidget {
 
         return GestureDetector(
           key: GuidedModeController.spotlightKey('deep_clean_btn'),
-          onTap: enabled ? () => _confirmDeepClean(context, ref) : null,
+          onTap: enabled ? () => _confirmDeepClean(context) : null,
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -103,44 +103,48 @@ class DeepCleanCard extends ConsumerWidget {
     );
   }
 
-  void _confirmDeepClean(BuildContext context, WidgetRef ref) {
+  void _confirmDeepClean(BuildContext context) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded,
-                color: DashboardPalette.deepCleanRed, size: 22),
-            SizedBox(width: 10),
-            Text('Deep Clean'),
-          ],
-        ),
-        content: const Text(
-          'This will permanently delete ALL files from:\n\n'
-          '• /var/www/html/model/\n'
-          '• /var/www/html/3d_model_wrapper/\n\n'
-          'And reset the master KML. This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ref.read(pushProvider.notifier).deepClean();
-              // Signal curriculum engine — Module 7 auto-verify listens here
-              ref.read(deepCleanConfirmedProvider.notifier).set(true);
-              ref.read(analyticsServiceProvider).recordDeepCleanConfirmed();
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: DashboardPalette.deepCleanRed,
+      builder: (ctx) => Consumer(
+        builder: (context, ref, child) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    color: DashboardPalette.deepCleanRed, size: 22),
+                SizedBox(width: 10),
+                Text('Deep Clean'),
+              ],
             ),
-            child: const Text('Deep Clean'),
-          ),
-        ],
+            content: const Text(
+              'This will permanently delete ALL files from:\n\n'
+              '• /var/www/html/model/\n'
+              '• /var/www/html/3d_model_wrapper/\n\n'
+              'And reset the master KML. This cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  ref.read(pushProvider.notifier).deepClean();
+                  // Signal curriculum engine — Module 7 auto-verify listens here
+                  ref.read(deepCleanConfirmedProvider.notifier).set(true);
+                  ref.read(analyticsServiceProvider).recordDeepCleanConfirmed();
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: DashboardPalette.deepCleanRed,
+                ),
+                child: const Text('Deep Clean'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

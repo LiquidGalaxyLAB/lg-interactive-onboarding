@@ -28,13 +28,12 @@ class LGService {
     final password = _settingsService.password;
 
     try {
-      final client = _sshService.client!;
       for (int i = 1; i <= rigs; i++) {
         final command =
             'sshpass -p "$password" ssh -o StrictHostKeyChecking=no lg$i '
             '"(echo $password; sleep 1) | sudo -S poweroff"';
         debugPrint('LGService: Shutdown lg$i...');
-        await client.run(command);
+        await _sshService.execute(command);
       }
       return true;
     } catch (e) {
@@ -51,13 +50,12 @@ class LGService {
     final password = _settingsService.password;
 
     try {
-      final client = _sshService.client!;
       for (int i = 1; i <= rigs; i++) {
         final command =
             'sshpass -p "$password" ssh -o StrictHostKeyChecking=no lg$i '
             '"(echo $password; sleep 1) | sudo -S reboot"';
         debugPrint('LGService: Reboot lg$i...');
-        await client.run(command);
+        await _sshService.execute(command);
       }
       return true;
     } catch (e) {
@@ -91,11 +89,10 @@ class LGService {
     """;
 
     try {
-      final client = _sshService.client!;
       for (var i = rigs; i >= 1; i--) {
         final command = 'sshpass -p "$password" ssh -o StrictHostKeyChecking=no lg$i "$relaunchScript"';
         debugPrint('LGService: Relaunch lg$i...');
-        await client.run(command);
+        await _sshService.execute(command);
       }
     } catch (e) {
       debugPrint('LGService: Relaunch failed: $e');
@@ -109,17 +106,15 @@ class LGService {
     if (!_isReady) return false;
 
     try {
-      final client = _sshService.client!;
-
       // Add refresh interval
-      await client.run(
+      await _sshService.execute(
         'sed -i "s|<href>[^<]*master.kml<\\/href>|&<refreshMode>onInterval<\\/refreshMode><refreshInterval>1<\\/refreshInterval>|" ~/earth/kml/master/myplaces.kml',
       );
 
       await Future.delayed(AppConstants.kmlRefreshDelay);
 
       // Remove refresh interval (revert)
-      await client.run(
+      await _sshService.execute(
         'sed -i "s|<href>[^<]*master.kml<\\/href><refreshMode>onInterval<\\/refreshMode><refreshInterval>[0-9]\\+<\\/refreshInterval>|<href>##LG_PHPIFACE##kml/master.kml<\\/href>|" ~/earth/kml/master/myplaces.kml',
       );
 

@@ -42,17 +42,18 @@ class ModelRepository {
   /// Executes an SSH command, optionally with sudo, and applies the channel delay.
   /// Returns the trimmed output string.
   Future<String> _execute(String command, {bool sudo = false}) async {
-    final client = _sshService.client!;
-    final Uint8List result;
+    final String finalCommand;
     if (sudo) {
       final password = _settingsService.password;
-      result = await client.run('(echo $password; sleep 1) | sudo -S $command');
+      finalCommand = '(echo $password; sleep 1) | sudo -S $command';
     } else {
-      result = await client.run(command);
+      finalCommand = command;
     }
-    final output = String.fromCharCodes(result).trim();
-    await _channelDelay();
-    return output;
+    
+    final result = await _sshService.execute(finalCommand);
+    if (result == null) throw Exception('Execution failed: $command');
+    
+    return result.stdout.trim();
   }
 
   // ─── KML Generation ──────────────────────────────────────────────

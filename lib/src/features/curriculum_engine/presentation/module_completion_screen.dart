@@ -37,11 +37,15 @@ class _ModuleCompletionScreenState extends ConsumerState<ModuleCompletionScreen>
     super.initState();
 
     // Mark module completed in the status notifier
+    final curriculumStatusNotifier = ref.read(curriculumStatusProvider.notifier);
+    final guidedModeNotifier = ref.read(guidedModeControllerProvider.notifier);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref
-          .read(curriculumStatusProvider.notifier)
-          .setStatus(widget.completedModule.id, ModuleStatus.completed);
-      ref.read(guidedModeControllerProvider.notifier).acknowledgeCompletion();
+      if (!mounted) return;
+      curriculumStatusNotifier.setStatus(
+        widget.completedModule.id,
+        ModuleStatus.completed,
+      );
+      guidedModeNotifier.acknowledgeCompletion();
     });
 
     // Generate confetti particles
@@ -59,8 +63,8 @@ class _ModuleCompletionScreenState extends ConsumerState<ModuleCompletionScreen>
 
     _confettiCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 4),
-    )..forward();
+      duration: const Duration(seconds: 6),
+    )..repeat();
 
     _scaleCtrl = AnimationController(
       vsync: this,
@@ -254,7 +258,7 @@ class _ConfettiPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     for (final p in particles) {
-      final t = (progress - p.delay).clamp(0.0, 1.0) * p.speed;
+      final t = (progress * 4.0 - p.delay) * p.speed;
       if (t <= 0) continue;
 
       final x = p.x * size.width;
