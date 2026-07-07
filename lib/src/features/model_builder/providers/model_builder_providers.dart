@@ -9,6 +9,7 @@ import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_repository.dart';
 import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 import 'package:lg_interactive_onboarding/src/common/lg/lg_service.dart';
+import 'package:lg_interactive_onboarding/src/features/model_builder/providers/scene_providers.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -54,7 +55,10 @@ const bundledModels = [
 
 String _generateId() {
   final now = DateTime.now().millisecondsSinceEpoch;
-  final rand = Random().nextInt(AppConstants.idMaxRandom).toString().padLeft(AppConstants.idPaddingLength, '0');
+  final rand = Random()
+      .nextInt(AppConstants.idMaxRandom)
+      .toString()
+      .padLeft(AppConstants.idPaddingLength, '0');
   return '${now}_$rand';
 }
 
@@ -116,8 +120,10 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
 
       // Validate extension in Dart (the OS picker is unfiltered)
       if (!ModelProject.supportedExtensions.contains(ext)) {
-        return ImportFailure('Unsupported format "$ext". '
-            'Accepted: ${ModelProject.supportedExtensions.join(', ')}');
+        return ImportFailure(
+          'Unsupported format "$ext". '
+          'Accepted: ${ModelProject.supportedExtensions.join(', ')}',
+        );
       }
 
       // Persist the file into the app documents directory
@@ -140,13 +146,19 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
           chunks.addAll(chunk);
         }
         if (chunks.isEmpty) {
-          return const ImportFailure('File appears to be empty (0 bytes read from stream).');
+          return const ImportFailure(
+            'File appears to be empty (0 bytes read from stream).',
+          );
         }
         await persistentFile.writeAsBytes(Uint8List.fromList(chunks));
-        debugPrint('Import: streamed ${chunks.length} bytes from content provider');
+        debugPrint(
+          'Import: streamed ${chunks.length} bytes from content provider',
+        );
       } else {
-        return const ImportFailure('Could not read file data from device. '
-            'Try copying the file to internal storage and retry.');
+        return const ImportFailure(
+          'Could not read file data from device. '
+          'Try copying the file to internal storage and retry.',
+        );
       }
 
       final fileInfo = await persistentFile.stat();
@@ -162,7 +174,8 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
       );
 
       debugPrint(
-          'Model imported: ${state.fileName} (${state.fileSizeFormatted})');
+        'Model imported: ${state.fileName} (${state.fileSizeFormatted})',
+      );
       return const ImportSuccess(); // success
     } catch (e) {
       debugPrint('File import failed: $e');
@@ -177,7 +190,7 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
       final byteData = await rootBundle.load(bundled.assetPath);
       final appDir = await getApplicationDocumentsDirectory();
       final localFile = File('${appDir.path}/${bundled.fileName}');
-      
+
       // Safe conversion from ByteData to Uint8List
       final bytes = byteData.buffer.asUint8List(
         byteData.offsetInBytes,
@@ -210,10 +223,7 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
 
   /// Places the model at the given coordinates.
   void placeModel(double latitude, double longitude) {
-    state = state.copyWith(
-      latitude: latitude,
-      longitude: longitude,
-    );
+    state = state.copyWith(latitude: latitude, longitude: longitude);
   }
 
   // ─── Orientation Controls ───────────────────────────────────────
@@ -230,11 +240,7 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
 
   /// Sets uniform scale on all axes.
   void setUniformScale(double value) {
-    state = state.copyWith(
-      scaleX: value,
-      scaleY: value,
-      scaleZ: value,
-    );
+    state = state.copyWith(scaleX: value, scaleY: value, scaleZ: value);
   }
 
   // ─── Altitude ───────────────────────────────────────────────────
@@ -269,8 +275,8 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
 
 final modelBuilderProvider =
     NotifierProvider<ModelBuilderNotifier, ModelProject>(
-  ModelBuilderNotifier.new,
-);
+      ModelBuilderNotifier.new,
+    );
 
 // ─── Deployed Models Registry ──────────────────────────────────────────
 
@@ -309,8 +315,8 @@ class DeployedModelsNotifier extends Notifier<List<DeployedModel>> {
 
 final deployedModelsProvider =
     NotifierProvider<DeployedModelsNotifier, List<DeployedModel>>(
-  DeployedModelsNotifier.new,
-);
+      DeployedModelsNotifier.new,
+    );
 
 // ─── KML Preview ───────────────────────────────────────────────────────
 
@@ -345,12 +351,44 @@ class PushNotifier extends Notifier<PushState> {
   PushState build() => const PushState();
 
   Future<void> push({bool relaunch = true}) async {
-    final project = ref.read(modelBuilderProvider);
+    final sceneState = ref.read(sceneProvider);
     final repo = ref.read(modelRepositoryProvider);
+
+    if (sceneState.hasScene && sceneState.activeScene!.modelCount > 0) {
+      state = const PushState(
+        status: PushStatus.pushing,
+        message: 'Pushing Scene & Tour...',
+      );
+      final deployed = ref.read(deployedModelsProvider);
+      final result = await repo.pushScene(
+        sceneState.activeScene!,
+        existingDeployments: deployed,
+        relaunch: relaunch,
+      );
+
+      if (result.success) {
+        ref.read(modelPushSuccessProvider.notifier).set(true);
+      }
+
+      state = PushState(
+        status: result.success ? PushStatus.success : PushStatus.error,
+        message: result.message,
+      );
+
+      await Future.delayed(AppConstants.pushStateResetDelay);
+      if (state.status != PushStatus.pushing) {
+        state = const PushState();
+      }
+      return;
+    }
+
+    final project = ref.read(modelBuilderProvider);
     final deployed = ref.read(deployedModelsProvider);
 
-    state =
-        const PushState(status: PushStatus.pushing, message: 'Uploading...');
+    state = const PushState(
+      status: PushStatus.pushing,
+      message: 'Uploading...',
+    );
 
     final result = await repo.pushToLG(
       project,
@@ -370,17 +408,22 @@ class PushNotifier extends Notifier<PushState> {
       if (project.hasLocation) {
         // The 'range' parameter dictates how far the camera pulls back from the object.
         // We increase the multiplier here so the camera doesn't end up inside very large models.
-        final range = (project.altitude + (project.scaleX * 15)).clamp(1000.0, 100000.0);
-        
-        ref.read(lgServiceProvider).flyTo(
-          latitude: project.latitude!,
-          longitude: project.longitude!,
-          altitude: project.altitude,
-          heading: project.heading,
-          // We use a fixed camera tilt for a nice bird's-eye 3D perspective.
-          tilt: AppConstants.defaultCameraTilt, 
-          range: range,
+        final range = (project.altitude + (project.scaleX * 15)).clamp(
+          1000.0,
+          100000.0,
         );
+
+        ref
+            .read(lgServiceProvider)
+            .flyTo(
+              latitude: project.latitude!,
+              longitude: project.longitude!,
+              altitude: project.altitude,
+              heading: project.heading,
+              // We use a fixed camera tilt for a nice bird's-eye 3D perspective.
+              tilt: AppConstants.defaultCameraTilt,
+              range: range,
+            );
       }
     }
 
@@ -494,8 +537,7 @@ class PushNotifier extends Notifier<PushState> {
     final result = await repo.writeEmptyMasterKml();
 
     // no logo action — logo lifecycle is managed by the SSH connection watcher
-    if (result.success) {
-    }
+    if (result.success) {}
 
     state = PushState(
       status: result.success ? PushStatus.success : PushStatus.error,
@@ -569,9 +611,10 @@ class ModelPushSuccessNotifier extends Notifier<bool> {
 /// The Curriculum Engine watches this to auto-verify Module 2.
 /// Reset to `false` automatically 5 seconds after being set so the next
 /// push attempt starts fresh.
-final modelPushSuccessProvider = NotifierProvider<ModelPushSuccessNotifier, bool>(
-  ModelPushSuccessNotifier.new,
-);
+final modelPushSuccessProvider =
+    NotifierProvider<ModelPushSuccessNotifier, bool>(
+      ModelPushSuccessNotifier.new,
+    );
 
 class KmlPreviewOpenedNotifier extends Notifier<bool> {
   @override
@@ -583,9 +626,10 @@ class KmlPreviewOpenedNotifier extends Notifier<bool> {
 ///
 /// The Curriculum Engine watches this to auto-verify Module 3.
 /// Backed by [AnalyticsService] for persistence across restarts.
-final kmlPreviewOpenedProvider = NotifierProvider<KmlPreviewOpenedNotifier, bool>(
-  KmlPreviewOpenedNotifier.new,
-);
+final kmlPreviewOpenedProvider =
+    NotifierProvider<KmlPreviewOpenedNotifier, bool>(
+      KmlPreviewOpenedNotifier.new,
+    );
 
 class DeepCleanConfirmedNotifier extends Notifier<bool> {
   @override
@@ -597,6 +641,7 @@ class DeepCleanConfirmedNotifier extends Notifier<bool> {
 ///
 /// The Curriculum Engine watches this to auto-verify Module 7.
 /// Backed by [AnalyticsService] for persistence across restarts.
-final deepCleanConfirmedProvider = NotifierProvider<DeepCleanConfirmedNotifier, bool>(
-  DeepCleanConfirmedNotifier.new,
-);
+final deepCleanConfirmedProvider =
+    NotifierProvider<DeepCleanConfirmedNotifier, bool>(
+      DeepCleanConfirmedNotifier.new,
+    );
