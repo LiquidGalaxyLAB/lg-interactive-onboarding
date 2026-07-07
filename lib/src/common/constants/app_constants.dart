@@ -33,4 +33,9 @@ class AppConstants {
   static const int logoOverlayWidth = 554;
   static const int logoOverlayHeight = 500;
   static const String lgSlaveKmlDir = '/var/www/html/kml';
+
+  // ─── Scene Storage ────────────────────────────────────────────────────
+  static const String scenesSubDir = 'scenes';
+  static const String sceneFileExtension = '.lgscene';
+  static const int sceneSchemaVersion = 1;
 }

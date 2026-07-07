@@ -52,6 +52,7 @@ dependencies:
 
   # Text-to-speech (voice narration for guided mode & Architecture Explorer)
   flutter_tts: ^3.8.0
+  uuid: ^4.5.3
 
 dev_dependencies:
   flutter_test:
