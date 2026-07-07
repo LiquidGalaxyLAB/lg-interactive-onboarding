@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lg_interactive_onboarding/src/features/model_builder/data/scene_models.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
+import 'package:lg_interactive_onboarding/src/features/model_builder/providers/scene_providers.dart';
 
 const double _scaleMin = 0.1;
 const double _scaleMax = 10000.0;
 
 /// Widget with sliders/inputs for adjusting heading, tilt, roll, and scale X/Y/Z.
+///
+/// Scene-aware: when exactly one [ModelNode] is selected in the scene outliner,
+/// sliders bind to that node's transforms via [SceneNotifier]. Otherwise,
+/// they control the current import via [ModelBuilderNotifier].
 class OrientationSlidersWidget extends ConsumerWidget {
   const OrientationSlidersWidget({super.key});
 
@@ -14,7 +20,92 @@ class OrientationSlidersWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final project = ref.watch(modelBuilderProvider);
     final notifier = ref.read(modelBuilderProvider.notifier);
+    final sceneState = ref.watch(sceneProvider);
     final theme = Theme.of(context);
+
+    // ── Scene-aware mode: editing a selected scene node ────────────
+    final ModelNode? editingNode;
+    if (sceneState.hasScene &&
+        sceneState.selectedNodeIds.length == 1) {
+      final node = sceneState.activeScene!
+          .nodes[sceneState.selectedNodeIds.first];
+      editingNode = node is ModelNode ? node : null;
+    } else {
+      editingNode = null;
+    }
+
+    // Resolve the values and setters based on mode
+    final double heading;
+    final double tilt;
+    final double roll;
+    final double scaleX;
+    final double scaleY;
+    final double scaleZ;
+    final double altitude;
+    final void Function(double) onHeading;
+    final void Function(double) onTilt;
+    final void Function(double) onRoll;
+    final void Function(double) onScaleX;
+    final void Function(double) onScaleY;
+    final void Function(double) onScaleZ;
+    final void Function(double) onUniformScale;
+    final void Function(double) onAltitude;
+    final VoidCallback onReset;
+
+    if (editingNode != null) {
+      // Reading from scene node
+      heading = editingNode.heading;
+      tilt = editingNode.tilt;
+      roll = editingNode.roll;
+      scaleX = editingNode.scaleX;
+      scaleY = editingNode.scaleY;
+      scaleZ = editingNode.scaleZ;
+      altitude = editingNode.altitude;
+
+      final nodeId = editingNode.id;
+      final sceneNotifier = ref.read(sceneProvider.notifier);
+      onHeading = (v) => sceneNotifier.setNodeTransform(nodeId, heading: v);
+      onTilt = (v) => sceneNotifier.setNodeTransform(nodeId, tilt: v);
+      onRoll = (v) => sceneNotifier.setNodeTransform(nodeId, roll: v);
+      onScaleX = (v) => sceneNotifier.setNodeTransform(nodeId, scaleX: v);
+      onScaleY = (v) => sceneNotifier.setNodeTransform(nodeId, scaleY: v);
+      onScaleZ = (v) => sceneNotifier.setNodeTransform(nodeId, scaleZ: v);
+      onUniformScale = (v) => sceneNotifier.setNodeTransform(
+            nodeId,
+            scaleX: v,
+            scaleY: v,
+            scaleZ: v,
+          );
+      onAltitude = (v) => sceneNotifier.setNodeTransform(nodeId, altitude: v);
+      onReset = () => sceneNotifier.setNodeTransform(
+            nodeId,
+            heading: 0,
+            tilt: 0,
+            roll: 0,
+            scaleX: 1000,
+            scaleY: 1000,
+            scaleZ: 1000,
+            altitude: 10,
+          );
+    } else {
+      // Default: editing the current import project
+      heading = project.heading;
+      tilt = project.tilt;
+      roll = project.roll;
+      scaleX = project.scaleX;
+      scaleY = project.scaleY;
+      scaleZ = project.scaleZ;
+      altitude = project.altitude;
+      onHeading = notifier.setHeading;
+      onTilt = notifier.setTilt;
+      onRoll = notifier.setRoll;
+      onScaleX = notifier.setScaleX;
+      onScaleY = notifier.setScaleY;
+      onScaleZ = notifier.setScaleZ;
+      onUniformScale = notifier.setUniformScale;
+      onAltitude = notifier.setAltitude;
+      onReset = notifier.resetAdjustments;
+    }
 
     return Card(
       child: Padding(

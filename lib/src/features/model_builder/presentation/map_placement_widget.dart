@@ -2,11 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:lg_interactive_onboarding/src/features/model_builder/data/scene_models.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
+import 'package:lg_interactive_onboarding/src/features/model_builder/providers/scene_providers.dart';
 
 /// An OpenStreetMap widget that lets the user tap to place a model marker.
 ///
 /// Uses flutter_map with OSM tiles — no API key required.
+///
+/// When a scene is active, all placed models are shown as markers:
+///   - Purple: current import placement
+///   - Blue: scene models (not selected)
+///   - Orange: scene models (selected in outliner)
 class MapPlacementWidget extends ConsumerStatefulWidget {
   const MapPlacementWidget({super.key});
 
@@ -22,10 +29,44 @@ class _MapPlacementWidgetState extends ConsumerState<MapPlacementWidget> {
   @override
   Widget build(BuildContext context) {
     final project = ref.watch(modelBuilderProvider);
+    final sceneState = ref.watch(sceneProvider);
     final theme = Theme.of(context);
     final hasLocation = project.hasLocation;
 
     final markers = <Marker>[];
+
+    // Scene model markers (blue/orange)
+    if (sceneState.hasScene) {
+      final scene = sceneState.activeScene!;
+      for (final node in scene.nodes.values) {
+        if (node is ModelNode) {
+          final isSelected = sceneState.selectedNodeIds.contains(node.id);
+          markers.add(
+            Marker(
+              point: LatLng(node.latitude, node.longitude),
+              width: 32,
+              height: 32,
+              child: Tooltip(
+                message: node.name,
+                child: GestureDetector(
+                  onTap: () =>
+                      ref.read(sceneProvider.notifier).selectNode(node.id),
+                  child: Icon(
+                    Icons.location_on,
+                    color: isSelected
+                        ? const Color(0xFFFDAA5E)
+                        : const Color(0xFF0984E3),
+                    size: 32,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+      }
+    }
+
+    // Current import placement marker (purple, on top)
     if (hasLocation) {
       markers.add(
         Marker(

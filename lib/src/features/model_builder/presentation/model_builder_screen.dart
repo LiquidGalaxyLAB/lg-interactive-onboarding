@@ -5,7 +5,10 @@ import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_
 import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/presentation/map_placement_widget.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/presentation/orientation_sliders.dart';
-
+import 'package:lg_interactive_onboarding/src/features/model_builder/providers/scene_providers.dart';
+import 'package:lg_interactive_onboarding/src/features/model_builder/presentation/scene_outliner_panel.dart';
+import 'package:lg_interactive_onboarding/src/features/model_builder/presentation/group_controls_bar.dart';
+import 'package:lg_interactive_onboarding/src/features/model_builder/presentation/scene_manager_dialog.dart';
 /// Main 3D Model Builder screen.
 class ModelBuilderScreen extends ConsumerWidget {
   const ModelBuilderScreen({super.key});
@@ -16,12 +19,70 @@ class ModelBuilderScreen extends ConsumerWidget {
     final pushState = ref.watch(pushProvider);
     final ssh = ref.watch(sshServiceProvider);
     final deployed = ref.watch(deployedModelsProvider);
+    final sceneState = ref.watch(sceneProvider);
     final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('3D Model Builder'),
+        title: sceneState.hasScene
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Flexible(
+                    child: Text(
+                      '3D Model Builder',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6C5CE7)
+                            .withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        sceneState.activeScene!.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF6C5CE7),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : const Text('3D Model Builder'),
         actions: [
+          // Relocate Scene button
+          if (sceneState.hasScene && project.hasLocation)
+            IconButton(
+              icon: const Icon(Icons.location_on_outlined, size: 22),
+              tooltip: 'Relocate Scene Here',
+              onPressed: () {
+                ref.read(sceneProvider.notifier).relocateScene(
+                      project.latitude!,
+                      project.longitude!,
+                    );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Scene relocated to current map coordinates'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+            ),
+          // Scene manager button
+          IconButton(
+            icon: const Icon(Icons.folder_open_outlined, size: 22),
+            tooltip: 'Scene Manager',
+            onPressed: () => SceneManagerDialog.show(context),
+          ),
           // Connection status indicator (read-only)
           Padding(
             padding: const EdgeInsets.only(right: 4),
@@ -69,26 +130,51 @@ class ModelBuilderScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: Column(
         children: [
-          // Deployed models panel (if any)
-          if (deployed.isNotEmpty) ...[
-            _DeployedModelsCard(theme: theme),
-            const SizedBox(height: 16),
-          ],
-          _ImportModelCard(theme: theme),
-          const SizedBox(height: 16),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                // Scene outliner panel (when a scene is active)
+                if (sceneState.hasScene) ...[
+                  const SceneOutlinerPanel(),
+                  const SizedBox(height: 16),
+                ],
+                // Deployed models panel (if any, when no scene)
+                if (!sceneState.hasScene && deployed.isNotEmpty) ...[
+                  _DeployedModelsCard(theme: theme),
+                  const SizedBox(height: 16),
+                ],
+                _ImportModelCard(theme: theme),
+                const SizedBox(height: 16),
 
-          const MapPlacementWidget(),
-          const SizedBox(height: 16),
-          const OrientationSlidersWidget(),
-          const SizedBox(height: 16),
-          _PushToLGCard(
-            theme: theme, pushState: pushState,
-            isReady: project.isReady, isConnected: ssh.isConnected,
+                const MapPlacementWidget(),
+                const SizedBox(height: 16),
+                const OrientationSlidersWidget(),
+                const SizedBox(height: 16),
+
+                // "Add to Scene" button (only when a scene is active and model is ready)
+                if (sceneState.hasScene && project.hasModel && project.hasLocation) ...[
+                  _AddToSceneButton(theme: theme),
+                  const SizedBox(height: 16),
+                ],
+
+                _PushToLGCard(
+                  theme: theme, pushState: pushState,
+                  isReady: sceneState.hasScene
+                      ? (sceneState.activeScene!.modelCount > 0 && ssh.isConnected)
+                      : project.isReady,
+                  isConnected: ssh.isConnected,
+                  isSceneMode: sceneState.hasScene,
+                  sceneModelCount: sceneState.activeScene?.modelCount ?? 0,
+                ),
+                const SizedBox(height: 32),
+              ],
+            ),
           ),
-          const SizedBox(height: 32),
+          // Group controls bar (sticks to bottom)
+          const GroupControlsBar(),
         ],
       ),
     );
@@ -104,7 +190,7 @@ class ModelBuilderScreen extends ConsumerWidget {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
             onPressed: () {
-              ref.read(modelBuilderProvider.notifier).reset();
+              ref.read(modelBuilderProvider.notifier).regenerateId();
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Project reset')));
             },
@@ -451,6 +537,41 @@ class _ImportButton extends ConsumerWidget {
 }
 
 
+// ═══════════════════════════════════════════════════════════════════
+// ADD TO SCENE BUTTON
+// ═══════════════════════════════════════════════════════════════════
+
+class _AddToSceneButton extends ConsumerWidget {
+  final ThemeData theme;
+  const _AddToSceneButton({required this.theme});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: FilledButton.icon(
+        onPressed: () {
+          final project = ref.read(modelBuilderProvider);
+          ref.read(sceneProvider.notifier).addModelFromProject(project);
+          ref.read(modelBuilderProvider.notifier).regenerateId();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('"${project.fileName}" added to scene'),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        },
+        icon: const Icon(Icons.add_circle_outline),
+        label: const Text('Add to Scene'),
+        style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xFF6C5CE7),
+        ),
+      ),
+    );
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // PUSH TO LG CARD
@@ -458,7 +579,8 @@ class _ImportButton extends ConsumerWidget {
 
 class _PushToLGCard extends ConsumerWidget {
   final ThemeData theme; final PushState pushState; final bool isReady; final bool isConnected;
-  const _PushToLGCard({required this.theme, required this.pushState, required this.isReady, required this.isConnected});
+  final bool isSceneMode; final int sceneModelCount;
+  const _PushToLGCard({required this.theme, required this.pushState, required this.isReady, required this.isConnected, this.isSceneMode = false, this.sceneModelCount = 0});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -493,7 +615,9 @@ class _PushToLGCard extends ConsumerWidget {
               icon: isPushing
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.cloud_upload),
-              label: Text(isPushing ? 'Pushing...' : 'Push Model & KML'),
+              label: Text(isPushing 
+                  ? 'Pushing...' 
+                  : (isSceneMode ? 'Push Scene ($sceneModelCount models)' : 'Push Model & KML')),
               style: FilledButton.styleFrom(backgroundColor: isReady && isConnected ? const Color(0xFF0984E3) : null),
             ),
           ),
