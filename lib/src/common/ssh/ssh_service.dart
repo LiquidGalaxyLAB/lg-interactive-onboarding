@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
@@ -58,6 +57,24 @@ class SSHService extends ChangeNotifier {
         username: username,
         onPasswordRequest: () => password,
       );
+
+      // Wait for the SSH handshake and authentication to complete.
+      // Without this, connection drops or bad passwords throw unhandled async exceptions.
+      await _client!.authenticated;
+
+      // Listen for unexpected connection drops (e.g., when rig reboots).
+      // We must catch errors on the done future, otherwise socket aborts will crash the app.
+      _client!.done.catchError((e) {
+        debugPrint('SSH: Socket error: $e');
+      }).whenComplete(() {
+        if (_client != null) {
+          debugPrint('SSH: Connection closed unexpectedly');
+          _client = null;
+          _sftpFuture = null;
+          notifyListeners();
+        }
+      });
+
       // Reset execution queue for the new connection.
       _execQueue = Future.value();
       debugPrint('SSH: Connected to $host');
@@ -143,12 +160,13 @@ class SSHService extends ChangeNotifier {
 
       final file = await sftpClient.open(
         remotePath,
-        mode: SftpFileOpenMode.create |
+        mode:
+            SftpFileOpenMode.create |
             SftpFileOpenMode.truncate |
             SftpFileOpenMode.write,
       );
       final bytes = Uint8List.fromList(localData.codeUnits);
-      await file.write(Stream.value(bytes));
+      await file.write(_chunkedStream(bytes));
       await file.close();
       debugPrint('SSH: File uploaded to $remotePath');
       return true;
@@ -174,17 +192,29 @@ class SSHService extends ChangeNotifier {
 
       final file = await sftpClient.open(
         remotePath,
-        mode: SftpFileOpenMode.create |
+        mode:
+            SftpFileOpenMode.create |
             SftpFileOpenMode.truncate |
             SftpFileOpenMode.write,
       );
-      await file.write(Stream.value(bytes));
+      await file.write(_chunkedStream(bytes));
       await file.close();
       debugPrint('SSH: Bytes uploaded to $remotePath (${bytes.length} bytes)');
       return true;
     } catch (e) {
       debugPrint('SSH: SFTP bytes upload failed: $e');
       return false;
+    }
+  }
+
+  /// Helper to split large files into safe SFTP chunks (32KB is standard max)
+  /// to prevent the SSH server from forcibly dropping the connection.
+  Stream<Uint8List> _chunkedStream(Uint8List bytes, [int chunkSize = 32768]) async* {
+    int offset = 0;
+    while (offset < bytes.length) {
+      final int length = (bytes.length - offset < chunkSize) ? bytes.length - offset : chunkSize;
+      yield bytes.sublist(offset, offset + length);
+      offset += length;
     }
   }
 }

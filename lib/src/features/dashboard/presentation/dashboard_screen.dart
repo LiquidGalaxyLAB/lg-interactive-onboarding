@@ -12,7 +12,6 @@ import 'widgets/dashboard_palette.dart';
 import 'widgets/connection_chip.dart';
 import 'widgets/status_banner.dart';
 import 'widgets/section_header.dart';
-import 'widgets/rig_controls_grid.dart';
 import 'widgets/feature_card.dart';
 import 'widgets/deep_clean_card.dart';
 import 'widgets/clear_logo_card.dart';
@@ -42,7 +41,7 @@ class DashboardScreen extends ConsumerWidget {
             pinned: true,
             automaticallyImplyLeading: false,
             backgroundColor: isDark
-                ? const Color(0xFF141929)
+                ? const Color(0xFF1E1E20)    // M3 dark surface
                 : DashboardPalette.parchment,
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
@@ -72,7 +71,7 @@ class DashboardScreen extends ConsumerWidget {
               // About / Help shortcut
               IconButton(
                 icon: Icon(
-                  Icons.help_outline_rounded,
+                  Icons.info_outline_rounded,
                   color: isDark ? Colors.white60 : DashboardPalette.warmGrey,
                 ),
                 tooltip: 'About / Help',
@@ -107,19 +106,6 @@ class DashboardScreen extends ConsumerWidget {
                   StatusBanner(pushState: pushState, isDark: isDark),
                   const SizedBox(height: 16),
                 ],
-
-                // ─── Section: Rig Controls ─────────────────────
-                SectionHeader(
-                  label: 'RIG CONTROLS',
-                  icon: Icons.gamepad_outlined,
-                  isDark: isDark,
-                ),
-                const SizedBox(height: 12),
-
-                // Asymmetric grid of rig controls
-                RigControlsGrid(isDark: isDark),
-
-                const SizedBox(height: 28),
 
                 // ─── Section: Tools ────────────────────────────
                 SectionHeader(

@@ -211,7 +211,7 @@ class ModelRepository {
     try {
       debugPrint('Assimp: Converting $uploadedFilePath → $targetDaePath');
 
-      final conversionOutput = await _execute('assimp export "$uploadedFilePath" "$targetDaePath" 2>&1');
+      final conversionOutput = await _execute('assimp export "$uploadedFilePath" "$targetDaePath" -tri 2>&1');
 
       // Verify the .dae was actually created
       final verifyOutput = await _execute('test -f "$targetDaePath" && echo EXISTS');
@@ -366,18 +366,22 @@ class ModelRepository {
         // The final .dae path on the server (what KML will reference)
         final remoteDaePath = '$_modelDir/${project.remoteModelFileName}';
 
-        if (project.requiresConversion) {
-          // Non-DAE file: upload with original extension, then convert
-          final rawUploadPath = '$_modelDir/${project.id}_${project.fileName}';
+        // Upload with a "raw_" prefix, then let Assimp process/triangulate it
+        final safeRawName = project.fileName?.replaceAll(' ', '_') ?? 'unnamed';
+        final rawUploadPath = '$_modelDir/raw_${project.id}_$safeRawName';
 
-          await _sshService.uploadBytes(bytes: fileBytes, remotePath: rawUploadPath);
-          await _channelDelay();
+        await _sshService.uploadBytes(bytes: fileBytes, remotePath: rawUploadPath);
+        await _channelDelay();
 
+        if (ext == '.dae') {
+          // Bypass Assimp conversion since the file is already a DAE.
+          // The Python script will handle triangulation next.
+          await _execute('mv -f "$rawUploadPath" "$remoteDaePath"');
+        } else {
           // Ensure assimp is available
           try {
             await _ensureAssimpInstalled();
           } catch (e) {
-            // Cleanup the uploaded raw file
             await _execute('rm -f "$rawUploadPath"');
             return PushResult(
               success: false,
@@ -385,7 +389,7 @@ class ModelRepository {
             );
           }
 
-          // Convert to .dae (deletes the raw file on success)
+          // Convert/Triangulate to .dae (deletes the raw file on success)
           try {
             await _convertToCollada(
               uploadedFilePath: rawUploadPath,
@@ -397,10 +401,6 @@ class ModelRepository {
               message: 'Model conversion failed: $e',
             );
           }
-          await _channelDelay();
-        } else {
-          // Already a .dae — upload directly to the final path
-          await _sshService.uploadBytes(bytes: fileBytes, remotePath: remoteDaePath);
           await _channelDelay();
         }
 
@@ -651,7 +651,19 @@ $networkLinks
 
   Future<int?> extractDaeVertexCount(String filePath) async {
     try {
-      final content = await File(filePath).readAsString();
+      // Run heavy regex parsing in a background isolate to avoid blocking the main UI thread.
+      // Blocking the main thread stalls network I/O and causes SSH socket aborts.
+      return await compute(_parseDaeVertices, filePath);
+    } catch (e) {
+      debugPrint('DAE parsing failed: $e');
+      return null;
+    }
+  }
+
+  // Top-level/static function required for `compute` isolate spawning.
+  static int? _parseDaeVertices(String filePath) {
+    try {
+      final content = File(filePath).readAsStringSync();
       final regex = RegExp(r'<float_array[^>]*count="(\d+)"');
       final matches = regex.allMatches(content);
 
@@ -660,8 +672,7 @@ $networkLinks
         totalFloats += int.tryParse(match.group(1) ?? '0') ?? 0;
       }
       return totalFloats > 0 ? totalFloats ~/ 3 : null;
-    } catch (e) {
-      debugPrint('DAE parsing failed: $e');
+    } catch (_) {
       return null;
     }
   }

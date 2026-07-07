@@ -284,6 +284,22 @@ def _normalize_scale_unit(root):
     unit.set("name", "meter")
     print("NOTE  : Normalized <unit> from meter='%s' to meter='1.0'" % old_meter)
 
+def _strip_transparency(root):
+    """
+    Remove <transparent> and <transparency> tags.
+    Assimp and some tools export these in ways that cause Google Earth
+    to render the entire model completely invisible.
+    """
+    count = 0
+    for tag_name in ["transparent", "transparency"]:
+        for elem in root.iter(_ns(tag_name)):
+            parent = elem.getparent()
+            if parent is not None:
+                parent.remove(elem)
+                count += 1
+    if count > 0:
+        print("NOTE  : Removed %d transparency-related tags to prevent Google Earth invisibility bug." % count)
+
 # ---------------------------------------------------------------------------
 # Main conversion
 # ---------------------------------------------------------------------------
@@ -310,6 +326,7 @@ def convert_dae(input_path, output_path):
     root = tree.getroot()
 
     _normalize_scale_unit(root)
+    _strip_transparency(root)
     # Collect ALL polylist / polygons elements anywhere in the document
     primitives = []
     for tag in PRIMITIVE_TAGS:

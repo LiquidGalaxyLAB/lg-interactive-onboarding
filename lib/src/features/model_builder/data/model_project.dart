@@ -102,17 +102,13 @@ class ModelProject {
   /// Whether the project is ready to generate KML and push.
   bool get isReady => hasModel && hasLocation;
 
-  /// Whether the model can be previewed in-app (glTF/GLB only).
-  bool get isPreviewable {
-    final ext = fileExtension?.toLowerCase();
-    return ext == '.glb' || ext == '.gltf';
-  }
+
 
   /// Whether this file needs assimp conversion to DAE before deployment.
   /// KMZ files have their own handling path and are excluded.
   bool get requiresConversion {
     final ext = fileExtension?.toLowerCase();
-    return ext != null && ext != nativeExtension && ext != '.kmz';
+    return ext != null && ext != '.kmz';
   }
 
   /// The remote filename used on the LG server.
@@ -123,14 +119,15 @@ class ModelProject {
     if (requiresConversion) {
       // Replace original extension with .dae (e.g., model.obj → {id}_model.dae)
       final withoutExt = baseName.replaceAll(RegExp(r'\.[^.]+$'), '');
-      return '${id}_$withoutExt.dae';
+      final safeName = withoutExt.replaceAll(' ', '_');
+      return '${id}_$safeName.dae';
     }
-    return '${id}_$baseName';
+    return '${id}_${baseName.replaceAll(' ', '_')}';
   }
 
   /// The remote KML filename.
   String get remoteKmlFileName =>
-      '${id}_${fileName?.replaceAll(RegExp(r'\.[^.]+$'), '')}.kml';
+      '${id}_${fileName?.replaceAll(RegExp(r'\.[^.]+$'), '').replaceAll(' ', '_')}.kml';
 
   /// Creates a copy with modified fields.
   ModelProject copyWith({

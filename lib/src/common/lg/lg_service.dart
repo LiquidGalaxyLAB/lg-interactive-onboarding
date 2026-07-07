@@ -28,7 +28,7 @@ class LGService {
     final password = _settingsService.password;
 
     try {
-      for (int i = 1; i <= rigs; i++) {
+      for (int i = rigs; i >= 1; i--) {
         final command =
             'sshpass -p "$password" ssh -o StrictHostKeyChecking=no lg$i '
             '"(echo $password; sleep 1) | sudo -S poweroff"';
@@ -50,7 +50,7 @@ class LGService {
     final password = _settingsService.password;
 
     try {
-      for (int i = 1; i <= rigs; i++) {
+      for (int i = rigs; i >= 1; i--) {
         final command =
             'sshpass -p "$password" ssh -o StrictHostKeyChecking=no lg$i '
             '"(echo $password; sleep 1) | sudo -S reboot"';
@@ -89,7 +89,7 @@ class LGService {
     """;
 
     try {
-      for (var i = rigs; i >= 1; i--) {
+      for (int i = rigs; i >= 1; i--) {
         final command = 'sshpass -p "$password" ssh -o StrictHostKeyChecking=no lg$i "$relaunchScript"';
         debugPrint('LGService: Relaunch lg$i...');
         await _sshService.execute(command);
@@ -153,6 +153,39 @@ class LGService {
       return true;
     } catch (e) {
       debugPrint('LGService: Clear KML failed: $e');
+      return false;
+    }
+  }
+
+  /// Commands Liquid Galaxy to fly to a specific coordinate and orientation.
+  Future<bool> flyTo({
+    required double latitude,
+    required double longitude,
+    required double altitude,
+    required double heading,
+    required double tilt,
+    double range = 1000,
+  }) async {
+    if (!_isReady) return false;
+
+    try {
+      final lookAt = '<LookAt>'
+          '<longitude>$longitude</longitude>'
+          '<latitude>$latitude</latitude>'
+          '<altitude>$altitude</altitude>'
+          '<heading>$heading</heading>'
+          '<tilt>$tilt</tilt>'
+          '<range>$range</range>'
+          '<gx:altitudeMode>relativeToGround</gx:altitudeMode>'
+          '</LookAt>';
+          
+      final command = 'echo "flytoview=$lookAt" > /tmp/query.txt';
+      await _sshService.execute(command);
+      
+      debugPrint('LGService: Flew to $latitude, $longitude');
+      return true;
+    } catch (e) {
+      debugPrint('LGService: FlyTo failed: $e');
       return false;
     }
   }

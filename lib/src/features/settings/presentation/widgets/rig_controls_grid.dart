@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
-import 'package:lg_interactive_onboarding/src/features/dashboard/data/lg_service.dart';
-import 'dashboard_palette.dart';
+import 'package:lg_interactive_onboarding/src/common/lg/lg_service.dart';
+import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
+import 'package:lg_interactive_onboarding/src/common/theme/app_palette.dart';
 
 class RigControlsGrid extends ConsumerWidget {
   final bool isDark;
@@ -25,7 +26,7 @@ class RigControlsGrid extends ConsumerWidget {
                   child: RigControlCard(
                     title: 'Shutdown',
                     icon: Icons.power_settings_new_rounded,
-                    accentColor: DashboardPalette.terracotta,
+                    accentColor: AppPalette.terracotta,
                     isDark: isDark,
                     enabled: isConnected,
                     onTap: () => _confirmDangerous(
@@ -44,7 +45,7 @@ class RigControlsGrid extends ConsumerWidget {
                   child: RigControlCard(
                     title: 'Reboot',
                     icon: Icons.restart_alt_rounded,
-                    accentColor: DashboardPalette.warmAmber,
+                    accentColor: AppPalette.warmAmber,
                     isDark: isDark,
                     enabled: isConnected,
                     onTap: () => _confirmDangerous(
@@ -61,7 +62,7 @@ class RigControlsGrid extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
 
-            // Row 2: Relaunch + Refresh Master KML + Clear KML
+            // Row 2: Relaunch + Refresh Master KML
             Row(
               children: [
                 Expanded(
@@ -69,7 +70,7 @@ class RigControlsGrid extends ConsumerWidget {
                   child: RigControlCard(
                     title: 'Relaunch',
                     icon: Icons.refresh_rounded,
-                    accentColor: DashboardPalette.sage,
+                    accentColor: AppPalette.sage,
                     isDark: isDark,
                     enabled: isConnected,
                     onTap: () async {
@@ -91,7 +92,7 @@ class RigControlsGrid extends ConsumerWidget {
                   child: RigControlCard(
                     title: 'Refresh KML',
                     icon: Icons.sync_rounded,
-                    accentColor: DashboardPalette.dustyBlue,
+                    accentColor: AppPalette.dustyBlue,
                     isDark: isDark,
                     enabled: isConnected,
                     onTap: () async {
@@ -102,7 +103,36 @@ class RigControlsGrid extends ConsumerWidget {
                             content: Text(ok
                                 ? 'Master KML refreshed'
                                 : 'Refresh failed'),
-                            backgroundColor: ok ? DashboardPalette.sage : DashboardPalette.terracotta,
+                            backgroundColor: ok ? AppPalette.sage : AppPalette.terracotta,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Row 3: Clear KML + Clear Logo
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: RigControlCard(
+                    title: 'Clear KML',
+                    icon: Icons.layers_clear_rounded,
+                    accentColor: AppPalette.warmGrey,
+                    isDark: isDark,
+                    enabled: isConnected,
+                    onTap: () async {
+                      final ok = await ref.read(lgServiceProvider).clearKml();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(ok ? 'KML cleared' : 'Clear failed'),
+                            backgroundColor: ok ? AppPalette.sage : AppPalette.terracotta,
                             duration: const Duration(seconds: 2),
                           ),
                         );
@@ -114,23 +144,22 @@ class RigControlsGrid extends ConsumerWidget {
                 Expanded(
                   flex: 2,
                   child: RigControlCard(
-                    title: 'Clear KML',
-                    icon: Icons.layers_clear_rounded,
-                    accentColor: DashboardPalette.warmGrey,
+                    title: 'Clear Logo',
+                    icon: Icons.hide_image_outlined,
+                    accentColor: AppPalette.dustyBlue,
                     isDark: isDark,
                     enabled: isConnected,
-                    onTap: () async {
-                      final ok = await ref.read(lgServiceProvider).clearKml();
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(ok ? 'KML cleared' : 'Clear failed'),
-                            backgroundColor: ok ? DashboardPalette.sage : DashboardPalette.terracotta,
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      }
-                    },
+                    onTap: () => _confirmDangerous(
+                      context,
+                      ref,
+                      title: 'Clear Logo',
+                      message: 'Remove the logo overlay from the leftmost LG screen?',
+                      action: () async {
+                        await ref.read(logoOverlayServiceProvider).clearLogo();
+                        return true;
+                      },
+                      actionLabel: 'Clear Logo',
+                    ),
                   ),
                 ),
               ],
@@ -156,7 +185,7 @@ class RigControlsGrid extends ConsumerWidget {
         title: Row(
           children: [
             Icon(Icons.warning_amber_rounded,
-                color: DashboardPalette.terracotta, size: 22),
+                color: AppPalette.terracotta, size: 22),
             const SizedBox(width: 10),
             Text(title),
           ],
@@ -177,13 +206,13 @@ class RigControlsGrid extends ConsumerWidget {
                     content: Text(ok
                         ? '$actionLabel command sent'
                         : '$actionLabel failed'),
-                    backgroundColor: ok ? DashboardPalette.sage : DashboardPalette.terracotta,
+                    backgroundColor: ok ? AppPalette.sage : AppPalette.terracotta,
                   ),
                 );
               }
             },
             style: FilledButton.styleFrom(
-              backgroundColor: DashboardPalette.terracotta,
+              backgroundColor: AppPalette.terracotta,
             ),
             child: Text(actionLabel),
           ),
@@ -221,7 +250,7 @@ class _RigControlCardState extends State<RigControlCard> {
   @override
   Widget build(BuildContext context) {
     final surfaceColor = widget.isDark
-        ? const Color(0xFF1C2236)
+        ? const Color(0xFF2A2A2D)   // M3 dark surface variant
         : Colors.white;
 
     return GestureDetector(
@@ -286,10 +315,10 @@ class _RigControlCardState extends State<RigControlCard> {
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: widget.enabled
-                    ? (widget.isDark ? Colors.white : DashboardPalette.inkDark)
+                    ? (widget.isDark ? Colors.white : AppPalette.inkDark)
                     : (widget.isDark
                         ? Colors.white38
-                        : DashboardPalette.warmGrey.withValues(alpha: 0.5)),
+                        : AppPalette.warmGrey.withValues(alpha: 0.5)),
               ),
             ),
           ],

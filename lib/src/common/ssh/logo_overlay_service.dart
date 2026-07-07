@@ -9,8 +9,12 @@ import 'package:lg_interactive_onboarding/src/features/settings/data/settings_se
 /// leftmost screen.
 ///
 /// The logo is displayed as a KML `<ScreenOverlay>` on the slave screen
-/// corresponding to the leftmost physical display. It is activated when
-/// a 3D model is pushed and deactivated on clear/remove/deep-clean.
+/// corresponding to the leftmost physical display.
+///
+/// Logo lifecycle:
+///   - Sent automatically when SSH connects.
+///   - Cleared explicitly BEFORE disconnect (call [clearLogo] then [SSHService.disconnect]).
+///   - Cleared on graceful app exit via [WidgetsBindingObserver] in AppShell.
 ///
 /// Screen numbering follows the LG clockwise convention:
 ///   - 3 rigs: lg3 (left), lg1 (master/center), lg2 (right)
@@ -21,6 +25,30 @@ class LogoOverlayService {
   final SettingsService _settingsService;
 
   LogoOverlayService(this._sshService, this._settingsService);
+
+  // ─── Connection Watcher ───────────────────────────────────────────
+
+  /// Tracks the last known connection state to fire [sendLogo] exactly once
+  /// per connect edge.
+  ///
+  /// Disconnect cleanup is NOT handled here — [clearLogo] must be called
+  /// explicitly BEFORE [SSHService.disconnect] so the SSH channel is still
+  /// open when we upload the empty KML.
+  bool _wasConnected = false;
+
+  /// Called by [logoConnectionWatcherProvider] on every [SSHService] notification.
+  /// Only reacts to false→true connect edges; disconnect is handled pre-emptively
+  /// at each call site before the SSH session is torn down.
+  void onConnectionChange() {
+    final nowConnected = _sshService.isConnected;
+    if (nowConnected == _wasConnected) return; // no edge — ignore
+    _wasConnected = nowConnected;
+    if (nowConnected) {
+      debugPrint('LogoOverlay: SSH connected → sending logo');
+      sendLogo();
+    }
+    // Disconnect edge: logo was already cleared before disconnect was called.
+  }
 
   /// Session-level flag: avoids re-uploading the logo PNG on every push.
   bool _logoUploaded = false;
@@ -195,11 +223,34 @@ class LogoOverlayService {
   }
 }
 
-// ─── Provider ──────────────────────────────────────────────────────────
+// ─── Providers ─────────────────────────────────────────────────────────
 
 final logoOverlayServiceProvider = Provider<LogoOverlayService>((ref) {
   return LogoOverlayService(
     ref.watch(sshServiceProvider),
     ref.watch(settingsServiceProvider),
   );
+});
+
+/// Activate this provider once at startup (e.g. in [LGContentStudioApp]) to
+/// automatically send the logo on SSH connect and clear it on disconnect
+/// or app exit.
+///
+/// It registers a listener on [SSHService] and removes it when the provider
+/// is disposed (i.e. when the [ProviderScope] is torn down on exit).
+final logoConnectionWatcherProvider = Provider<void>((ref) {
+  final ssh = ref.read(sshServiceProvider);
+  final logoService = ref.read(logoOverlayServiceProvider);
+
+  // Edge-detector: fires on every SSHService.notifyListeners() call.
+  void listener() => logoService.onConnectionChange();
+
+  ssh.addListener(listener);
+
+  // Clean up when the ProviderScope is disposed (app exit).
+  ref.onDispose(() {
+    ssh.removeListener(listener);
+    // Attempt a final logo clear in case the connection is still alive.
+    logoService.clearLogo();
+  });
 });

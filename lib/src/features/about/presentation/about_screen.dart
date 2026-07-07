@@ -6,7 +6,6 @@ class AboutScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -26,28 +25,16 @@ class AboutScreen extends StatelessWidget {
               children: [
                 Hero(
                   tag: 'app_logo',
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        )
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: Image.asset(
-                        'assets/logos/apk_logo.png',
-                        width: 120,
-                        fit: BoxFit.contain,
-                      ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Image.asset(
+                      'assets/logos/apk_logo.png',
+                      width: 120,
+                      fit: BoxFit.contain,
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
                 Text(
                   'LG Interactive Onboarding',
                   style: TextStyle(
@@ -58,84 +45,32 @@ class AboutScreen extends StatelessWidget {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 24),
                 Text(
-                  'Create KML content for Liquid Galaxy',
+                  'Built by Darpan Baviskar (darpanbaviskar@gmail.com) for Google Summer of Code (GSoC) 2026 with Liquid Galaxy.',
                   style: TextStyle(
                     fontSize: 16,
-                    color: colorScheme.onSurface.withValues(alpha: 0.6),
+                    height: 1.5,
+                    color: colorScheme.onSurface.withValues(alpha: 0.8),
                     fontWeight: FontWeight.w500,
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 48),
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withValues(alpha: isDark ? 0.3 : 0.5),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: colorScheme.outline.withValues(alpha: 0.1),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.stars_rounded, color: colorScheme.primary),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Features & Usage',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'LG Interactive Onboarding provides a powerful, interactive content '
-                        'creation suite for the Liquid Galaxy platform. Designed to '
-                        'streamline the deployment of complex spatial data, it enables '
-                        'you to effortlessly import, configure, and push custom 3D models '
-                        'directly to the LG rig.\n\n'
-                        'Key capabilities include:\n\n'
-                        '• Real-time connection management via SSH.\n'
-                        '• An intuitive 3D Model Builder for DAE & KMZ placement.\n'
-                        '• Dynamic KML generation with live position adjustments.\n'
-                        '• Overlay injection and rig maintenance tools.',
-                        style: TextStyle(
-                          fontSize: 15,
-                          height: 1.6,
-                          color: colorScheme.onSurface.withValues(alpha: 0.8),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 48),
+                const SizedBox(height: 24),
                 Text(
-                  'DEVELOPER',
+                  'Project Contributions:\n\n'
+                  '• Serves as a comprehensive, interactive onboarding suite for the Liquid Galaxy platform.\n'
+                  '• Lowers the barrier to entry for new developers and community members.\n'
+                  '• Provides an intuitive interface to learn the system\'s architecture and interact with the rig.\n'
+                  '• Streamlines the deployment of custom KML content and 3D models with extended format support.\n'
+                  '• Empowers the community to create richer spatial experiences and accelerates new application development.',
                   style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurface.withValues(alpha: 0.4),
-                    letterSpacing: 1.5,
+                    fontSize: 15,
+                    height: 1.6,
+                    color: colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
+                  textAlign: TextAlign.left,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Darpan Baviskar',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 32),
               ],
             ),
           ),

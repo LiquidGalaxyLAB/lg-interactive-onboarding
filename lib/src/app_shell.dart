@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lg_interactive_onboarding/src/common/curriculum/guided_mode_controller.dart';
+import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
+import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/features/curriculum_engine/presentation/learn_screen.dart';
 import 'package:lg_interactive_onboarding/src/features/curriculum_engine/presentation/guided_mode_overlay.dart';
 import 'package:lg_interactive_onboarding/src/features/dashboard/presentation/dashboard_screen.dart';
@@ -23,15 +25,42 @@ class AppShell extends ConsumerStatefulWidget {
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends ConsumerState<AppShell> {
+class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver {
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Clears the logo and disconnects SSH when the app is gracefully exited.
+  /// [AppLifecycleState.detached] fires when the Flutter engine is about to
+  /// be torn down (back-button exit on Android, swipe-close on iOS, etc.).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached) {
+      final ssh = ref.read(sshServiceProvider);
+      if (ssh.isConnected) {
+        final logo = ref.read(logoOverlayServiceProvider);
+        // Fire-and-forget — best-effort before process is killed.
+        logo.clearLogo().then((_) => ssh.disconnect());
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final guidedState = ref.watch(guidedModeControllerProvider);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    const accent = Color(0xFF6C5CE7);
+    const accent = Color(0xFF1A73E8);
 
     return Scaffold(
       body: Stack(
@@ -55,7 +84,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (i) => setState(() => _selectedIndex = i),
-        backgroundColor: isDark ? const Color(0xFF141929) : Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E1E20) : Colors.white,
         indicatorColor: accent.withValues(alpha: 0.15),
         shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
@@ -68,13 +97,13 @@ class _AppShellState extends ConsumerState<AppShell> {
                   ? accent
                   : (isDark ? Colors.white38 : Colors.black38),
             ),
-            selectedIcon: const Icon(Icons.home_rounded, color: Color(0xFF6C5CE7)),
+            selectedIcon: const Icon(Icons.home_rounded, color: Color(0xFF1A73E8)),
             label: 'Home',
           ),
           NavigationDestination(
             icon: Badge(
               isLabelVisible: guidedState.isActive && _selectedIndex != 1,
-              backgroundColor: const Color(0xFFFD79A8),
+              backgroundColor: const Color(0xFFB3261E),
               child: Icon(
                 Icons.school_outlined,
                 color: _selectedIndex == 1
@@ -83,7 +112,7 @@ class _AppShellState extends ConsumerState<AppShell> {
               ),
             ),
             selectedIcon:
-                const Icon(Icons.school_rounded, color: Color(0xFF6C5CE7)),
+                const Icon(Icons.school_rounded, color: Color(0xFF1A73E8)),
             label: 'Learn',
           ),
         ],

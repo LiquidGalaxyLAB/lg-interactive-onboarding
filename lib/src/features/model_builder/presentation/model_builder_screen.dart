@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_project.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/presentation/map_placement_widget.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/presentation/orientation_sliders.dart';
-import 'package:lg_interactive_onboarding/src/features/model_builder/presentation/kml_preview_widget.dart';
 
 /// Main 3D Model Builder screen.
 class ModelBuilderScreen extends ConsumerWidget {
@@ -81,15 +79,10 @@ class ModelBuilderScreen extends ConsumerWidget {
           ],
           _ImportModelCard(theme: theme),
           const SizedBox(height: 16),
-          if (project.hasModel && project.isPreviewable) ...[
-            _ModelPreviewCard(filePath: project.filePath!, theme: theme),
-            const SizedBox(height: 16),
-          ],
+
           const MapPlacementWidget(),
           const SizedBox(height: 16),
           const OrientationSlidersWidget(),
-          const SizedBox(height: 16),
-          const KmlPreviewWidget(),
           const SizedBox(height: 16),
           _PushToLGCard(
             theme: theme, pushState: pushState,
@@ -365,10 +358,6 @@ class _FileInfoTile extends StatelessWidget {
                 const SizedBox(width: 8),
                 _InfoChip(label: 'Bundled', icon: Icons.inventory_2, theme: theme, color: const Color(0xFF6C5CE7)),
               ],
-              if (project.isPreviewable) ...[
-                const SizedBox(width: 8),
-                _InfoChip(label: '3D Preview', icon: Icons.view_in_ar, theme: theme, color: Colors.greenAccent[400]),
-              ],
             ]),
           ])),
           Consumer(builder: (context, ref, _) => IconButton(
@@ -395,21 +384,6 @@ class _FileInfoTile extends StatelessWidget {
           loading: () => const Padding(padding: EdgeInsets.only(top: 8), child: LinearProgressIndicator()),
           error: (_, _) => const SizedBox.shrink(),
         ),
-        if (!project.isPreviewable && project.hasModel)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
-              child: Row(children: [
-                Icon(Icons.info_outline, size: 14, color: Colors.amber[700]),
-                const SizedBox(width: 6),
-                Expanded(child: Text('COLLADA preview not available; model can still be pushed to LG.',
-                  style: theme.textTheme.bodySmall?.copyWith(color: Colors.amber[700], fontSize: 11))),
-              ]),
-            ),
-          ),
       ]),
     );
   }
@@ -476,44 +450,7 @@ class _ImportButton extends ConsumerWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// 3D MODEL PREVIEW CARD
-// ═══════════════════════════════════════════════════════════════════
 
-class _ModelPreviewCard extends StatelessWidget {
-  final String filePath; final ThemeData theme;
-  const _ModelPreviewCard({required this.filePath, required this.theme});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Row(children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF00B894).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.view_in_ar, color: Color(0xFF00B894), size: 20),
-            ),
-            const SizedBox(width: 12),
-            Text('3D Preview', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-          ]),
-        ),
-        SizedBox(
-          height: 300,
-          child: ModelViewer(
-            src: 'file://$filePath', alt: '3D Model Preview',
-            autoPlay: true, autoRotate: true, cameraControls: true,
-            backgroundColor: theme.brightness == Brightness.dark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F6FA),
-          ),
-        ),
-      ]),
-    );
-  }
-}
 
 // ═══════════════════════════════════════════════════════════════════
 // PUSH TO LG CARD

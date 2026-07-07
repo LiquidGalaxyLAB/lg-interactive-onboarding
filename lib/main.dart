@@ -9,6 +9,7 @@ import 'package:lg_interactive_onboarding/src/common/curriculum/learning_module.
 import 'package:lg_interactive_onboarding/src/common/theme/app_theme.dart';
 import 'package:lg_interactive_onboarding/src/features/architecture_explorer/presentation/architecture_explorer_screen.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/presentation/model_builder_screen.dart';
+import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/presentation/settings_screen.dart';
 
@@ -49,6 +50,10 @@ class LGContentStudioApp extends ConsumerWidget {
 
     // Inject navigator key into GuidedModeController so it can insert overlays.
     ref.read(guidedModeControllerProvider.notifier).navigatorKey = navigatorKey;
+
+    // Activate the logo connection watcher for the full app lifetime.
+    // This sends the logo on SSH connect and clears it on disconnect / app exit.
+    ref.read(logoConnectionWatcherProvider);
 
     return MaterialApp(
       navigatorKey: navigatorKey,

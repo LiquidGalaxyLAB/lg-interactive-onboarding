@@ -50,7 +50,7 @@ class ArchitectureExplorerScreen extends ConsumerWidget {
           'Architecture Explorer',
           style: GoogleFonts.inter(fontWeight: FontWeight.w700),
         ),
-        backgroundColor: isDark ? const Color(0xFF141929) : Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E1E20) : Colors.white,
         leading: const BackButton(),
       ),
       body: Column(
@@ -98,12 +98,12 @@ class _DiagramTabRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 60,
-      color: isDark ? const Color(0xFF141929) : Colors.white,
+      color: isDark ? const Color(0xFF1E1E20) : Colors.white,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         itemCount: diagrams.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
           final d = diagrams[i];
           final isSelected = d.id == selectedId;
@@ -178,7 +178,7 @@ class _DiagramBody extends ConsumerWidget {
                       style: GoogleFonts.inter(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                        color: isDark ? Colors.white : const Color(0xFF1F1F1F),
                       ),
                     ),
                     Text(
@@ -224,8 +224,8 @@ class _DiagramBody extends ConsumerWidget {
               child: Container(
                 decoration: BoxDecoration(
                   color: isDark
-                      ? const Color(0xFF0E1321)
-                      : const Color(0xFFF0F2F8),
+                      ? const Color(0xFF1E1E20)
+                      : const Color(0xFFF8F9FA),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: diagram.accentColor.withValues(alpha: 0.15),
@@ -299,7 +299,7 @@ class _HotspotDetailSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bg = isDark ? const Color(0xFF1A1F33) : Colors.white;
+    final bg = isDark ? const Color(0xFF2A2A2D) : Colors.white;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.5,
@@ -358,7 +358,7 @@ class _HotspotDetailSheet extends ConsumerWidget {
                                 fontWeight: FontWeight.w800,
                                 color: isDark
                                     ? Colors.white
-                                    : const Color(0xFF1A1A2E),
+                                    : const Color(0xFF1F1F1F),
                               ),
                             ),
                             Text(
