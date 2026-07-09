@@ -51,9 +51,10 @@ class ModelRepository {
     }
     
     final result = await _sshService.execute(finalCommand);
-    if (result == null) throw Exception('Execution failed: $command');
-    
-    return result.stdout.trim();
+    return switch (result) {
+      SSHExecSuccess(:final stdout) => stdout.trim(),
+      SSHExecFailure(:final message) => throw Exception('Execution failed ($command): $message'),
+    };
   }
 
   // ─── KML Generation ──────────────────────────────────────────────

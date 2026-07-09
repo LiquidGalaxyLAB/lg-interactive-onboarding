@@ -15,8 +15,7 @@ class LGService {
   LGService(this._sshService, this._settingsService);
 
   /// Helper to ensure SSH is connected before running commands.
-  bool get _isReady =>
-      _sshService.client != null && !_sshService.client!.isClosed;
+  bool get _isReady => _sshService.isConnected;
 
   // ─── Rig Control Commands ─────────────────────────────────────────
 

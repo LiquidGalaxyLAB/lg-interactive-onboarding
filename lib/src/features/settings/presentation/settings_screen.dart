@@ -70,7 +70,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await ref.read(logoOverlayServiceProvider).clearLogo();
     }
     await ssh.disconnect();
-    final success = await ssh.connect(
+    final result = await ssh.connect(
       host: _hostCtrl.text.trim(),
       port: int.tryParse(_portCtrl.text) ?? 22,
       username: _usernameCtrl.text.trim(),
@@ -80,20 +80,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!mounted) return;
     setState(() => _isConnecting = false);
 
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Connected to Liquid Galaxy successfully!'),
-          backgroundColor: Color(0xFF1E8E3E),
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Connection failed — check your settings'),
-          backgroundColor: Color(0xFFB3261E),
-        ),
-      );
+    switch (result) {
+      case SSHConnected():
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Connected to Liquid Galaxy successfully!'),
+            backgroundColor: Color(0xFF1E8E3E),
+          ),
+        );
+      case SSHConnectionError(:final message):
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Connection failed: $message'),
+            backgroundColor: const Color(0xFFB3261E),
+          ),
+        );
+      case SSHConnecting() || SSHDisconnected():
+        // Stale result from a superseded connection attempt; ignore.
+        break;
     }
   }
 
