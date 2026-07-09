@@ -189,6 +189,22 @@ class LGService {
       return false;
     }
   }
+
+  /// Commands Liquid Galaxy to play a tour by name.
+  Future<bool> playTour(String tourName) async {
+    if (!_isReady) return false;
+
+    try {
+      final command = 'echo "playtour=$tourName" > /tmp/query.txt';
+      await _sshService.execute(command);
+      
+      debugPrint('LGService: Playing tour $tourName');
+      return true;
+    } catch (e) {
+      debugPrint('LGService: Play tour failed: $e');
+      return false;
+    }
+  }
 }
 
 // ─── Provider ──────────────────────────────────────────────────────────

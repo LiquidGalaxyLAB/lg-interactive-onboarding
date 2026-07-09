@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
@@ -6,9 +7,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_project.dart';
+import 'package:lg_interactive_onboarding/src/features/model_builder/data/scene_models.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
-import 'package:lg_interactive_onboarding/src/features/model_builder/data/scene_models.dart';
 import 'package:path/path.dart' as p;
 
 /// Repository for 3D model operations: KML generation, file handling, SSH push.
@@ -50,10 +51,10 @@ class ModelRepository {
     } else {
       finalCommand = command;
     }
-    
+
     final result = await _sshService.execute(finalCommand);
     if (result == null) throw Exception('Execution failed: $command');
-    
+
     return result.stdout.trim();
   }
 
@@ -97,7 +98,6 @@ class ModelRepository {
 </kml>''';
   }
 
-  /// Generates just the Model block (for KML preview).
   String generateModelBlock(ModelProject project) {
     final masterIp = _settingsService.host;
     final remoteModelFile = project.remoteModelFileName;
@@ -123,6 +123,46 @@ class ModelRepository {
     <z>${project.scaleZ}</z>
   </Scale>
 </Model>''';
+  }
+
+  /// Generates a KML Tour for a list of models to automatically fly to each one.
+  String generateSceneTourKml(List<ModelProject> models, String tourName) {
+    final buffer = StringBuffer();
+    buffer.writeln('<?xml version="1.0" encoding="UTF-8"?>');
+    buffer.writeln('<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">');
+    buffer.writeln('  <Document>');
+    buffer.writeln('    <name>$tourName Document</name>');
+    buffer.writeln('    <gx:Tour>');
+    buffer.writeln('      <name>$tourName</name>');
+    buffer.writeln('      <gx:Playlist>');
+    
+    for (final model in models) {
+      // Calculate a comfortable viewing range based on model altitude and scale
+      final range = (model.altitude + (model.scaleX * 15)).clamp(1000.0, 100000.0);
+      
+      buffer.writeln('        <gx:FlyTo>');
+      buffer.writeln('          <gx:duration>4.0</gx:duration>');
+      buffer.writeln('          <gx:flyToMode>smooth</gx:flyToMode>');
+      buffer.writeln('          <LookAt>');
+      buffer.writeln('            <longitude>${model.longitude ?? 0.0}</longitude>');
+      buffer.writeln('            <latitude>${model.latitude ?? 0.0}</latitude>');
+      buffer.writeln('            <altitude>${model.altitude}</altitude>');
+      buffer.writeln('            <heading>${model.heading}</heading>');
+      buffer.writeln('            <tilt>${AppConstants.defaultCameraTilt}</tilt>');
+      buffer.writeln('            <range>$range</range>');
+      buffer.writeln('            <gx:altitudeMode>relativeToGround</gx:altitudeMode>');
+      buffer.writeln('          </LookAt>');
+      buffer.writeln('        </gx:FlyTo>');
+      buffer.writeln('        <gx:Wait>');
+      buffer.writeln('          <gx:duration>2.0</gx:duration>');
+      buffer.writeln('        </gx:Wait>');
+    }
+    
+    buffer.writeln('      </gx:Playlist>');
+    buffer.writeln('    </gx:Tour>');
+    buffer.writeln('  </Document>');
+    buffer.writeln('</kml>');
+    return buffer.toString();
   }
 
   // ─── KMZ Handling ────────────────────────────────────────────────
@@ -174,7 +214,10 @@ class ModelRepository {
       debugPrint('Assimp: apt update output: $updateOutput');
 
       // ── Step 2: apt install ──
-      final installOutput = await _execute('apt install assimp-utils -y -qq 2>&1', sudo: true);
+      final installOutput = await _execute(
+        'apt install assimp-utils -y -qq 2>&1',
+        sudo: true,
+      );
       debugPrint('Assimp: apt install output: $installOutput');
 
       // ── Step 3: Verify installation succeeded ──
@@ -186,7 +229,9 @@ class ModelRepository {
         return;
       }
 
-      throw Exception('Installation failed — assimp not found after apt install.');
+      throw Exception(
+        'Installation failed — assimp not found after apt install.',
+      );
     } catch (e) {
       throw Exception('Prerequisite check failed: $e');
     }
@@ -208,14 +253,17 @@ class ModelRepository {
     required String uploadedFilePath,
     required String targetDaePath,
   }) async {
-
     try {
       debugPrint('Assimp: Converting $uploadedFilePath → $targetDaePath');
 
-      final conversionOutput = await _execute('assimp export "$uploadedFilePath" "$targetDaePath" -tri 2>&1');
+      final conversionOutput = await _execute(
+        'assimp export "$uploadedFilePath" "$targetDaePath" -tri 2>&1',
+      );
 
       // Verify the .dae was actually created
-      final verifyOutput = await _execute('test -f "$targetDaePath" && echo EXISTS');
+      final verifyOutput = await _execute(
+        'test -f "$targetDaePath" && echo EXISTS',
+      );
 
       if (!verifyOutput.contains('EXISTS')) {
         throw Exception(
@@ -257,7 +305,10 @@ class ModelRepository {
 
       // Install lxml via pip
       debugPrint('Triangulate: lxml not found — installing...');
-      final installOutput = await _execute('pip3 install lxml 2>&1', sudo: true);
+      final installOutput = await _execute(
+        'pip3 install lxml 2>&1',
+        sudo: true,
+      );
       debugPrint('Triangulate: pip3 install lxml output: $installOutput');
 
       // Verify
@@ -310,11 +361,15 @@ class ModelRepository {
       await _ensureLxmlInstalled();
 
       // 3. Run the triangulation script
-      final triOutput = await _execute('python3 $remoteScriptPath "$remoteDaePath" "$triangulatedTempPath" 2>&1');
+      final triOutput = await _execute(
+        'python3 $remoteScriptPath "$remoteDaePath" "$triangulatedTempPath" 2>&1',
+      );
       debugPrint('Triangulate: script output: $triOutput');
 
       // 4. Verify the triangulated file was created
-      final verifyOutput = await _execute('test -f "$triangulatedTempPath" && echo EXISTS');
+      final verifyOutput = await _execute(
+        'test -f "$triangulatedTempPath" && echo EXISTS',
+      );
 
       if (!verifyOutput.contains('EXISTS')) {
         throw Exception('Output file not created. Script output: $triOutput');
@@ -323,7 +378,9 @@ class ModelRepository {
       // 5. Overwrite the original .dae with the triangulated version
       await _execute('mv -f "$triangulatedTempPath" "$remoteDaePath"');
 
-      debugPrint('Triangulate: Success — $remoteDaePath overwritten with triangulated version');
+      debugPrint(
+        'Triangulate: Success — $remoteDaePath overwritten with triangulated version',
+      );
     } catch (e) {
       // Cleanup temp file on failure
       await _execute('rm -f "$triangulatedTempPath"').catchError((_) => '');
@@ -339,7 +396,10 @@ class ModelRepository {
     bool relaunch = true,
   }) async {
     if (!_sshService.isConnected) {
-      return PushResult(success: false, message: 'SSH not connected. Please connect first.');
+      return PushResult(
+        success: false,
+        message: 'SSH not connected. Please connect first.',
+      );
     }
     if (!project.isReady) {
       return PushResult(success: false, message: 'Model or location not set.');
@@ -348,7 +408,9 @@ class ModelRepository {
 
     try {
       // 1. Ensure directories exist (single command)
-      await _execute('mkdir -p $_modelDir && mkdir -p $_wrapperDir && mkdir -p /var/www/html/kml');
+      await _execute(
+        'mkdir -p $_modelDir && mkdir -p $_wrapperDir && mkdir -p /var/www/html/kml',
+      );
 
       // 2. Upload and process model file
       if (ext == '.kmz') {
@@ -357,7 +419,10 @@ class ModelRepository {
         for (final entry in entries) {
           final remotePath = '$_modelDir/${project.id}_${entry.key}';
           await _execute('mkdir -p ${p.posix.dirname(remotePath)}');
-          await _sshService.uploadBytes(bytes: entry.value, remotePath: remotePath);
+          await _sshService.uploadBytes(
+            bytes: entry.value,
+            remotePath: remotePath,
+          );
           await _channelDelay();
         }
       } else {
@@ -371,7 +436,10 @@ class ModelRepository {
         final safeRawName = project.fileName?.replaceAll(' ', '_') ?? 'unnamed';
         final rawUploadPath = '$_modelDir/raw_${project.id}_$safeRawName';
 
-        await _sshService.uploadBytes(bytes: fileBytes, remotePath: rawUploadPath);
+        await _sshService.uploadBytes(
+          bytes: fileBytes,
+          remotePath: rawUploadPath,
+        );
         await _channelDelay();
 
         if (ext == '.dae') {
@@ -447,7 +515,10 @@ class ModelRepository {
         await _execute('/usr/local/bin/lg-relaunch', sudo: true);
       }
 
-      return PushResult(success: true, message: 'Model and KML pushed successfully!');
+      return PushResult(
+        success: true,
+        message: 'Model and KML pushed successfully!',
+      );
     } catch (e) {
       debugPrint('Push to LG failed: $e');
       return PushResult(success: false, message: 'Push failed: $e');
@@ -461,7 +532,10 @@ class ModelRepository {
     required List<DeployedModel> remainingDeployments,
   }) async {
     if (!_sshService.isConnected) {
-      return PushResult(success: false, message: 'SSH not connected. Please connect first.');
+      return PushResult(
+        success: false,
+        message: 'SSH not connected. Please connect first.',
+      );
     }
 
     try {
@@ -472,8 +546,9 @@ class ModelRepository {
       );
 
       // 3. Rewrite wrapper master.kml with only the remaining models
-      final remainingKmlFiles =
-          remainingDeployments.map((d) => d.remoteKmlFileName).toList();
+      final remainingKmlFiles = remainingDeployments
+          .map((d) => d.remoteKmlFileName)
+          .toList();
 
       if (remainingKmlFiles.isEmpty) {
         await _writeEmptyWrapperMasterKml();
@@ -489,15 +564,10 @@ class ModelRepository {
       // 5. Force refresh
       await _forceRefresh();
 
-      // 5b. Start the tour
-      await _channelDelay();
-      await _execute('echo "playtour=SceneTour" > /tmp/query.txt');
-
-      // 5b. Start the tour
-      await _channelDelay();
-      await _execute('echo "playtour=SceneTour" > /tmp/query.txt');
-
-      return PushResult(success: true, message: '${model.displayName} removed from LG.');
+      return PushResult(
+        success: true,
+        message: '${model.displayName} removed from LG.',
+      );
     } catch (e) {
       debugPrint('Remove from LG failed: $e');
       return PushResult(success: false, message: 'Remove failed: $e');
@@ -544,7 +614,10 @@ class ModelRepository {
 
       await _forceRefresh();
 
-      return PushResult(success: true, message: 'Master KML cleared successfully.');
+      return PushResult(
+        success: true,
+        message: 'Master KML cleared successfully.',
+      );
     } catch (e) {
       debugPrint('Clear master KML failed: $e');
       return PushResult(success: false, message: 'Clear master KML failed: $e');
@@ -569,7 +642,10 @@ class ModelRepository {
 
       await _forceRefresh();
 
-      return PushResult(success: true, message: 'Deep clean complete — all model files removed.');
+      return PushResult(
+        success: true,
+        message: 'Deep clean complete — all model files removed.',
+      );
     } catch (e) {
       debugPrint('Deep clean failed: $e');
       return PushResult(success: false, message: 'Deep clean failed: $e');
@@ -578,52 +654,28 @@ class ModelRepository {
 
   // ─── Helpers ─────────────────────────────────────────────────────
 
-  Future<void> _writeWrapperMasterKml(List<String> kmlFileNames, {List<ModelNode>? sceneTourNodes}) async {
+  Future<void> _writeWrapperMasterKml(List<String> kmlFileNames) async {
     final masterIp = _settingsService.host;
 
-    final networkLinks = kmlFileNames.map((kmlFile) => '''
+    final networkLinks = kmlFileNames
+        .map(
+          (kmlFile) =>
+              '''
     <NetworkLink>
       <name>$kmlFile</name>
       <Link>
         <href>http://$masterIp:${AppConstants.lgHttpPort}/3d_model_wrapper/$kmlFile</href>
       </Link>
-    </NetworkLink>''').join('\n');
+    </NetworkLink>''',
+        )
+        .join('\n');
 
-    String tourKml = '';
-    if (sceneTourNodes != null && sceneTourNodes.isNotEmpty) {
-      final flyTos = sceneTourNodes.map((node) => '''
-        <gx:FlyTo>
-          <gx:duration>4.0</gx:duration>
-          <gx:flyToMode>smooth</gx:flyToMode>
-          <LookAt>
-            <longitude>${node.longitude}</longitude>
-            <latitude>${node.latitude}</latitude>
-            <altitude>${node.altitude}</altitude>
-            <heading>${node.heading}</heading>
-            <tilt>${node.tilt}</tilt>
-            <range>800</range>
-            <gx:altitudeMode>relativeToGround</gx:altitudeMode>
-          </LookAt>
-        </gx:FlyTo>
-        <gx:Wait><gx:duration>2.0</gx:duration></gx:Wait>
-      ''').join('\n');
-
-      tourKml = '''
-    <gx:Tour>
-      <name>SceneTour</name>
-      <gx:Playlist>
-$flyTos
-      </gx:Playlist>
-    </gx:Tour>
-''';
-    }
-
-    final wrapperKml = '''<?xml version="1.0" encoding="UTF-8"?>
+    final wrapperKml =
+        '''<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"
      xmlns:gx="http://www.google.com/kml/ext/2.2">
   <Document>
     <name>Deployed 3D Models</name>
-$tourKml
 $networkLinks
   </Document>
 </kml>''';
@@ -651,7 +703,8 @@ $networkLinks
   Future<void> _writeSystemMasterKml() async {
     final masterIp = _settingsService.host;
 
-    final systemKml = '''<?xml version="1.0" encoding="UTF-8"?>
+    final systemKml =
+        '''<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"
      xmlns:gx="http://www.google.com/kml/ext/2.2">
   <Document>
@@ -690,200 +743,187 @@ $networkLinks
 
   Future<int?> extractDaeVertexCount(String filePath) async {
     try {
-      // Run heavy regex parsing in a background isolate to avoid blocking the main UI thread.
-      // Blocking the main thread stalls network I/O and causes SSH socket aborts.
-      return await compute(_parseDaeVertices, filePath);
+      final file = File(filePath);
+      final regex = RegExp(r'<float_array[^>]*count="(\d+)"');
+      int totalFloats = 0;
+
+
+      // Use a stream with LineSplitter to parse asynchronously without blocking the main thread
+      // and without the heavy memory overhead of spawning an isolate.
+      final lines = file.openRead().transform(utf8.decoder).transform(const LineSplitter());
+      
+      await for (final line in lines) {
+        final matches = regex.allMatches(line);
+        for (final match in matches) {
+          totalFloats += int.tryParse(match.group(1) ?? '0') ?? 0;
+        }
+      }
+
+      return totalFloats > 0 ? totalFloats ~/ 3 : null;
     } catch (e) {
       debugPrint('DAE parsing failed: $e');
       return null;
     }
   }
 
-  // Top-level/static function required for `compute` isolate spawning.
-  static int? _parseDaeVertices(String filePath) {
-    try {
-      final content = File(filePath).readAsStringSync();
-      final regex = RegExp(r'<float_array[^>]*count="(\d+)"');
-      final matches = regex.allMatches(content);
-
-      int totalFloats = 0;
-      for (final match in matches) {
-        totalFloats += int.tryParse(match.group(1) ?? '0') ?? 0;
-      }
-      return totalFloats > 0 ? totalFloats ~/ 3 : null;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  // ─── Scene Push ──────────────────────────────────────────────────
-
-  /// Generates a KML document for a single [ModelNode] (scene-level).
-  String generateKmlForModelNode(ModelNode node) {
-    final masterIp = _settingsService.host;
-    final remoteModelFile = node.remoteModelFileName;
-
-    return '''<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2"
-     xmlns:gx="http://www.google.com/kml/ext/2.2">
-  <Document>
-    <name>3D Model: ${node.fileName}</name>
-    <Placemark>
-      <name>${node.fileName}</name>
-      <Model>
-        <Link>
-          <href>http://$masterIp:${AppConstants.lgHttpPort}/model/$remoteModelFile</href>
-        </Link>
-        <Location>
-          <latitude>${node.latitude}</latitude>
-          <longitude>${node.longitude}</longitude>
-          <altitude>${node.altitude}</altitude>
-        </Location>
-        <altitudeMode>relativeToGround</altitudeMode>
-        <Orientation>
-          <heading>${node.heading}</heading>
-          <tilt>${node.tilt}</tilt>
-          <roll>${node.roll}</roll>
-        </Orientation>
-        <Scale>
-          <x>${node.scaleX}</x>
-          <y>${node.scaleY}</y>
-          <z>${node.scaleZ}</z>
-        </Scale>
-      </Model>
-    </Placemark>
-  </Document>
-</kml>''';
-  }
-
-  /// Pushes all models in a [Scene] to the LG rig.
-  ///
-  /// The group hierarchy is flattened — each [ModelNode] is pushed
-  /// individually through the same conversion/triangulation/KML pipeline
-  /// used by [pushToLG].
   Future<PushResult> pushScene(
     Scene scene, {
     required List<DeployedModel> existingDeployments,
-    bool relaunch = true,
+    required bool relaunch,
   }) async {
     if (!_sshService.isConnected) {
-      return PushResult(success: false, message: 'SSH not connected.');
+      return PushResult(
+        success: false,
+        message: 'SSH not connected. Please connect first.',
+      );
     }
-
-    final modelNodes = <ModelNode>[];
-    void traverse(List<String> nodeIds) {
-      for (final id in nodeIds) {
-        final node = scene.nodes[id];
-        if (node is ModelNode) {
-          modelNodes.add(node);
-        } else if (node is GroupNode) {
-          traverse(node.childIds);
-        }
-      }
-    }
-    traverse(scene.rootNodeIds);
-    if (modelNodes.isEmpty) {
+    if (scene.modelCount == 0) {
       return PushResult(success: false, message: 'Scene has no models to push.');
     }
 
     try {
       // 1. Ensure directories exist
-      await _execute('mkdir -p $_modelDir && mkdir -p $_wrapperDir && mkdir -p /var/www/html/kml');
+      await _execute(
+        'mkdir -p $_modelDir && mkdir -p $_wrapperDir && mkdir -p /var/www/html/kml',
+      );
 
-      final allKmlFiles = <String>[
-        ...existingDeployments.map((d) => d.remoteKmlFileName),
-      ];
+      final modelNodes = scene.nodes.values.whereType<ModelNode>().toList();
+      final pushedKmlFiles = <String>[];
+      final generatedProjects = <ModelProject>[];
 
-      // 2. Process each model node
+      // Process each model node
       for (final node in modelNodes) {
-        final ext = node.fileExtension?.toLowerCase() ?? '';
+        final project = ModelProject(
+          id: node.id, // Using node UUID ensures each placement gets its own KML and model copy
+          filePath: node.filePath,
+          fileName: node.fileName,
+          fileExtension: node.fileExtension,
+          fileSize: node.fileSize,
+          isAsset: node.isAsset,
+          assetPath: node.assetPath,
+          latitude: node.latitude,
+          longitude: node.longitude,
+          altitude: node.altitude,
+          heading: node.heading,
+          tilt: node.tilt,
+          roll: node.roll,
+          scaleX: node.scaleX,
+          scaleY: node.scaleY,
+          scaleZ: node.scaleZ,
+        );
+        
+        final ext = project.fileExtension?.toLowerCase() ?? '';
 
-        // Upload model file
-        final fileBytes = await File(node.filePath).readAsBytes();
-        final remoteDaePath = '$_modelDir/${node.remoteModelFileName}';
-        final safeRawName = node.fileName.replaceAll(' ', '_');
-        final rawUploadPath = '$_modelDir/raw_${node.modelAssetId}_$safeRawName';
-
-        await _sshService.uploadBytes(bytes: fileBytes, remotePath: rawUploadPath);
-        await _channelDelay();
-
-        if (ext == '.dae') {
-          await _execute('mv -f "$rawUploadPath" "$remoteDaePath"');
-        } else {
-          try {
-            await _ensureAssimpInstalled();
-          } catch (e) {
-            await _execute('rm -f "$rawUploadPath"');
-            return PushResult(
-              success: false,
-              message: 'Failed to install assimp for ${node.name}: $e',
+        // 2. Upload and process model file
+        if (ext == '.kmz') {
+          final entries = await extractKmz(project.filePath!);
+          for (final entry in entries) {
+            final remotePath = '$_modelDir/${project.id}_${entry.key}';
+            await _execute('mkdir -p ${p.posix.dirname(remotePath)}');
+            await _sshService.uploadBytes(
+              bytes: entry.value,
+              remotePath: remotePath,
             );
+            await _channelDelay();
+          }
+        } else {
+          final fileBytes = await File(project.filePath!).readAsBytes();
+          final remoteDaePath = '$_modelDir/${project.remoteModelFileName}';
+          final safeRawName = project.fileName?.replaceAll(' ', '_') ?? 'unnamed';
+          final rawUploadPath = '$_modelDir/raw_${project.id}_$safeRawName';
+
+          await _sshService.uploadBytes(
+            bytes: fileBytes,
+            remotePath: rawUploadPath,
+          );
+          await _channelDelay();
+
+          if (ext == '.dae') {
+            await _execute('mv -f "$rawUploadPath" "$remoteDaePath"');
+          } else {
+            try {
+              await _ensureAssimpInstalled();
+            } catch (e) {
+              await _execute('rm -f "$rawUploadPath"');
+              return PushResult(success: false, message: 'Failed to install assimp: $e');
+            }
+            try {
+              await _convertToCollada(
+                uploadedFilePath: rawUploadPath,
+                targetDaePath: remoteDaePath,
+              );
+            } catch (e) {
+              return PushResult(success: false, message: 'Model conversion failed: $e');
+            }
+            await _channelDelay();
           }
 
           try {
-            await _convertToCollada(
-              uploadedFilePath: rawUploadPath,
-              targetDaePath: remoteDaePath,
-            );
+            await _triangulateDaeWithScript(remoteDaePath);
           } catch (e) {
-            return PushResult(
-              success: false,
-              message: 'Conversion failed for ${node.name}: $e',
-            );
+            return PushResult(success: false, message: 'DAE triangulation failed: $e');
           }
           await _channelDelay();
         }
 
-        // Triangulate
-        try {
-          await _triangulateDaeWithScript(remoteDaePath);
-        } catch (e) {
-          return PushResult(
-            success: false,
-            message: 'Triangulation failed for ${node.name}: $e',
-          );
-        }
-        await _channelDelay();
-
-        // Generate and upload KML
-        final kml = generateKmlForModelNode(node);
+        // 5. Generate and upload KML for this model
+        final kml = generateKml(project);
         await _sshService.uploadFile(
           localData: kml,
-          remotePath: '$_wrapperDir/${node.remoteKmlFileName}',
+          remotePath: '$_wrapperDir/${project.remoteKmlFileName}',
         );
         await _channelDelay();
 
-        allKmlFiles.add(node.remoteKmlFileName);
+        pushedKmlFiles.add(project.remoteKmlFileName);
+        generatedProjects.add(project);
       }
 
-      // 3. Build wrapper master.kml
-      await _writeWrapperMasterKml(allKmlFiles, sceneTourNodes: modelNodes);
+      // Generate and upload KML Tour
+      final tourName = 'SceneTour';
+      final tourKmlName = 'scene_tour.kml';
+      final tourKml = generateSceneTourKml(generatedProjects, tourName);
+      await _sshService.uploadFile(
+        localData: tourKml,
+        remotePath: '$_wrapperDir/$tourKmlName',
+      );
+      await _channelDelay();
+      pushedKmlFiles.add(tourKmlName);
+
+      // 6. Build wrapper master.kml with NetworkLinks for ALL deployed models + scene models
+      final allKmlFiles = <String>[
+        ...existingDeployments.map((d) => d.remoteKmlFileName),
+        ...pushedKmlFiles,
+      ];
+      await _writeWrapperMasterKml(allKmlFiles);
       await _channelDelay();
 
-      // 4. Write system master.kml
+      // 7. Write system master.kml
       await _writeSystemMasterKml();
       await _channelDelay();
 
-      // 5. Force refresh
+      // 8. Force refresh
       await _forceRefresh();
 
-      // 6. Relaunch if requested
+      // 9. Relaunch if requested
       if (relaunch) {
         await _channelDelay();
         await _execute('/usr/local/bin/lg-relaunch', sudo: true);
+        // Give Google Earth time to restart
+        await Future.delayed(const Duration(seconds: 20));
+      } else {
+        await Future.delayed(const Duration(seconds: 2));
       }
 
-      // 7. Start the tour
-      await _channelDelay();
-      await _execute('echo "playtour=SceneTour" > /tmp/query.txt');
+      // Start the tour
+      await _execute('echo "playtour=$tourName" > /tmp/query.txt');
 
       return PushResult(
         success: true,
-        message: 'Scene pushed: ${modelNodes.length} model(s) deployed!',
+        message: 'Scene pushed successfully!',
       );
     } catch (e) {
-      debugPrint('Push scene failed: $e');
-      return PushResult(success: false, message: 'Scene push failed: $e');
+      debugPrint('Push scene to LG failed: $e');
+      return PushResult(success: false, message: 'Push scene failed: $e');
     }
   }
 }
