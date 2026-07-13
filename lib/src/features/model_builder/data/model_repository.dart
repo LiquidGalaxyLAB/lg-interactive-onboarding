@@ -53,9 +53,10 @@ class ModelRepository {
     }
 
     final result = await _sshService.execute(finalCommand);
-    if (result == null) throw Exception('Execution failed: $command');
-
-    return result.stdout.trim();
+    return switch (result) {
+      SSHExecSuccess(:final stdout) => stdout.trim(),
+      SSHExecFailure(:final message) => throw Exception('Execution failed ($command): $message'),
+    };
   }
 
   // ─── KML Generation ──────────────────────────────────────────────
@@ -256,9 +257,7 @@ class ModelRepository {
     try {
       debugPrint('Assimp: Converting $uploadedFilePath → $targetDaePath');
 
-      final conversionOutput = await _execute(
-        'assimp export "$uploadedFilePath" "$targetDaePath" -tri 2>&1',
-      );
+      final conversionOutput = await _execute('assimp export "$uploadedFilePath" "$targetDaePath" -tri 2>&1');
 
       // Verify the .dae was actually created
       final verifyOutput = await _execute(
@@ -436,10 +435,7 @@ class ModelRepository {
         final safeRawName = project.fileName?.replaceAll(' ', '_') ?? 'unnamed';
         final rawUploadPath = '$_modelDir/raw_${project.id}_$safeRawName';
 
-        await _sshService.uploadBytes(
-          bytes: fileBytes,
-          remotePath: rawUploadPath,
-        );
+        await _sshService.uploadBytes(bytes: fileBytes, remotePath: rawUploadPath);
         await _channelDelay();
 
         if (ext == '.dae') {
@@ -743,14 +739,26 @@ $networkLinks
 
   Future<int?> extractDaeVertexCount(String filePath) async {
     try {
-      final file = File(filePath);
+      // Run heavy regex parsing in a background isolate to avoid blocking the main UI thread.
+      // Blocking the main thread stalls network I/O and causes SSH socket aborts.
+      return await compute(_parseDaeVertices, filePath);
+    } catch (e) {
+      debugPrint('DAE parsing failed: $e');
+      return null;
+    }
+  }
+
+  // Top-level/static function required for `compute` isolate spawning.
+  static Future<int?> _parseDaeVertices(String filePath) async {
+    try {
+      final content = File(filePath).readAsStringSync();
       final regex = RegExp(r'<float_array[^>]*count="(\d+)"');
       int totalFloats = 0;
 
 
       // Use a stream with LineSplitter to parse asynchronously without blocking the main thread
       // and without the heavy memory overhead of spawning an isolate.
-      final lines = file.openRead().transform(utf8.decoder).transform(const LineSplitter());
+      final lines = File(filePath).openRead().transform(utf8.decoder).transform(const LineSplitter());
       
       await for (final line in lines) {
         final matches = regex.allMatches(line);
@@ -760,8 +768,7 @@ $networkLinks
       }
 
       return totalFloats > 0 ? totalFloats ~/ 3 : null;
-    } catch (e) {
-      debugPrint('DAE parsing failed: $e');
+    } catch (_) {
       return null;
     }
   }
