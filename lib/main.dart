@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -17,9 +18,9 @@ import 'package:lg_interactive_onboarding/src/features/settings/presentation/set
 /// can be inserted into the navigator overlay and survive tab switches.
 final GlobalKey<NavigatorState> rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  GoogleFonts.config.allowRuntimeFetching = false;
 
   // Initialize SharedPreferences for persistent settings
   final prefs = await SharedPreferences.getInstance();
