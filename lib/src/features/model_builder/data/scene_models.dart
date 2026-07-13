@@ -45,7 +45,12 @@ sealed class SceneNode {
   }
 
   /// Creates a deep copy with optional field overrides.
-  SceneNode copyWith({String? id, String? name, String? parentGroupId});
+  SceneNode copyWith({
+    String? id,
+    String? name,
+    String? parentGroupId,
+    bool clearParentGroupId = false,
+  });
 }
 
 // ─── ModelNode ──────────────────────────────────────────────────────────────
@@ -168,6 +173,7 @@ class ModelNode extends SceneNode {
     String? id,
     String? name,
     String? parentGroupId,
+    bool clearParentGroupId = false,
     String? modelAssetId,
     String? filePath,
     String? fileName,
@@ -188,7 +194,8 @@ class ModelNode extends SceneNode {
     return ModelNode(
       id: id ?? this.id,
       name: name ?? this.name,
-      parentGroupId: parentGroupId ?? this.parentGroupId,
+      parentGroupId:
+          clearParentGroupId ? null : parentGroupId ?? this.parentGroupId,
       modelAssetId: modelAssetId ?? this.modelAssetId,
       filePath: filePath ?? this.filePath,
       fileName: fileName ?? this.fileName,
@@ -246,11 +253,25 @@ class GroupNode extends SceneNode {
   /// Ordered list of child [SceneNode] IDs.
   final List<String> childIds;
 
+  /// The group's world-space pivot, normally the centroid of its children.
+  final double latitude;
+  final double longitude;
+  final double altitude;
+
+  /// Non-destructive overrides inherited by descendant models at push time.
+  final double headingOffset;
+  final double scaleMultiplier;
+
   const GroupNode({
     required super.id,
     required super.name,
     super.parentGroupId,
     this.childIds = const [],
+    this.latitude = 0.0,
+    this.longitude = 0.0,
+    this.altitude = 0.0,
+    this.headingOffset = 0.0,
+    this.scaleMultiplier = 1.0,
   });
 
   @override
@@ -260,6 +281,11 @@ class GroupNode extends SceneNode {
         'name': name,
         'parentGroupId': parentGroupId,
         'childIds': childIds,
+        'latitude': latitude,
+        'longitude': longitude,
+        'altitude': altitude,
+        'headingOffset': headingOffset,
+        'scaleMultiplier': scaleMultiplier,
       };
 
   factory GroupNode.fromJson(Map<String, dynamic> json) => GroupNode(
@@ -267,6 +293,11 @@ class GroupNode extends SceneNode {
         name: json['name'] as String,
         parentGroupId: json['parentGroupId'] as String?,
         childIds: (json['childIds'] as List<dynamic>).cast<String>(),
+        latitude: (json['latitude'] as num?)?.toDouble() ?? 0.0,
+        longitude: (json['longitude'] as num?)?.toDouble() ?? 0.0,
+        altitude: (json['altitude'] as num?)?.toDouble() ?? 0.0,
+        headingOffset: (json['headingOffset'] as num?)?.toDouble() ?? 0.0,
+        scaleMultiplier: (json['scaleMultiplier'] as num?)?.toDouble() ?? 1.0,
       );
 
   @override
@@ -274,13 +305,25 @@ class GroupNode extends SceneNode {
     String? id,
     String? name,
     String? parentGroupId,
+    bool clearParentGroupId = false,
     List<String>? childIds,
+    double? latitude,
+    double? longitude,
+    double? altitude,
+    double? headingOffset,
+    double? scaleMultiplier,
   }) {
     return GroupNode(
       id: id ?? this.id,
       name: name ?? this.name,
-      parentGroupId: parentGroupId ?? this.parentGroupId,
+      parentGroupId:
+          clearParentGroupId ? null : parentGroupId ?? this.parentGroupId,
       childIds: childIds ?? List.of(this.childIds),
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      altitude: altitude ?? this.altitude,
+      headingOffset: headingOffset ?? this.headingOffset,
+      scaleMultiplier: scaleMultiplier ?? this.scaleMultiplier,
     );
   }
 }
@@ -323,7 +366,7 @@ class Scene {
     required this.name,
     required this.createdAt,
     required this.modifiedAt,
-    this.version = 1,
+    this.version = 2,
     Map<String, SceneNode>? nodes,
     List<String>? rootNodeIds,
   })  : nodes = nodes ?? {},
@@ -375,6 +418,66 @@ class Scene {
     return result;
   }
 
+  /// Resolves a model's transform after applying every ancestor group's
+  /// non-destructive heading and scale overrides.
+  ({
+    double latitude,
+    double longitude,
+    double altitude,
+    double heading,
+    double scaleX,
+    double scaleY,
+    double scaleZ,
+  }) effectiveWorldTransform(String modelNodeId) {
+    final node = nodes[modelNodeId];
+    if (node is! ModelNode) {
+      throw ArgumentError.value(modelNodeId, 'modelNodeId', 'Not a model node');
+    }
+
+    var headingOffset = 0.0;
+    var scaleMultiplier = 1.0;
+    String? groupId = node.parentGroupId;
+    var guard = 0;
+    while (groupId != null && guard++ <= maxNestingDepth) {
+      final group = nodes[groupId];
+      if (group is! GroupNode) break;
+      headingOffset += group.headingOffset;
+      scaleMultiplier *= group.scaleMultiplier;
+      groupId = group.parentGroupId;
+    }
+
+    final heading = (node.heading + headingOffset) % 360;
+    return (
+      latitude: node.latitude,
+      longitude: node.longitude,
+      altitude: node.altitude,
+      heading: heading < 0 ? heading + 360 : heading,
+      scaleX: node.scaleX * scaleMultiplier,
+      scaleY: node.scaleY * scaleMultiplier,
+      scaleZ: node.scaleZ * scaleMultiplier,
+    );
+  }
+
+  /// Returns the centroid of all model descendants of [groupId].
+  ({double latitude, double longitude, double altitude}) computeGroupCentroid(
+      String groupId) {
+    final models = allModelDescendants(groupId);
+    if (models.isEmpty) {
+      return (latitude: 0.0, longitude: 0.0, altitude: 0.0);
+    }
+
+    final count = models.length;
+    return (
+      latitude: models.fold<double>(0, (sum, model) => sum + model.latitude) /
+          count,
+      longitude:
+          models.fold<double>(0, (sum, model) => sum + model.longitude) /
+              count,
+      altitude: models.fold<double>(0, (sum, model) => sum + model.altitude) /
+          count,
+    );
+  }
+
   /// Creates a deep copy with optional field overrides.
   Scene copyWith({
     String? id,
@@ -416,15 +519,35 @@ class Scene {
           SceneNode.fromJson(entry.value as Map<String, dynamic>);
     }
 
-    return Scene(
+    final loadedVersion = json['version'] as int? ?? 1;
+    final scene = Scene(
       id: json['id'] as String,
       name: json['name'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
       modifiedAt: DateTime.parse(json['modifiedAt'] as String),
-      version: json['version'] as int? ?? 1,
+      version: loadedVersion < 2 ? 2 : loadedVersion,
       nodes: nodesMap,
       rootNodeIds: (json['rootNodeIds'] as List<dynamic>).cast<String>(),
     );
+
+    if (loadedVersion >= 2) return scene;
+
+    // V1 scenes stored no group coordinates. Preserve every child coordinate
+    // exactly as saved and derive only the new group pivot metadata.
+    final migratedNodes = Map<String, SceneNode>.of(scene.nodes);
+    for (final entry in scene.nodes.entries) {
+      final node = entry.value;
+      if (node is GroupNode) {
+        final centroid = scene.computeGroupCentroid(entry.key);
+        migratedNodes[entry.key] = node.copyWith(
+          latitude: centroid.latitude,
+          longitude: centroid.longitude,
+          altitude: centroid.altitude,
+        );
+      }
+    }
+
+    return scene.copyWith(nodes: migratedNodes, version: 2);
   }
 }
 

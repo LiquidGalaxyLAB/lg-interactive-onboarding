@@ -42,6 +42,9 @@ class SceneState {
     return node is GroupNode;
   }
 
+  /// Whether the current selection can be stamped at a map placement.
+  bool get canStamp => canUngroup;
+
   /// Top-level nodes in display order.
   List<SceneNode> get rootNodes {
     final scene = activeScene;
@@ -309,7 +312,7 @@ class SceneNotifier extends Notifier<SceneState> {
         }
       }
 
-      duplicated = (node as GroupNode).copyWith(
+      duplicated = node.copyWith(
         id: newId,
         name: '${node.name} (copy)',
         childIds: node.childIds
@@ -364,39 +367,134 @@ class SceneNotifier extends Notifier<SceneState> {
   /// The first model found in the scene tree acts as the anchor. It is moved
   /// exactly to [targetLat] and [targetLng], and all other models are shifted
   /// by the exact same delta.
+  /// Deep-copies a group at [targetLat]/[targetLng], leaving the original
+  /// hierarchy and placement unchanged. The stamped group becomes a root node.
+  void stampGroupAtLocation(String groupId, double targetLat, double targetLng) {
+    final scene = state.activeScene;
+    final sourceGroup = scene?.nodes[groupId];
+    if (scene == null || sourceGroup is! GroupNode) return;
+
+    final idMapping = <String, String>{groupId: generateNodeId()};
+    _buildDuplicateMapping(sourceGroup, scene, idMapping);
+
+    final updatedNodes = Map<String, SceneNode>.of(scene.nodes);
+    for (final entry in idMapping.entries) {
+      if (entry.key == groupId) continue;
+      final original = scene.nodes[entry.key];
+      if (original is ModelNode) {
+        updatedNodes[entry.value] = original.copyWith(
+          id: entry.value,
+          modelAssetId: generateNodeId(),
+          parentGroupId: idMapping[original.parentGroupId!]!,
+        );
+      } else if (original is GroupNode) {
+        updatedNodes[entry.value] = original.copyWith(
+          id: entry.value,
+          parentGroupId: idMapping[original.parentGroupId!]!,
+          childIds: original.childIds.map((id) => idMapping[id]!).toList(),
+        );
+      }
+    }
+
+    final stampedGroupId = idMapping[groupId]!;
+    updatedNodes[stampedGroupId] = sourceGroup.copyWith(
+      id: stampedGroupId,
+      name: '${sourceGroup.name} (stamp)',
+      clearParentGroupId: true,
+      childIds: sourceGroup.childIds.map((id) => idMapping[id]!).toList(),
+    );
+
+    final deltaLat = targetLat - sourceGroup.latitude;
+    final deltaLng = targetLng - sourceGroup.longitude;
+    for (final copiedId in idMapping.values) {
+      final copied = updatedNodes[copiedId]!;
+      if (copied is ModelNode) {
+        updatedNodes[copiedId] = copied.copyWith(
+          latitude: copied.latitude + deltaLat,
+          longitude: copied.longitude + deltaLng,
+        );
+      } else if (copied is GroupNode) {
+        updatedNodes[copiedId] = copied.copyWith(
+          latitude: copied.latitude + deltaLat,
+          longitude: copied.longitude + deltaLng,
+        );
+      }
+    }
+
+    state = state.copyWith(
+      activeScene: scene.copyWith(
+        nodes: updatedNodes,
+        rootNodeIds: [...scene.rootNodeIds, stampedGroupId],
+      ),
+      selectedNodeIds: {stampedGroupId},
+      isDirty: true,
+    );
+  }
+
+  /// Relocates the entire scene to a new center coordinate, maintaining the
+  /// relative distances between all models.
+  ///
+  /// Uses the first root-level group pivot (or first model if no groups) as
+  /// the anchor. Both model coordinates AND group pivots are shifted.
   void relocateScene(double targetLat, double targetLng) {
     final scene = state.activeScene;
     if (scene == null) return;
 
-    // Find the first model node to use as an anchor
-    ModelNode? anchor;
-    void findAnchor(List<String> nodeIds) {
-      if (anchor != null) return;
-      for (final id in nodeIds) {
-        final node = scene.nodes[id];
-        if (node is ModelNode) {
-          anchor = node;
-          return;
-        } else if (node is GroupNode) {
-          findAnchor(node.childIds);
-        }
+    // Pick the best anchor: prefer a root-level group pivot, fall back to
+    // the first model found in the tree.
+    double anchorLat = 0.0;
+    double anchorLng = 0.0;
+    bool foundAnchor = false;
+
+    // Try root-level groups first
+    for (final id in scene.rootNodeIds) {
+      final node = scene.nodes[id];
+      if (node is GroupNode && node.latitude != 0.0 && node.longitude != 0.0) {
+        anchorLat = node.latitude;
+        anchorLng = node.longitude;
+        foundAnchor = true;
+        break;
       }
     }
-    findAnchor(scene.rootNodeIds);
 
-    if (anchor == null) {
-      debugPrint('SceneNotifier: Cannot relocate scene with no models.');
-      return;
+    // Fall back to the first model anywhere in the tree
+    if (!foundAnchor) {
+      ModelNode? anchor;
+      void findAnchor(List<String> nodeIds) {
+        if (anchor != null) return;
+        for (final id in nodeIds) {
+          final node = scene.nodes[id];
+          if (node is ModelNode) {
+            anchor = node;
+            return;
+          } else if (node is GroupNode) {
+            findAnchor(node.childIds);
+          }
+        }
+      }
+      findAnchor(scene.rootNodeIds);
+
+      if (anchor == null) {
+        debugPrint('SceneNotifier: Cannot relocate scene with no models.');
+        return;
+      }
+      anchorLat = anchor!.latitude;
+      anchorLng = anchor!.longitude;
     }
 
-    final deltaLat = targetLat - anchor!.latitude;
-    final deltaLng = targetLng - anchor!.longitude;
+    final deltaLat = targetLat - anchorLat;
+    final deltaLng = targetLng - anchorLng;
 
     final updatedNodes = Map<String, SceneNode>.of(scene.nodes);
 
     for (final entry in updatedNodes.entries) {
       final node = entry.value;
       if (node is ModelNode) {
+        updatedNodes[entry.key] = node.copyWith(
+          latitude: node.latitude + deltaLat,
+          longitude: node.longitude + deltaLng,
+        );
+      } else if (node is GroupNode) {
         updatedNodes[entry.key] = node.copyWith(
           latitude: node.latitude + deltaLat,
           longitude: node.longitude + deltaLng,
@@ -409,6 +507,53 @@ class SceneNotifier extends Notifier<SceneState> {
       isDirty: true,
     );
     debugPrint('SceneNotifier: Relocated scene to $targetLat, $targetLng');
+  }
+
+  /// Relocates a single group's pivot to new coordinates, shifting all
+  /// descendant model coordinates and nested group pivots by the same delta.
+  void relocateGroup(String groupId, double targetLat, double targetLng) {
+    final scene = state.activeScene;
+    if (scene == null) return;
+
+    final group = scene.nodes[groupId];
+    if (group is! GroupNode) return;
+
+    final deltaLat = targetLat - group.latitude;
+    final deltaLng = targetLng - group.longitude;
+
+    final updatedNodes = Map<String, SceneNode>.of(scene.nodes);
+
+    // Shift the group's own pivot
+    updatedNodes[groupId] = group.copyWith(
+      latitude: targetLat,
+      longitude: targetLng,
+    );
+
+    // Shift all descendants (models + nested groups)
+    void shiftDescendants(GroupNode g) {
+      for (final childId in g.childIds) {
+        final child = updatedNodes[childId];
+        if (child is ModelNode) {
+          updatedNodes[childId] = child.copyWith(
+            latitude: child.latitude + deltaLat,
+            longitude: child.longitude + deltaLng,
+          );
+        } else if (child is GroupNode) {
+          updatedNodes[childId] = child.copyWith(
+            latitude: child.latitude + deltaLat,
+            longitude: child.longitude + deltaLng,
+          );
+          shiftDescendants(child);
+        }
+      }
+    }
+    shiftDescendants(group);
+
+    state = state.copyWith(
+      activeScene: scene.copyWith(nodes: updatedNodes),
+      isDirty: true,
+    );
+    debugPrint('SceneNotifier: Relocated group "${group.name}" to $targetLat, $targetLng');
   }
 
   // ─── Grouping ─────────────────────────────────────────────────────────
@@ -460,6 +605,13 @@ class SceneNotifier extends Notifier<SceneState> {
       childIds: selectedIds,
     );
     updatedNodes[groupId] = group;
+    final centroid =
+        scene.copyWith(nodes: updatedNodes).computeGroupCentroid(groupId);
+    updatedNodes[groupId] = group.copyWith(
+      latitude: centroid.latitude,
+      longitude: centroid.longitude,
+      altitude: centroid.altitude,
+    );
 
     // Update the parent's child list
     if (parentId != null) {
@@ -520,7 +672,9 @@ class SceneNotifier extends Notifier<SceneState> {
     // Update each child's parentGroupId to the group's parent
     for (final childId in group.childIds) {
       final child = updatedNodes[childId]!;
-      updatedNodes[childId] = child.copyWith(parentGroupId: parentId);
+      updatedNodes[childId] = parentId == null
+          ? child.copyWith(clearParentGroupId: true)
+          : child.copyWith(parentGroupId: parentId);
     }
 
     // Remove the group node itself
@@ -631,7 +785,7 @@ class SceneNotifier extends Notifier<SceneState> {
     );
 
     // Set parent to null and add to root
-    updatedNodes[nodeId] = node.copyWith(parentGroupId: null);
+    updatedNodes[nodeId] = node.copyWith(clearParentGroupId: true);
     final updatedRootIds = List<String>.of(scene.rootNodeIds)..add(nodeId);
 
     state = state.copyWith(
@@ -757,19 +911,37 @@ class SceneNotifier extends Notifier<SceneState> {
     );
   }
 
-  /// Rotates all selected models by a heading delta.
+  /// Rotates selected items by a heading delta.
+  ///
+  /// When a [GroupNode] is selected, the delta is applied to the group's
+  /// [headingOffset] (non-destructive). When individual [ModelNode]s are
+  /// selected, their heading is mutated directly (existing behaviour).
   void rotateSelected(double deltaHeading) {
     final scene = state.activeScene;
     if (scene == null) return;
 
     final updatedNodes = Map<String, SceneNode>.of(scene.nodes);
-    final modelIds = _resolveSelectedModelIds(scene);
+    bool anyGroupUpdated = false;
 
-    for (final id in modelIds) {
-      final node = updatedNodes[id] as ModelNode;
-      updatedNodes[id] = node.copyWith(
-        heading: (node.heading + deltaHeading) % 360,
-      );
+    for (final id in state.selectedNodeIds) {
+      final node = updatedNodes[id];
+      if (node is GroupNode) {
+        updatedNodes[id] = node.copyWith(
+          headingOffset: (node.headingOffset + deltaHeading) % 360,
+        );
+        anyGroupUpdated = true;
+      }
+    }
+
+    // For individually selected models (not part of a selected group)
+    if (!anyGroupUpdated) {
+      final modelIds = _resolveSelectedModelIds(scene);
+      for (final id in modelIds) {
+        final node = updatedNodes[id] as ModelNode;
+        updatedNodes[id] = node.copyWith(
+          heading: (node.heading + deltaHeading) % 360,
+        );
+      }
     }
 
     state = state.copyWith(
@@ -778,21 +950,39 @@ class SceneNotifier extends Notifier<SceneState> {
     );
   }
 
-  /// Scales all selected models by a factor.
+  /// Scales selected items by a factor.
+  ///
+  /// When a [GroupNode] is selected, the factor is multiplied into the
+  /// group's [scaleMultiplier] (non-destructive). When individual
+  /// [ModelNode]s are selected, their scale is mutated directly.
   void scaleSelected(double factor) {
     final scene = state.activeScene;
     if (scene == null) return;
 
     final updatedNodes = Map<String, SceneNode>.of(scene.nodes);
-    final modelIds = _resolveSelectedModelIds(scene);
+    bool anyGroupUpdated = false;
 
-    for (final id in modelIds) {
-      final node = updatedNodes[id] as ModelNode;
-      updatedNodes[id] = node.copyWith(
-        scaleX: node.scaleX * factor,
-        scaleY: node.scaleY * factor,
-        scaleZ: node.scaleZ * factor,
-      );
+    for (final id in state.selectedNodeIds) {
+      final node = updatedNodes[id];
+      if (node is GroupNode) {
+        updatedNodes[id] = node.copyWith(
+          scaleMultiplier: node.scaleMultiplier * factor,
+        );
+        anyGroupUpdated = true;
+      }
+    }
+
+    // For individually selected models (not part of a selected group)
+    if (!anyGroupUpdated) {
+      final modelIds = _resolveSelectedModelIds(scene);
+      for (final id in modelIds) {
+        final node = updatedNodes[id] as ModelNode;
+        updatedNodes[id] = node.copyWith(
+          scaleX: node.scaleX * factor,
+          scaleY: node.scaleY * factor,
+          scaleZ: node.scaleZ * factor,
+        );
+      }
     }
 
     state = state.copyWith(
