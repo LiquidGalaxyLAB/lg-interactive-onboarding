@@ -2,8 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lg_interactive_onboarding/src/common/curriculum/analytics_service.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
-import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
-import 'package:lg_interactive_onboarding/src/features/model_builder/providers/scene_providers.dart';
+import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
 
 // ─── Verification Check Provider ──────────────────────────────────────────────
 //
