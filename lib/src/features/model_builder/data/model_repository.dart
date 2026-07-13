@@ -751,7 +751,7 @@ $networkLinks
   // Top-level/static function required for `compute` isolate spawning.
   static Future<int?> _parseDaeVertices(String filePath) async {
     try {
-      final content = File(filePath).readAsStringSync();
+
       final regex = RegExp(r'<float_array[^>]*count="(\d+)"');
       int totalFloats = 0;
 
@@ -800,6 +800,9 @@ $networkLinks
 
       // Process each model node
       for (final node in modelNodes) {
+        // Resolve effective world transform (applies ancestor group overrides)
+        final wt = scene.effectiveWorldTransform(node.id);
+
         final project = ModelProject(
           id: node.id, // Using node UUID ensures each placement gets its own KML and model copy
           filePath: node.filePath,
@@ -808,15 +811,15 @@ $networkLinks
           fileSize: node.fileSize,
           isAsset: node.isAsset,
           assetPath: node.assetPath,
-          latitude: node.latitude,
-          longitude: node.longitude,
-          altitude: node.altitude,
-          heading: node.heading,
+          latitude: wt.latitude,
+          longitude: wt.longitude,
+          altitude: wt.altitude,
+          heading: wt.heading,
           tilt: node.tilt,
           roll: node.roll,
-          scaleX: node.scaleX,
-          scaleY: node.scaleY,
-          scaleZ: node.scaleZ,
+          scaleX: wt.scaleX,
+          scaleY: wt.scaleY,
+          scaleZ: wt.scaleZ,
         );
         
         final ext = project.fileExtension?.toLowerCase() ?? '';
