@@ -20,9 +20,10 @@ class OrientationSlidersWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final project = ref.watch(modelBuilderProvider);
     final notifier = ref.read(modelBuilderProvider.notifier);
-    final sceneState = ref.watch(sceneProvider);
+    // final sceneState = ref.watch(sceneProvider);
     final theme = Theme.of(context);
 
+    /*
     // ── Scene-aware mode: editing a selected scene node ────────────
     final ModelNode? editingNode;
     if (sceneState.hasScene &&
@@ -33,7 +34,9 @@ class OrientationSlidersWidget extends ConsumerWidget {
     } else {
       editingNode = null;
     }
+    */
 
+    /*
     // Resolve the values and setters based on mode
     final double heading;
     final double tilt;
@@ -106,6 +109,7 @@ class OrientationSlidersWidget extends ConsumerWidget {
       onAltitude = notifier.setAltitude;
       onReset = notifier.resetAdjustments;
     }
+    */
 
     return Card(
       child: Padding(

@@ -311,6 +311,7 @@ class _SceneManagerDialogState extends ConsumerState<SceneManagerDialog> {
                 ref.read(sceneProvider.notifier).closeScene();
               }
 
+              if (!context.mounted) return;
               Navigator.pop(ctx);
               _loadScenes(); // Refresh the list
             },

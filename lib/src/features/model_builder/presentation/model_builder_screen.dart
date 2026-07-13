@@ -59,24 +59,96 @@ class ModelBuilderScreen extends ConsumerWidget {
               )
             : const Text('3D Model Builder'),
         actions: [
-          // Relocate Scene button
+          // Relocate / Stamp button
           if (sceneState.hasScene && project.hasLocation)
-            IconButton(
-              icon: const Icon(Icons.location_on_outlined, size: 22),
-              tooltip: 'Relocate Scene Here',
-              onPressed: () {
-                ref.read(sceneProvider.notifier).relocateScene(
-                      project.latitude!,
-                      project.longitude!,
-                    );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Scene relocated to current map coordinates'),
-                    behavior: SnackBarBehavior.floating,
+            sceneState.canStamp
+                ? PopupMenuButton<String>(
+                    icon: const Icon(Icons.location_on_outlined, size: 22),
+                    tooltip: 'Relocate or Stamp',
+                    onSelected: (value) {
+                      final notifier = ref.read(sceneProvider.notifier);
+                      final groupId = sceneState.selectedNodeIds.first;
+                      switch (value) {
+                        case 'relocate_scene':
+                          notifier.relocateScene(
+                            project.latitude!,
+                            project.longitude!,
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Scene relocated'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        case 'relocate_group':
+                          notifier.relocateGroup(
+                            groupId,
+                            project.latitude!,
+                            project.longitude!,
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Group relocated'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        case 'stamp_group':
+                          notifier.stampGroupAtLocation(
+                            groupId,
+                            project.latitude!,
+                            project.longitude!,
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Group stamped at new location'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'relocate_scene',
+                        child: ListTile(
+                          leading: Icon(Icons.location_on_outlined),
+                          title: Text('Relocate Scene'),
+                          dense: true,
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'relocate_group',
+                        child: ListTile(
+                          leading: Icon(Icons.my_location),
+                          title: Text('Relocate Group'),
+                          dense: true,
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'stamp_group',
+                        child: ListTile(
+                          leading: Icon(Icons.control_point_duplicate),
+                          title: Text('Stamp Group Here'),
+                          dense: true,
+                        ),
+                      ),
+                    ],
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.location_on_outlined, size: 22),
+                    tooltip: 'Relocate Scene Here',
+                    onPressed: () {
+                      ref.read(sceneProvider.notifier).relocateScene(
+                            project.latitude!,
+                            project.longitude!,
+                          );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Scene relocated to current map coordinates'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           // Scene manager button
           IconButton(
             icon: const Icon(Icons.folder_open_outlined, size: 22),

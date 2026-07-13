@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/providers/scene_providers.dart';
 
 /// A bottom action bar for scene-level group operations.
@@ -8,6 +9,7 @@ import 'package:lg_interactive_onboarding/src/features/model_builder/providers/s
 /// Shows contextual actions based on the current selection state:
 /// - Group (2+ nodes selected)
 /// - Ungroup (1 group selected)
+/// - Stamp (1 group selected + location placed — duplicate group at map pin)
 /// - Duplicate (1+ nodes selected)
 /// - Delete (1+ nodes selected)
 class GroupControlsBar extends ConsumerWidget {
@@ -87,6 +89,34 @@ class GroupControlsBar extends ConsumerWidget {
                 ref.read(sceneProvider.notifier).ungroupNode(selectedId);
               },
             ),
+
+            const SizedBox(width: 6),
+
+            // ─── Stamp button ─────────────────────────────────────
+            Consumer(builder: (context, ref, _) {
+              final project = ref.watch(modelBuilderProvider);
+              final canStamp = sceneState.canStamp && project.hasLocation;
+              return _ActionButton(
+                icon: Icons.control_point_duplicate,
+                label: 'Stamp',
+                enabled: canStamp,
+                color: const Color(0xFF6C5CE7),
+                onPressed: () {
+                  final groupId = sceneState.selectedNodeIds.first;
+                  ref.read(sceneProvider.notifier).stampGroupAtLocation(
+                        groupId,
+                        project.latitude!,
+                        project.longitude!,
+                      );
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Group stamped at map location'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+              );
+            }),
 
             const SizedBox(width: 6),
 

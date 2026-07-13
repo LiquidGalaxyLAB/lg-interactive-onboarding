@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/scene_models.dart';
+import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/providers/scene_providers.dart';
 
 /// A hierarchical tree view panel showing the active scene's structure.
@@ -255,6 +256,54 @@ class _SceneOutlinerPanelState extends ConsumerState<SceneOutlinerPanel> {
                   notifier.ungroupNode(node.id);
                 },
               ),
+            if (node is GroupNode)
+              Consumer(builder: (context, ref, _) {
+                final project = ref.watch(modelBuilderProvider);
+                return ListTile(
+                  leading: const Icon(Icons.control_point_duplicate),
+                  title: const Text('Stamp Here'),
+                  subtitle: const Text('Duplicate group at map pin'),
+                  enabled: project.hasLocation,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    notifier.stampGroupAtLocation(
+                      node.id,
+                      project.latitude!,
+                      project.longitude!,
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Group stamped at map location'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                );
+              }),
+            if (node is GroupNode)
+              Consumer(builder: (context, ref, _) {
+                final project = ref.watch(modelBuilderProvider);
+                return ListTile(
+                  leading: const Icon(Icons.my_location),
+                  title: const Text('Relocate Group Here'),
+                  subtitle: const Text('Move group to map pin'),
+                  enabled: project.hasLocation,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    notifier.relocateGroup(
+                      node.id,
+                      project.latitude!,
+                      project.longitude!,
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Group relocated to map location'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                );
+              }),
             if (node.parentGroupId != null)
               ListTile(
                 leading: const Icon(Icons.move_up),
@@ -441,9 +490,21 @@ class _NodeRow extends StatelessWidget {
                 ),
               ),
 
-            if (isGroup)
+            if (isGroup) ...[
+              if (node.latitude != 0.0)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Text(
+                    '${node.latitude.toStringAsFixed(2)}, ${node.longitude.toStringAsFixed(2)}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontSize: 9,
+                      fontFamily: 'monospace',
+                      color: const Color(0xFFFDAA5E).withValues(alpha: 0.7),
+                    ),
+                  ),
+                ),
               Text(
-                '${(node as GroupNode).childIds.length}',
+                '${node.childIds.length}',
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
@@ -451,6 +512,7 @@ class _NodeRow extends StatelessWidget {
                       theme.colorScheme.onSurface.withValues(alpha: 0.35),
                 ),
               ),
+            ],
           ],
         ),
       ),
