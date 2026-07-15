@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
@@ -28,7 +29,23 @@ final class SSHConnecting extends SSHConnectionState {
 
 /// The SSH session is authenticated and ready to accept commands.
 final class SSHConnected extends SSHConnectionState {
-  const SSHConnected();
+  final SSHClient client;
+  Future<SftpClient>? _sftpFuture;
+
+  SSHConnected(this.client);
+
+  /// Gets or creates a reusable SFTP client for the current session.
+  Future<SftpClient?> get sftp async {
+    if (client.isClosed) return null;
+    _sftpFuture ??= client.sftp();
+    try {
+      return await _sftpFuture;
+    } catch (e) {
+      _sftpFuture = null;
+      debugPrint('SSH: Failed to open SFTP channel: $e');
+      return null;
+    }
+  }
 }
 
 /// The most recent connection attempt failed, with a human-readable reason.
@@ -85,8 +102,6 @@ final class SSHUploadFailure extends SSHUploadResult {
 /// SFTP channel via [sftp]. Never call `client!.run()` directly from
 /// outside this class.
 class SSHService extends ChangeNotifier {
-  SSHClient? _client;
-  Future<SftpClient>? _sftpFuture;
 
   /// Serialization lock for exec channels — ensures only ONE exec session
   /// channel is open at a time. Each `client.run()` opens a new SSH session
@@ -104,10 +119,10 @@ class SSHService extends ChangeNotifier {
 
   /// Convenience getter retained for backward-compatibility with the ~50
   /// existing call-sites that read `ssh.isConnected` for UI gating.
-  bool get isConnected =>
-      _connectionState is SSHConnected &&
-      _client != null &&
-      !(_client!.isClosed);
+  bool get isConnected {
+    final state = _connectionState;
+    return state is SSHConnected && !state.client.isClosed;
+  }
 
   // ─── Technique 3: Async Staleness Guard ─────────────────────────────
   //
@@ -121,15 +136,11 @@ class SSHService extends ChangeNotifier {
   /// Gets or creates a reusable SFTP client for the current session.
   /// Reusing the client prevents SSH channel exhaustion when pushing multiple files.
   Future<SftpClient?> get sftp async {
-    if (!isConnected) return null;
-    _sftpFuture ??= _client!.sftp();
-    try {
-      return await _sftpFuture;
-    } catch (e) {
-      _sftpFuture = null;
-      debugPrint('SSH: Failed to open SFTP channel: $e');
-      return null;
+    final state = _connectionState;
+    if (state is SSHConnected) {
+      return await state.sftp;
     }
+    return null;
   }
 
   /// Connects to the SSH server.
@@ -174,17 +185,14 @@ class SSHService extends ChangeNotifier {
         return _connectionState;
       }
 
-      _client = client;
-
       // Listen for unexpected connection drops (e.g., when rig reboots).
       // We must catch errors on the done future, otherwise socket aborts will crash the app.
-      _client!.done.catchError((e) {
+      client.done.catchError((e) {
         debugPrint('SSH: Socket error: $e');
       }).whenComplete(() {
-        if (_client != null) {
+        // Only transition to disconnected if a newer connection hasn't already started
+        if (generation == _connectionGeneration) {
           debugPrint('SSH: Connection closed unexpectedly');
-          _client = null;
-          _sftpFuture = null;
           _connectionState = const SSHDisconnected();
           notifyListeners();
         }
@@ -192,7 +200,7 @@ class SSHService extends ChangeNotifier {
 
       // Reset execution queue for the new connection.
       _execQueue = Future.value();
-      _connectionState = const SSHConnected();
+      _connectionState = SSHConnected(client);
       debugPrint('SSH: Connected to $host');
       notifyListeners();
       return _connectionState;
@@ -213,13 +221,18 @@ class SSHService extends ChangeNotifier {
 
   /// Disconnects from the SSH server.
   Future<void> disconnect() async {
-    try {
-      final sftpClient = await _sftpFuture;
-      sftpClient?.close();
-    } catch (_) {}
-    _sftpFuture = null;
-    _client?.close();
-    _client = null;
+    final state = _connectionState;
+    if (state is SSHConnected) {
+      try {
+        final sftpClient = await state.sftp;
+        sftpClient?.close();
+      } catch (_) {}
+      state.client.close();
+    }
+    
+    // Bump generation so any pending async operations for the old connection are discarded
+    _connectionGeneration++;
+    
     _execQueue = Future.value();
     _connectionState = const SSHDisconnected();
     debugPrint('SSH: Disconnected');
@@ -249,14 +262,15 @@ class SSHService extends ChangeNotifier {
     // Wait for the previous command to finish (including its cooldown).
     await previous;
 
-    if (!isConnected) {
+    final stateAfterQueue = _connectionState;
+    if (stateAfterQueue is! SSHConnected || stateAfterQueue.client.isClosed) {
       const failure = SSHExecFailure('Connection lost during queue wait');
       completer.complete(failure);
       return failure;
     }
 
     try {
-      final result = await _client!.run(command);
+      final result = await stateAfterQueue.client.run(command);
       final success = SSHExecSuccess(
         stdout: String.fromCharCodes(result),
         stderr: '',
