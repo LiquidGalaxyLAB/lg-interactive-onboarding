@@ -29,15 +29,21 @@ final class SSHConnecting extends SSHConnectionState {
 
 /// The SSH session is authenticated and ready to accept commands.
 final class SSHConnected extends SSHConnectionState {
-  final SSHClient client;
+  final SSHClient _client;
   Future<SftpClient>? _sftpFuture;
 
-  SSHConnected(this.client);
+  /// Serialization lock for exec channels — ensures only ONE exec session
+  /// channel is open at a time. Each `client.run()` opens a new SSH session
+  /// channel; without serialization, rapid repeated operations exhaust the
+  /// server's MaxSessions limit (default 10).
+  Future<void> _execQueue = Future.value();
+
+  SSHConnected(this._client);
 
   /// Gets or creates a reusable SFTP client for the current session.
   Future<SftpClient?> get sftp async {
-    if (client.isClosed) return null;
-    _sftpFuture ??= client.sftp();
+    if (_client.isClosed) return null;
+    _sftpFuture ??= _client.sftp();
     try {
       return await _sftpFuture;
     } catch (e) {
@@ -103,12 +109,6 @@ final class SSHUploadFailure extends SSHUploadResult {
 /// outside this class.
 class SSHService extends ChangeNotifier {
 
-  /// Serialization lock for exec channels — ensures only ONE exec session
-  /// channel is open at a time. Each `client.run()` opens a new SSH session
-  /// channel; without serialization, rapid repeated operations exhaust the
-  /// server's MaxSessions limit (default 10).
-  Future<void> _execQueue = Future.value();
-
   // ─── Technique 1: Connection state ──────────────────────────────────
 
   SSHConnectionState _connectionState = const SSHDisconnected();
@@ -121,7 +121,7 @@ class SSHService extends ChangeNotifier {
   /// existing call-sites that read `ssh.isConnected` for UI gating.
   bool get isConnected {
     final state = _connectionState;
-    return state is SSHConnected && !state.client.isClosed;
+    return state is SSHConnected && !state._client.isClosed;
   }
 
   // ─── Technique 3: Async Staleness Guard ─────────────────────────────
@@ -198,8 +198,6 @@ class SSHService extends ChangeNotifier {
         }
       });
 
-      // Reset execution queue for the new connection.
-      _execQueue = Future.value();
       _connectionState = SSHConnected(client);
       debugPrint('SSH: Connected to $host');
       notifyListeners();
@@ -227,13 +225,12 @@ class SSHService extends ChangeNotifier {
         final sftpClient = await state.sftp;
         sftpClient?.close();
       } catch (_) {}
-      state.client.close();
+      state._client.close();
     }
     
     // Bump generation so any pending async operations for the old connection are discarded
     _connectionGeneration++;
     
-    _execQueue = Future.value();
     _connectionState = const SSHDisconnected();
     debugPrint('SSH: Disconnected');
     notifyListeners();
@@ -245,7 +242,8 @@ class SSHService extends ChangeNotifier {
   /// one finishes AND a short cooldown elapses. This prevents the server
   /// from running out of session channel slots (OpenSSH MaxSessions=10).
   Future<SSHExecResult> execute(String command) async {
-    if (!isConnected) {
+    final stateBeforeQueue = _connectionState;
+    if (stateBeforeQueue is! SSHConnected || stateBeforeQueue._client.isClosed) {
       debugPrint('SSH: Not connected, cannot execute: $command');
       return SSHExecFailure('Not connected');
     }
@@ -253,8 +251,8 @@ class SSHService extends ChangeNotifier {
     final completer = Completer<SSHExecResult>();
 
     // Chain onto the queue — this call waits until all previous calls finish.
-    final previous = _execQueue;
-    _execQueue = completer.future.then((_) async {
+    final previous = stateBeforeQueue._execQueue;
+    stateBeforeQueue._execQueue = completer.future.then((_) async {
       // Post-command cooldown: give the server time to release the channel.
       await Future.delayed(const Duration(milliseconds: 200));
     });
@@ -263,14 +261,15 @@ class SSHService extends ChangeNotifier {
     await previous;
 
     final stateAfterQueue = _connectionState;
-    if (stateAfterQueue is! SSHConnected || stateAfterQueue.client.isClosed) {
+    // Ensure we are still connected on the EXACT SAME session we queued against.
+    if (stateAfterQueue != stateBeforeQueue || stateBeforeQueue._client.isClosed) {
       const failure = SSHExecFailure('Connection lost during queue wait');
       completer.complete(failure);
       return failure;
     }
 
     try {
-      final result = await stateAfterQueue.client.run(command);
+      final result = await stateBeforeQueue._client.run(command);
       final success = SSHExecSuccess(
         stdout: String.fromCharCodes(result),
         stderr: '',
