@@ -46,8 +46,11 @@ class LogoOverlayService {
     if (nowConnected) {
       debugPrint('LogoOverlay: SSH connected → sending logo');
       sendLogo();
+    } else {
+      // Disconnect edge: reset session flag to ensure the next connection
+      // re-uploads the logo PNG from scratch.
+      _logoUploaded = false;
     }
-    // Disconnect edge: logo was already cleared before disconnect was called.
   }
 
   /// Session-level flag: avoids re-uploading the logo PNG on every push.
@@ -97,7 +100,11 @@ class LogoOverlayService {
 
       final kml = _buildLogoKml(masterIp);
 
-      await _sshService.uploadFile(localData: kml, remotePath: kmlPath);
+      final uploadResult = await _sshService.uploadFile(localData: kml, remotePath: kmlPath);
+      if (uploadResult is SSHUploadFailure) {
+        throw Exception('KML upload failed: ${uploadResult.message}');
+      }
+      
       await _channelDelay();
 
       // 3. Force refresh the slave KML
@@ -120,9 +127,10 @@ class LogoOverlayService {
     }
     
     final result = await _sshService.execute(finalCommand);
-    if (result == null) throw Exception('Execution failed: $command');
-    
-    return result.stdout.trim();
+    return switch (result) {
+      SSHExecSuccess(:final stdout) => stdout.trim(),
+      SSHExecFailure(:final message) => throw Exception('Execution failed ($command): $message'),
+    };
   }
 
   // ─── Clear Logo ───────────────────────────────────────────────────
@@ -144,7 +152,11 @@ class LogoOverlayService {
   <Document><name>Empty</name></Document>
 </kml>''';
 
-      await _sshService.uploadFile(localData: emptyKml, remotePath: kmlPath);
+      final uploadResult = await _sshService.uploadFile(localData: emptyKml, remotePath: kmlPath);
+      if (uploadResult is SSHUploadFailure) {
+        throw Exception('Empty KML upload failed: ${uploadResult.message}');
+      }
+      
       await _channelDelay();
 
       await _forceRefreshSlave('slave_$leftScreen.kml');
@@ -170,10 +182,15 @@ class LogoOverlayService {
         byteData.lengthInBytes,
       );
 
-      await _sshService.uploadBytes(
+      final uploadResult = await _sshService.uploadBytes(
         bytes: bytes,
         remotePath: AppConstants.lgLogoRemotePath,
       );
+      
+      if (uploadResult is SSHUploadFailure) {
+        throw Exception('SFTP bytes upload failed: ${uploadResult.message}');
+      }
+      
       _logoUploaded = true;
       debugPrint('LogoOverlay: Logo PNG uploaded to ${AppConstants.lgLogoRemotePath} (${bytes.length} bytes)');
     } catch (e) {

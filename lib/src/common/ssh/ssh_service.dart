@@ -1,18 +1,35 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 
-/// Core SSH service for connecting to the Liquid Galaxy master node.
-///
-/// All command execution is serialized through [execute] to prevent
-/// SSH channel exhaustion. All file transfers go through the cached
-/// SFTP channel via [sftp]. Never call `client!.run()` directly from
-/// outside this class.
-class SSHService extends ChangeNotifier {
-  SSHClient? _client;
+// ─── Technique 1: Make Invalid States Unrepresentable ──────────────────
+//
+// The connection lifecycle is a sealed class with exactly four cases.
+// No combination of flags can drift out of sync because no flags exist.
+
+/// Represents the mutually exclusive states of the SSH connection lifecycle.
+sealed class SSHConnectionState {
+  const SSHConnectionState();
+}
+
+/// No connection attempt has been made, or the previous connection was
+/// cleanly disconnected.
+final class SSHDisconnected extends SSHConnectionState {
+  const SSHDisconnected();
+}
+
+/// A connection attempt is in progress (socket + handshake).
+final class SSHConnecting extends SSHConnectionState {
+  const SSHConnecting();
+}
+
+/// The SSH session is authenticated and ready to accept commands.
+final class SSHConnected extends SSHConnectionState {
+  final SSHClient _client;
   Future<SftpClient>? _sftpFuture;
 
   /// Serialization lock for exec channels — ensures only ONE exec session
@@ -21,15 +38,12 @@ class SSHService extends ChangeNotifier {
   /// server's MaxSessions limit (default 10).
   Future<void> _execQueue = Future.value();
 
-  SSHClient? get client => _client;
-
-  bool get isConnected => _client != null && !(_client!.isClosed);
+  SSHConnected(this._client);
 
   /// Gets or creates a reusable SFTP client for the current session.
-  /// Reusing the client prevents SSH channel exhaustion when pushing multiple files.
   Future<SftpClient?> get sftp async {
-    if (!isConnected) return null;
-    _sftpFuture ??= _client!.sftp();
+    if (_client.isClosed) return null;
+    _sftpFuture ??= _client.sftp();
     try {
       return await _sftpFuture;
     } catch (e) {
@@ -38,21 +52,121 @@ class SSHService extends ChangeNotifier {
       return null;
     }
   }
+}
+
+/// The most recent connection attempt failed, with a human-readable reason.
+final class SSHConnectionError extends SSHConnectionState {
+  final String message;
+  const SSHConnectionError(this.message);
+}
+
+// ─── Technique 2: Define Errors Out of Existence ───────────────────────
+//
+// Every operation returns a sealed result. Callers never have to remember
+// to catch exceptions or check for null; they pattern-match on the value.
+
+/// The outcome of a single SSH command execution.
+sealed class SSHExecResult {
+  const SSHExecResult();
+}
+
+/// The command completed and produced output.
+final class SSHExecSuccess extends SSHExecResult {
+  final String stdout;
+  final String stderr;
+  const SSHExecSuccess({required this.stdout, required this.stderr});
+}
+
+/// The command could not be executed (not connected, channel error, etc.).
+final class SSHExecFailure extends SSHExecResult {
+  final String message;
+  const SSHExecFailure(this.message);
+}
+
+/// The outcome of an SFTP upload operation.
+sealed class SSHUploadResult {
+  const SSHUploadResult();
+}
+
+/// The file was written to the remote path successfully.
+final class SSHUploadSuccess extends SSHUploadResult {
+  const SSHUploadSuccess();
+}
+
+/// The upload failed, with a human-readable reason.
+final class SSHUploadFailure extends SSHUploadResult {
+  final String message;
+  const SSHUploadFailure(this.message);
+}
+
+// ─── SSH Service ───────────────────────────────────────────────────────
+
+/// Core SSH service for connecting to the Liquid Galaxy master node.
+///
+/// All command execution is serialized through [execute] to prevent
+/// SSH channel exhaustion. All file transfers go through the cached
+/// SFTP channel via [sftp]. Never call `client!.run()` directly from
+/// outside this class.
+class SSHService extends ChangeNotifier {
+
+  // ─── Technique 1: Connection state ──────────────────────────────────
+
+  SSHConnectionState _connectionState = const SSHDisconnected();
+
+  /// The current connection state as a sealed algebraic type.
+  /// Use pattern matching (`switch`) to handle each case exhaustively.
+  SSHConnectionState get connectionState => _connectionState;
+
+  /// Convenience getter retained for backward-compatibility with the ~50
+  /// existing call-sites that read `ssh.isConnected` for UI gating.
+  bool get isConnected {
+    final state = _connectionState;
+    return state is SSHConnected && !state._client.isClosed;
+  }
+
+  // ─── Technique 3: Async Staleness Guard ─────────────────────────────
+  //
+  // Every connect() call increments a generation counter. After the async
+  // handshake completes, the result is applied only if the generation
+  // still matches — preventing a slow first attempt from overwriting a
+  // fast second attempt (the exact race from the spec).
+
+  int _connectionGeneration = 0;
+
+  /// Gets or creates a reusable SFTP client for the current session.
+  /// Reusing the client prevents SSH channel exhaustion when pushing multiple files.
+  Future<SftpClient?> get sftp async {
+    final state = _connectionState;
+    if (state is SSHConnected) {
+      return await state.sftp;
+    }
+    return null;
+  }
 
   /// Connects to the SSH server.
-  Future<bool> connect({
+  ///
+  /// Returns the resulting [SSHConnectionState]. If another `connect()` call
+  /// is made before this one completes, this call's result is discarded (the
+  /// generation guard ensures the latest call always wins).
+  Future<SSHConnectionState> connect({
     required String host,
     required int port,
     required String username,
     required String password,
   }) async {
+    // Capture a new generation — any earlier in-flight connect is now stale.
+    final generation = ++_connectionGeneration;
+
+    _connectionState = const SSHConnecting();
+    notifyListeners();
+
     try {
       final socket = await SSHSocket.connect(
         host,
         port,
         timeout: AppConstants.sshConnectionTimeout,
       );
-      _client = SSHClient(
+      final client = SSHClient(
         socket,
         username: username,
         onPasswordRequest: () => password,
@@ -60,63 +174,85 @@ class SSHService extends ChangeNotifier {
 
       // Wait for the SSH handshake and authentication to complete.
       // Without this, connection drops or bad passwords throw unhandled async exceptions.
-      await _client!.authenticated;
+      await client.authenticated;
+
+      // ── Generation check: discard if superseded ──────────────────
+      if (generation != _connectionGeneration) {
+        debugPrint('SSH: Discarding stale connection to $host '
+            '(generation $generation, current $_connectionGeneration)');
+        client.close();
+        // Return the *current* state (which was set by the newer call).
+        return _connectionState;
+      }
 
       // Listen for unexpected connection drops (e.g., when rig reboots).
       // We must catch errors on the done future, otherwise socket aborts will crash the app.
-      _client!.done.catchError((e) {
+      client.done.catchError((e) {
         debugPrint('SSH: Socket error: $e');
       }).whenComplete(() {
-        if (_client != null) {
+        // Only transition to disconnected if a newer connection hasn't already started
+        if (generation == _connectionGeneration) {
           debugPrint('SSH: Connection closed unexpectedly');
-          _client = null;
-          _sftpFuture = null;
+          _connectionState = const SSHDisconnected();
           notifyListeners();
         }
       });
 
-      // Reset execution queue for the new connection.
-      _execQueue = Future.value();
+      _connectionState = SSHConnected(client);
       debugPrint('SSH: Connected to $host');
       notifyListeners();
-      return true;
+      return _connectionState;
     } catch (e) {
+      // ── Generation check: discard if superseded ──────────────────
+      if (generation != _connectionGeneration) {
+        debugPrint('SSH: Discarding stale connection error for $host');
+        return _connectionState;
+      }
+
+      final errorState = SSHConnectionError('$e');
+      _connectionState = errorState;
       debugPrint('SSH: Connection failed: $e');
       notifyListeners();
-      return false;
+      return errorState;
     }
   }
 
   /// Disconnects from the SSH server.
   Future<void> disconnect() async {
-    try {
-      final sftpClient = await _sftpFuture;
-      sftpClient?.close();
-    } catch (_) {}
-    _sftpFuture = null;
-    _client?.close();
-    _client = null;
-    _execQueue = Future.value();
+    final state = _connectionState;
+    if (state is SSHConnected) {
+      try {
+        final sftpClient = await state.sftp;
+        sftpClient?.close();
+      } catch (_) {}
+      state._client.close();
+    }
+    
+    // Bump generation so any pending async operations for the old connection are discarded
+    _connectionGeneration++;
+    
+    _connectionState = const SSHDisconnected();
     debugPrint('SSH: Disconnected');
     notifyListeners();
   }
 
-  /// Executes a command on the remote server and returns stdout.
+  /// Executes a command on the remote server and returns an [SSHExecResult].
   ///
   /// All calls are serialized: the next command waits until the previous
   /// one finishes AND a short cooldown elapses. This prevents the server
   /// from running out of session channel slots (OpenSSH MaxSessions=10).
-  Future<SSHResult?> execute(String command) async {
-    if (!isConnected) {
+  Future<SSHExecResult> execute(String command) async {
+    final stateBeforeQueue = _connectionState;
+    if (stateBeforeQueue is! SSHConnected || stateBeforeQueue._client.isClosed) {
       debugPrint('SSH: Not connected, cannot execute: $command');
-      return null;
+      return SSHExecFailure('Not connected');
     }
 
-    final completer = Completer<SSHResult?>();
+    final completer = Completer<SSHExecResult>();
 
     // Chain onto the queue — this call waits until all previous calls finish.
-    final previous = _execQueue;
-    _execQueue = completer.future.then((_) async {
+    final previous = stateBeforeQueue._execQueue;
+    stateBeforeQueue._execQueue = completer.future.then((_) async {
       // Post-command cooldown: give the server time to release the channel.
       await Future.delayed(const Duration(milliseconds: 200));
     });
@@ -124,39 +260,45 @@ class SSHService extends ChangeNotifier {
     // Wait for the previous command to finish (including its cooldown).
     await previous;
 
-    if (!isConnected) {
-      completer.complete(null);
-      return null;
+    final stateAfterQueue = _connectionState;
+    // Ensure we are still connected on the EXACT SAME session we queued against.
+    if (stateAfterQueue != stateBeforeQueue || stateBeforeQueue._client.isClosed) {
+      const failure = SSHExecFailure('Connection lost during queue wait');
+      completer.complete(failure);
+      return failure;
     }
 
     try {
-      final result = await _client!.run(command);
-      final sshResult = SSHResult(
+      final result = await stateBeforeQueue._client.run(command);
+      final success = SSHExecSuccess(
         stdout: String.fromCharCodes(result),
         stderr: '',
       );
-      completer.complete(sshResult);
-      return sshResult;
+      completer.complete(success);
+      return success;
     } catch (e) {
       debugPrint('SSH: Execution failed: $e');
-      completer.complete(null);
-      return null;
+      final failure = SSHExecFailure('$e');
+      completer.complete(failure);
+      return failure;
     }
   }
 
   /// Uploads a file to the remote server via SFTP.
-  Future<bool> uploadFile({
+  Future<SSHUploadResult> uploadFile({
     required String localData,
     required String remotePath,
   }) async {
     if (!isConnected) {
       debugPrint('SSH: Not connected, cannot upload to $remotePath');
-      return false;
+      return SSHUploadFailure('Not connected');
     }
 
     try {
       final sftpClient = await sftp;
-      if (sftpClient == null) return false;
+      if (sftpClient == null) {
+        return const SSHUploadFailure('Failed to open SFTP channel');
+      }
 
       final file = await sftpClient.open(
         remotePath,
@@ -169,26 +311,28 @@ class SSHService extends ChangeNotifier {
       await file.write(_chunkedStream(bytes));
       await file.close();
       debugPrint('SSH: File uploaded to $remotePath');
-      return true;
+      return const SSHUploadSuccess();
     } catch (e) {
       debugPrint('SSH: SFTP upload failed: $e');
-      return false;
+      return SSHUploadFailure('$e');
     }
   }
 
   /// Uploads raw bytes to the remote server via SFTP.
-  Future<bool> uploadBytes({
+  Future<SSHUploadResult> uploadBytes({
     required Uint8List bytes,
     required String remotePath,
   }) async {
     if (!isConnected) {
       debugPrint('SSH: Not connected, cannot upload to $remotePath');
-      return false;
+      return SSHUploadFailure('Not connected');
     }
 
     try {
       final sftpClient = await sftp;
-      if (sftpClient == null) return false;
+      if (sftpClient == null) {
+        return const SSHUploadFailure('Failed to open SFTP channel');
+      }
 
       final file = await sftpClient.open(
         remotePath,
@@ -200,10 +344,10 @@ class SSHService extends ChangeNotifier {
       await file.write(_chunkedStream(bytes));
       await file.close();
       debugPrint('SSH: Bytes uploaded to $remotePath (${bytes.length} bytes)');
-      return true;
+      return const SSHUploadSuccess();
     } catch (e) {
       debugPrint('SSH: SFTP bytes upload failed: $e');
-      return false;
+      return SSHUploadFailure('$e');
     }
   }
 
@@ -217,14 +361,6 @@ class SSHService extends ChangeNotifier {
       offset += length;
     }
   }
-}
-
-/// Encapsulates the result of an SSH command execution.
-class SSHResult {
-  final String stdout;
-  final String stderr;
-
-  SSHResult({required this.stdout, required this.stderr});
 }
 
 /// Global SSH service provider.
