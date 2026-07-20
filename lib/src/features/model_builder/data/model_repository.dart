@@ -637,6 +637,15 @@ $networkLinks
       localData: systemKml,
       remotePath: _systemMasterKml,
     );
+
+    final rigsCount = _settingsService.rigs;
+    for (int i = 2; i <= rigsCount; i++) {
+      await _channelDelay();
+      await _sshService.uploadFile(
+        localData: systemKml,
+        remotePath: '${AppConstants.lgSlaveKmlDir}/slave_$i.kml',
+      );
+    }
   }
 
   /// Forces LG to refresh the master KML by toggling refresh interval.
