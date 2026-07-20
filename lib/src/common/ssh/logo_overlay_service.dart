@@ -96,7 +96,7 @@ class LogoOverlayService {
       // 2. Write the ScreenOverlay KML to the leftmost slave screen
       final leftScreen = _getLeftSlaveScreen();
       final masterIp = _settingsService.host;
-      final kmlPath = '${AppConstants.lgSlaveKmlDir}/slave_$leftScreen.kml';
+      final kmlPath = '${AppConstants.lgSlaveKmlDir}/logo.kml';
 
       final kml = _buildLogoKml(masterIp);
 
@@ -145,7 +145,7 @@ class LogoOverlayService {
 
     try {
       final leftScreen = _getLeftSlaveScreen();
-      final kmlPath = '${AppConstants.lgSlaveKmlDir}/slave_$leftScreen.kml';
+      final kmlPath = '${AppConstants.lgSlaveKmlDir}/logo.kml';
 
       const emptyKml = '''<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
