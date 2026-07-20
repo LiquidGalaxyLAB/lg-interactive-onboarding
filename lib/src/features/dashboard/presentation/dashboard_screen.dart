@@ -7,6 +7,7 @@ import 'package:lg_interactive_onboarding/src/features/model_builder/presentatio
 import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/presentation/settings_screen.dart';
+import 'package:lg_interactive_onboarding/src/features/kml_playground/presentation/kml_playground_screen.dart';
 
 import 'widgets/dashboard_palette.dart';
 import 'widgets/connection_chip.dart';
@@ -126,6 +127,23 @@ class DashboardScreen extends ConsumerWidget {
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const ModelBuilderScreen(),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // KML Playground — experiment with KML elements
+                FeatureCard(
+                  title: 'KML Playground',
+                  subtitle: 'Create and tweak KML elements — push live to Liquid Galaxy',
+                  icon: Icons.science_outlined,
+                  accentColor: DashboardPalette.kmlPlaygroundTeal,
+                  isDark: isDark,
+                  spotlightKey: 'kml_playground_card',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const KmlPlaygroundScreen(),
                     ),
                   ),
                 ),
