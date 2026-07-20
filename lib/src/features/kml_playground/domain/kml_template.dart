@@ -7,7 +7,6 @@ enum KmlTemplateType {
   lineString,
   screenOverlay,
   groundOverlay,
-  model,
   tour,
 }
 
@@ -23,6 +22,8 @@ enum ParamFieldType {
   polygonVertices,
   /// Two-point map — renders a map that lets the user pick Start and End pins
   twoPointMap,
+  /// Boolean toggle switch
+  boolean,
 }
 
 /// Represents a single editable parameter for a KML Template.
@@ -128,7 +129,7 @@ class KmlTemplate {
           category: TemplateCategory.basics,
           description: 'A filled shape on the map.',
           icon: Icons.polyline,
-          tip: '💡 Tap the map to place vertices. The polygon closes automatically. The first and last points are always the same in KML!',
+          tip: '💡 Tap the map to place vertices. Try turning on "Extrude" and setting a high Altitude to create instant 3D buildings purely from KML!',
           parameters: [
             KmlParameter(id: 'name', label: 'Name', defaultValue: 'My Polygon', fieldType: ParamFieldType.text),
             KmlParameter(
@@ -138,6 +139,7 @@ class KmlTemplate {
               fieldType: ParamFieldType.polygonVertices,
             ),
             KmlParameter(id: 'altitude', label: 'Altitude (m)', defaultValue: 0.0, fieldType: ParamFieldType.number, min: 0, max: 100000),
+            KmlParameter(id: 'extrude', label: 'Extrude to Ground', defaultValue: false, fieldType: ParamFieldType.boolean),
             KmlParameter(
               id: 'fillColor', label: 'Fill Color', defaultValue: 'Green',
               fieldType: ParamFieldType.dropdown,
@@ -230,34 +232,6 @@ class KmlTemplate {
         ),
 
         // ── Advanced ────────────────────────────────────────────────
-
-        const KmlTemplate(
-          id: 'basic_model',
-          name: '3D Model',
-          type: KmlTemplateType.model,
-          category: TemplateCategory.advanced,
-          description: 'Place a COLLADA 3D model.',
-          icon: Icons.view_in_ar,
-          tip: '💡 Google Earth supports COLLADA (.dae) models. The Scale values let you resize the model, and Orientation controls its rotation in 3D space.',
-          parameters: [
-            KmlParameter(id: 'name', label: 'Name', defaultValue: 'My Model', fieldType: ParamFieldType.text),
-            KmlParameter(id: 'latitude', label: 'Latitude', defaultValue: 28.6139, fieldType: ParamFieldType.number, min: -90, max: 90),
-            KmlParameter(id: 'longitude', label: 'Longitude', defaultValue: 77.2090, fieldType: ParamFieldType.number, min: -180, max: 180),
-            KmlParameter(id: 'altitude', label: 'Altitude (m)', defaultValue: 0.0, fieldType: ParamFieldType.number, min: 0, max: 100000),
-            KmlParameter(id: 'heading', label: 'Heading (°)', defaultValue: 0.0, fieldType: ParamFieldType.number, min: 0, max: 360),
-            KmlParameter(id: 'tilt', label: 'Tilt (°)', defaultValue: 0.0, fieldType: ParamFieldType.number, min: 0, max: 180),
-            KmlParameter(id: 'roll', label: 'Roll (°)', defaultValue: 0.0, fieldType: ParamFieldType.number, min: 0, max: 360),
-            KmlParameter(id: 'scaleX', label: 'Scale X', defaultValue: 1.0, fieldType: ParamFieldType.number, min: 0.1, max: 100),
-            KmlParameter(id: 'scaleY', label: 'Scale Y', defaultValue: 1.0, fieldType: ParamFieldType.number, min: 0.1, max: 100),
-            KmlParameter(id: 'scaleZ', label: 'Scale Z', defaultValue: 1.0, fieldType: ParamFieldType.number, min: 0.1, max: 100),
-            KmlParameter(id: 'modelUrl', label: 'Model URL (.dae)', defaultValue: 'https://developers.google.com/kml/documentation/KML_Samples/donut.dae', fieldType: ParamFieldType.url),
-            KmlParameter(
-              id: 'altitudeMode', label: 'Altitude Mode', defaultValue: 'relativeToGround',
-              fieldType: ParamFieldType.dropdown,
-              options: ['clampToGround', 'relativeToGround', 'absolute'],
-            ),
-          ],
-        ),
 
         const KmlTemplate(
           id: 'simple_tour',

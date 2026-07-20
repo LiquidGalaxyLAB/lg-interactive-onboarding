@@ -27,8 +27,6 @@ class KmlGenerator {
         return _generateGroundOverlay(params);
       case KmlTemplateType.screenOverlay:
         return _generateScreenOverlay(params);
-      case KmlTemplateType.model:
-        return _generateModel(params);
       case KmlTemplateType.tour:
         return _generateTour(params);
     }
@@ -90,7 +88,14 @@ class KmlGenerator {
   String _generatePolygon(Map<String, dynamic> params) {
     final name = _s(params, 'name', fallback: 'Polygon');
     final altitude = _d(params, 'altitude');
-    final altitudeMode = _s(params, 'altitudeMode', fallback: 'clampToGround');
+    final extrude = params['extrude'] == true;
+    
+    // Extrusion requires absolute or relativeToGround altitude mode
+    String altitudeMode = _s(params, 'altitudeMode', fallback: 'clampToGround');
+    if (extrude && altitudeMode == 'clampToGround') {
+      altitudeMode = 'relativeToGround';
+    }
+
     final lineWidth = _d(params, 'lineWidth', fallback: 2.0);
 
     // Resolve named colours → ABGR hex
@@ -141,6 +146,7 @@ class KmlGenerator {
       <name>$name</name>
       <styleUrl>#polyStyle</styleUrl>
       <Polygon>
+        ${extrude ? '<extrude>1</extrude>' : ''}
         <tessellate>1</tessellate>
         <altitudeMode>$altitudeMode</altitudeMode>
         <outerBoundaryIs>
@@ -248,51 +254,6 @@ $coordString
       <screenXY x="$overlayX" y="$overlayY" xunits="fraction" yunits="fraction"/>
       <size x="$sizeX" y="$sizeY" xunits="fraction" yunits="fraction"/>
     </ScreenOverlay>''',
-    );
-  }
-
-  String _generateModel(Map<String, dynamic> params) {
-    final name = _s(params, 'name', fallback: '3D Model');
-    final lat = _d(params, 'latitude');
-    final lng = _d(params, 'longitude');
-    final altitude = _d(params, 'altitude', fallback: 0.0);
-    final heading = _d(params, 'heading');
-    final tilt = _d(params, 'tilt');
-    final roll = _d(params, 'roll');
-    final scaleX = _d(params, 'scaleX', fallback: 1.0);
-    final scaleY = _d(params, 'scaleY', fallback: 1.0);
-    final scaleZ = _d(params, 'scaleZ', fallback: 1.0);
-    final modelUrl = _s(params, 'modelUrl',
-        fallback: 'https://developers.google.com/kml/documentation/KML_Samples/donut.dae');
-    final altitudeMode = _s(params, 'altitudeMode', fallback: 'relativeToGround');
-
-    return _wrapDocument(
-      name: name,
-      body: '''
-    <Placemark>
-      <name>$name</name>
-      <Model>
-        <altitudeMode>$altitudeMode</altitudeMode>
-        <Location>
-          <longitude>$lng</longitude>
-          <latitude>$lat</latitude>
-          <altitude>$altitude</altitude>
-        </Location>
-        <Orientation>
-          <heading>$heading</heading>
-          <tilt>$tilt</tilt>
-          <roll>$roll</roll>
-        </Orientation>
-        <Scale>
-          <x>$scaleX</x>
-          <y>$scaleY</y>
-          <z>$scaleZ</z>
-        </Scale>
-        <Link>
-          <href>$modelUrl</href>
-        </Link>
-      </Model>
-    </Placemark>''',
     );
   }
 

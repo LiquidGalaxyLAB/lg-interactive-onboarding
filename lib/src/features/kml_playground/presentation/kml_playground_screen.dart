@@ -485,6 +485,17 @@ class _ParametersCard extends ConsumerWidget {
           onChanged: (v) => controller.updateParameter(param.id, v),
         );
 
+      case ParamFieldType.boolean:
+        final boolValue = value is bool ? value : false;
+        return SwitchListTile(
+          title: Text(param.label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+          value: boolValue,
+          contentPadding: EdgeInsets.zero,
+          visualDensity: VisualDensity.compact,
+          activeColor: const Color(0xFF00B894),
+          onChanged: (v) => controller.updateParameter(param.id, v),
+        );
+
       case ParamFieldType.polygonVertices:
       case ParamFieldType.twoPointMap:
         // Rendered by custom map widgets above, not via _buildField.
