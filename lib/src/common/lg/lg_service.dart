@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
+import 'package:lg_interactive_onboarding/src/common/ssh/system_kml_service.dart';
 
 /// Service for controlling the Liquid Galaxy rig.
 ///
@@ -11,8 +12,9 @@ import 'package:lg_interactive_onboarding/src/features/settings/data/settings_se
 class LGService {
   final SSHService _sshService;
   final SettingsService _settingsService;
+  final SystemKmlService _systemKmlService;
 
-  LGService(this._sshService, this._settingsService);
+  LGService(this._sshService, this._settingsService, this._systemKmlService);
 
   /// Helper to ensure SSH is connected before running commands.
   bool get _isReady => _sshService.isConnected;
@@ -105,19 +107,8 @@ class LGService {
     if (!_isReady) return false;
 
     try {
-      // Add refresh interval
-      await _sshService.execute(
-        'sed -i "s|<href>[^<]*master.kml<\\/href>|&<refreshMode>onInterval<\\/refreshMode><refreshInterval>1<\\/refreshInterval>|" ~/earth/kml/master/myplaces.kml',
-      );
-
-      await Future.delayed(AppConstants.kmlRefreshDelay);
-
-      // Remove refresh interval (revert)
-      await _sshService.execute(
-        'sed -i "s|<href>[^<]*master.kml<\\/href><refreshMode>onInterval<\\/refreshMode><refreshInterval>[0-9]\\+<\\/refreshInterval>|<href>##LG_PHPIFACE##kml/master.kml<\\/href>|" ~/earth/kml/master/myplaces.kml',
-      );
-
-      debugPrint('LGService: Master KML refreshed');
+      await _systemKmlService.forceRefreshAll();
+      debugPrint('LGService: Master KML refreshed via SystemKmlService');
       return true;
     } catch (e) {
       debugPrint('LGService: Refresh master KML failed: $e');
@@ -126,14 +117,14 @@ class LGService {
   }
 
   /// Sends a KML string to the master screen by uploading it to
-  /// /var/www/html/kml/master.kml and triggering a refresh.
+  /// /var/www/html/kml/playground.kml and triggering a refresh.
   Future<bool> sendKml(String kmlString) async {
     if (!_isReady) return false;
 
     try {
       final result = await _sshService.uploadFile(
         localData: kmlString,
-        remotePath: '/var/www/html/kml/master.kml',
+        remotePath: '/var/www/html/kml/playground.kml',
       );
 
       if (result is SSHUploadFailure) {
@@ -152,8 +143,8 @@ class LGService {
     }
   }
 
-  /// Clears all KML from the master screen by writing an empty KML
-  /// to /var/www/html/kml/master.kml, removing all NetworkLinks.
+  /// Clears all KML from the playground by writing an empty KML
+  /// to /var/www/html/kml/playground.kml.
   Future<bool> clearKml() async {
     if (!_isReady) return false;
 
@@ -168,7 +159,7 @@ class LGService {
 
       await _sshService.uploadFile(
         localData: blankKml,
-        remotePath: '/var/www/html/kml/master.kml',
+        remotePath: '/var/www/html/kml/playground.kml',
       );
 
       // Delay before refresh to avoid SSH channel exhaustion
@@ -250,5 +241,6 @@ final lgServiceProvider = Provider<LGService>((ref) {
   return LGService(
     ref.watch(sshServiceProvider),
     ref.watch(settingsServiceProvider),
+    ref.watch(systemKmlServiceProvider),
   );
 });
