@@ -53,6 +53,12 @@ class SystemKmlService {
         <href>http://lg1:${AppConstants.lgHttpPort}/3d_model_wrapper/master.kml</href>
       </Link>
     </NetworkLink>
+    <NetworkLink>
+      <name>Playground KML</name>
+      <Link>
+        <href>http://lg1:${AppConstants.lgHttpPort}/kml/playground.kml</href>
+      </Link>
+    </NetworkLink>
   </Document>
 </kml>''';
 
@@ -87,6 +93,12 @@ class SystemKmlService {
       <name>3D Model Wrapper</name>
       <Link>
         <href>http://lg1:${AppConstants.lgHttpPort}/3d_model_wrapper/master.kml</href>
+      </Link>
+    </NetworkLink>
+    <NetworkLink>
+      <name>Playground KML</name>
+      <Link>
+        <href>http://lg1:${AppConstants.lgHttpPort}/kml/playground.kml</href>
       </Link>
     </NetworkLink>$logoLink
   </Document>
