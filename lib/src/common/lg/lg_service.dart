@@ -125,6 +125,33 @@ class LGService {
     }
   }
 
+  /// Sends a KML string to the master screen by uploading it to
+  /// /var/www/html/kml/master.kml and triggering a refresh.
+  Future<bool> sendKml(String kmlString) async {
+    if (!_isReady) return false;
+
+    try {
+      final result = await _sshService.uploadFile(
+        localData: kmlString,
+        remotePath: '/var/www/html/kml/master.kml',
+      );
+
+      if (result is SSHUploadFailure) {
+        debugPrint('LGService: Send KML upload failed: ${result.message}');
+        return false;
+      }
+
+      await Future.delayed(AppConstants.kmlRefreshDelay);
+      await refreshMasterKml();
+
+      debugPrint('LGService: KML sent to master');
+      return true;
+    } catch (e) {
+      debugPrint('LGService: Send KML failed: $e');
+      return false;
+    }
+  }
+
   /// Clears all KML from the master screen by writing an empty KML
   /// to /var/www/html/kml/master.kml, removing all NetworkLinks.
   Future<bool> clearKml() async {
@@ -185,6 +212,33 @@ class LGService {
       return true;
     } catch (e) {
       debugPrint('LGService: FlyTo failed: $e');
+      return false;
+    }
+  }
+
+  /// Commands Liquid Galaxy to play a named gx:Tour in the loaded KML.
+  Future<bool> playTour(String tourName) async {
+    if (!_isReady) return false;
+    try {
+      final command = 'echo "playtour=$tourName" > /tmp/query.txt';
+      await _sshService.execute(command);
+      debugPrint('LGService: Playing tour "$tourName"');
+      return true;
+    } catch (e) {
+      debugPrint('LGService: playTour failed: $e');
+      return false;
+    }
+  }
+
+  /// Stops any currently playing tour on the Liquid Galaxy.
+  Future<bool> stopTour() async {
+    if (!_isReady) return false;
+    try {
+      await _sshService.execute('echo "exittour=true" > /tmp/query.txt');
+      debugPrint('LGService: Tour stopped');
+      return true;
+    } catch (e) {
+      debugPrint('LGService: stopTour failed: $e');
       return false;
     }
   }
