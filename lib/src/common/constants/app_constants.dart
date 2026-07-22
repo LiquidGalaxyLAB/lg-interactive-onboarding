@@ -33,4 +33,5 @@ class AppConstants {
   static const int logoOverlayWidth = 554;
   static const int logoOverlayHeight = 500;
   static const String lgSlaveKmlDir = '/var/www/html/kml';
+
 }

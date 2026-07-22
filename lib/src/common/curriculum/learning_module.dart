@@ -115,4 +115,5 @@ abstract final class AppRoutes {
   static const modelBuilder = '/model-builder';
   static const architectureExplorer = '/architecture-explorer';
   static const learn = '/learn';
+  static const mentor = '/mentor';
 }
