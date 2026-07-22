@@ -10,14 +10,18 @@ class SettingsService {
   final SharedPreferences _prefs;
   final FlutterSecureStorage _secureStorage;
   String _cachedPassword;
+  String _cachedGeminiApiKey;
+  String _cachedGeminiModel;
 
-  SettingsService(this._prefs, this._secureStorage, this._cachedPassword);
+  SettingsService(this._prefs, this._secureStorage, this._cachedPassword, this._cachedGeminiApiKey, this._cachedGeminiModel);
 
   // ─── Keys ──────────────────────────────────────────────────────────
   static const _keyHost = 'host';
   static const _keyPort = 'port';
   static const _keyUsername = 'username';
   static const _keyPassword = 'password';
+  static const _keyGeminiApiKey = 'geminiApiKey';
+  static const _keyGeminiModel = 'geminiModel';
   static const _keyRigs = 'rigs';
   static const _keyThemeMode = 'themeMode';
   static const _keyVoiceNarration = 'voiceNarration';
@@ -27,6 +31,8 @@ class SettingsService {
   int get port => _prefs.getInt(_keyPort) ?? AppConstants.defaultSshPort;
   String get username => _prefs.getString(_keyUsername) ?? AppConstants.defaultSshUsername;
   String get password => _cachedPassword;
+  String get geminiApiKey => _cachedGeminiApiKey;
+  String get geminiModel => _cachedGeminiModel.isEmpty ? 'google/gemini-2.5-flash:free' : _cachedGeminiModel;
   int get rigs => _prefs.getInt(_keyRigs) ?? AppConstants.defaultRigsCount;
   ThemeMode get themeMode => _parseThemeMode(_prefs.getString(_keyThemeMode));
   bool get voiceNarration => _prefs.getBool(_keyVoiceNarration) ?? true;
@@ -39,6 +45,14 @@ class SettingsService {
   Future<void> setPassword(String value) async {
     _cachedPassword = value;
     await _secureStorage.write(key: _keyPassword, value: value);
+  }
+  Future<void> setGeminiApiKey(String value) async {
+    _cachedGeminiApiKey = value;
+    await _secureStorage.write(key: _keyGeminiApiKey, value: value);
+  }
+  Future<void> setGeminiModel(String value) async {
+    _cachedGeminiModel = value;
+    await _prefs.setString(_keyGeminiModel, value);
   }
   Future<void> setRigs(int value) => _prefs.setInt(_keyRigs, value);
   Future<void> setThemeMode(ThemeMode value) =>
@@ -75,11 +89,17 @@ final initialPasswordProvider = Provider<String>((ref) {
   throw UnimplementedError('Initialize initialPasswordProvider in main.dart');
 });
 
+final initialGeminiApiKeyProvider = Provider<String>((ref) {
+  throw UnimplementedError('Initialize initialGeminiApiKeyProvider in main.dart');
+});
+
 final settingsServiceProvider = Provider<SettingsService>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   final secureStorage = ref.watch(secureStorageProvider);
   final initialPassword = ref.watch(initialPasswordProvider);
-  return SettingsService(prefs, secureStorage, initialPassword);
+  final initialGeminiApiKey = ref.watch(initialGeminiApiKeyProvider);
+  final initialGeminiModel = prefs.getString('geminiModel') ?? 'google/gemini-2.5-flash:free';
+  return SettingsService(prefs, secureStorage, initialPassword, initialGeminiApiKey, initialGeminiModel);
 });
 
 /// Theme mode notifier for dynamic theme switching.
