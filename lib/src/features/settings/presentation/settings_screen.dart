@@ -23,6 +23,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late final TextEditingController _usernameCtrl;
   late final TextEditingController _passwordCtrl;
   late final TextEditingController _rigsCtrl;
+  late final TextEditingController _geminiApiKeyCtrl;
+  late final TextEditingController _geminiModelCtrl;
 
   bool _isConnecting = false;
   bool _obscurePassword = true;
@@ -36,6 +38,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _portCtrl = TextEditingController(text: settings.port.toString());
     _usernameCtrl = TextEditingController(text: settings.username);
     _passwordCtrl = TextEditingController(text: settings.password);
+    _geminiApiKeyCtrl = TextEditingController(text: settings.geminiApiKey);
+    _geminiModelCtrl = TextEditingController(text: settings.geminiModel);
     _rigsCtrl = TextEditingController(text: settings.rigs.toString());
     _voiceNarration = settings.voiceNarration;
     // Sync TTS service with persisted preference on screen load.
@@ -48,6 +52,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _portCtrl.dispose();
     _usernameCtrl.dispose();
     _passwordCtrl.dispose();
+    _geminiApiKeyCtrl.dispose();
+    _geminiModelCtrl.dispose();
     _rigsCtrl.dispose();
     super.dispose();
   }
@@ -60,6 +66,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await settings.setPort(int.tryParse(_portCtrl.text) ?? 22);
     await settings.setUsername(_usernameCtrl.text.trim());
     await settings.setPassword(_passwordCtrl.text);
+    await settings.setGeminiApiKey(_geminiApiKeyCtrl.text.trim());
+    await settings.setGeminiModel(_geminiModelCtrl.text.trim());
     await settings.setRigs(int.tryParse(_rigsCtrl.text) ?? 3);
 
     if (!mounted) return;
@@ -320,6 +328,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _SectionLabel(label: 'RIG CONTROLS', isDark: isDark),
             const SizedBox(height: 14),
             RigControlsGrid(isDark: isDark),
+
+            const SizedBox(height: 32),
+
+            // ─── AI Mentor Configuration ──────────────────────────
+            _SectionLabel(label: 'AI MENTOR', isDark: isDark),
+            const SizedBox(height: 14),
+
+            TextField(
+              controller: _geminiApiKeyCtrl,
+              decoration: const InputDecoration(
+                labelText: 'OpenRouter API Key',
+                prefixIcon: Icon(Icons.vpn_key),
+                hintText: 'sk-or-v1-...',
+              ),
+              onChanged: (val) {
+                ref.read(settingsServiceProvider).setGeminiApiKey(val.trim());
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _geminiModelCtrl,
+              decoration: const InputDecoration(
+                labelText: 'OpenRouter Model',
+                prefixIcon: Icon(Icons.psychology_alt),
+                hintText: 'google/gemini-2.5-flash:free',
+              ),
+              onChanged: (val) {
+                ref.read(settingsServiceProvider).setGeminiModel(val.trim());
+              },
+            ),
 
             const SizedBox(height: 32),
 
