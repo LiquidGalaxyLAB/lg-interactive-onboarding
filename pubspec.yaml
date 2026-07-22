@@ -53,6 +53,9 @@ dependencies:
   # Text-to-speech (voice narration for guided mode & Architecture Explorer)
   flutter_tts: ^3.8.0
 
+  # HTTP client (AI Mentor → Firebase Cloud Function)
+  http: ^1.6.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
