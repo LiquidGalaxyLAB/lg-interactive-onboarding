@@ -61,7 +61,6 @@ class ModelRepository {
 
   /// Generates a complete KML document for the given model project.
   String generateKml(ModelProject project) {
-    final masterIp = _settingsService.host;
     final remoteModelFile = project.remoteModelFileName;
 
     return '''<?xml version="1.0" encoding="UTF-8"?>
@@ -73,7 +72,7 @@ class ModelRepository {
       <name>${project.fileName}</name>
       <Model>
         <Link>
-          <href>http://$masterIp:${AppConstants.lgHttpPort}/model/$remoteModelFile</href>
+          <href>http://lg1:${AppConstants.lgHttpPort}/model/$remoteModelFile</href>
         </Link>
         <Location>
           <latitude>${project.latitude ?? 0.0}</latitude>
@@ -99,12 +98,11 @@ class ModelRepository {
 
   /// Generates just the Model block (for KML preview).
   String generateModelBlock(ModelProject project) {
-    final masterIp = _settingsService.host;
     final remoteModelFile = project.remoteModelFileName;
 
     return '''<Model>
   <Link>
-    <href>http://$masterIp:${AppConstants.lgHttpPort}/model/$remoteModelFile</href>
+    <href>http://lg1:${AppConstants.lgHttpPort}/model/$remoteModelFile</href>
   </Link>
   <Location>
     <latitude>${project.latitude ?? 0.0}</latitude>
@@ -426,6 +424,12 @@ class ModelRepository {
       );
       await _channelDelay();
 
+      // Set proper permissions for the web server to read the model and KML
+      await _execute('chmod 644 "$_wrapperDir/${project.remoteKmlFileName}"');
+      if (ext != '.kmz') {
+        await _execute('chmod 644 "$_modelDir/${project.remoteModelFileName}"');
+      }
+
       // 6. Build wrapper master.kml with NetworkLinks for ALL deployed models
       final allKmlFiles = <String>[
         ...existingDeployments.map((d) => d.remoteKmlFileName),
@@ -465,13 +469,8 @@ class ModelRepository {
     }
 
     try {
-      // 1 & 2. Remove model file AND KML file in one command
-      await _execute(
-        'rm -f $_modelDir/${model.remoteModelFileName} && '
-        'rm -f $_wrapperDir/${model.remoteKmlFileName}',
-      );
-
-      // 3. Rewrite wrapper master.kml with only the remaining models
+      // 1. Rewrite wrapper master.kml with only the remaining models FIRST
+      // This prevents Google Earth from trying to fetch a deleted model and throwing a 404 error
       final remainingKmlFiles =
           remainingDeployments.map((d) => d.remoteKmlFileName).toList();
 
@@ -482,12 +481,21 @@ class ModelRepository {
       }
       await _channelDelay();
 
-      // 4. Update system master
+      // 3. Update system master
       await _writeSystemMasterKml();
       await _channelDelay();
 
-      // 5. Force refresh
+      // 4. Force refresh to unload the model in Google Earth
       await _forceRefresh();
+      
+      // Wait a moment for Google Earth to process the refresh before deleting files
+      await Future.delayed(const Duration(seconds: 2));
+
+      // 5. Now it is safe to remove the model file AND its KML file
+      await _execute(
+        'rm -f $_modelDir/${model.remoteModelFileName} && '
+        'rm -f $_wrapperDir/${model.remoteKmlFileName}',
+      );
 
       return PushResult(success: true, message: '${model.displayName} removed from LG.');
     } catch (e) {
@@ -504,8 +512,6 @@ class ModelRepository {
     }
 
     try {
-      await _execute('rm -f $_modelDir/* && rm -f $_wrapperDir/*');
-
       await _writeEmptyWrapperMasterKml();
       await _channelDelay();
 
@@ -513,6 +519,9 @@ class ModelRepository {
       await _channelDelay();
 
       await _forceRefresh();
+      
+      await Future.delayed(const Duration(seconds: 2));
+      await _execute('rm -f $_modelDir/* && rm -f $_wrapperDir/*');
 
       return PushResult(success: true, message: 'All models removed from LG.');
     } catch (e) {
@@ -551,8 +560,6 @@ class ModelRepository {
     }
 
     try {
-      await _execute('rm -rf $_modelDir/* && rm -rf $_wrapperDir/*');
-
       await _writeEmptyWrapperMasterKml();
       await _channelDelay();
 
@@ -560,6 +567,9 @@ class ModelRepository {
       await _channelDelay();
 
       await _forceRefresh();
+
+      await Future.delayed(const Duration(seconds: 2));
+      await _execute('rm -rf $_modelDir/* && rm -rf $_wrapperDir/*');
 
       return PushResult(success: true, message: 'Deep clean complete — all model files removed.');
     } catch (e) {
@@ -571,13 +581,11 @@ class ModelRepository {
   // ─── Helpers ─────────────────────────────────────────────────────
 
   Future<void> _writeWrapperMasterKml(List<String> kmlFileNames) async {
-    final masterIp = _settingsService.host;
-
     final networkLinks = kmlFileNames.map((kmlFile) => '''
     <NetworkLink>
       <name>$kmlFile</name>
       <Link>
-        <href>http://$masterIp:${AppConstants.lgHttpPort}/3d_model_wrapper/$kmlFile</href>
+        <href>http://lg1:${AppConstants.lgHttpPort}/3d_model_wrapper/$kmlFile</href>
       </Link>
     </NetworkLink>''').join('\n');
 
@@ -611,8 +619,6 @@ $networkLinks
   }
 
   Future<void> _writeSystemMasterKml() async {
-    final masterIp = _settingsService.host;
-
     final systemKml = '''<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"
      xmlns:gx="http://www.google.com/kml/ext/2.2">
@@ -621,7 +627,7 @@ $networkLinks
     <NetworkLink>
       <name>3D Model Wrapper</name>
       <Link>
-        <href>http://$masterIp:${AppConstants.lgHttpPort}/3d_model_wrapper/master.kml</href>
+        <href>http://lg1:${AppConstants.lgHttpPort}/3d_model_wrapper/master.kml</href>
       </Link>
     </NetworkLink>
   </Document>

@@ -12,6 +12,7 @@ import 'package:lg_interactive_onboarding/src/features/model_builder/presentatio
 import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/presentation/settings_screen.dart';
+import 'package:lg_interactive_onboarding/src/features/splash/presentation/splash_screen.dart';
 
 /// Root navigator key — injected into [GuidedModeController] so the overlay
 /// can be inserted into the navigator overlay and survive tab switches.
@@ -62,8 +63,8 @@ class LGContentStudioApp extends ConsumerWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
-      // The shell is the initial screen; Settings was the old home.
-      home: const AppShell(),
+      // Splash screen is now the initial screen, which navigates to AppShell after 4 seconds
+      home: const SplashScreen(),
       // Named routes for guided-mode navigation
       routes: {
         AppRoutes.settings: (_) => const SettingsScreen(),
