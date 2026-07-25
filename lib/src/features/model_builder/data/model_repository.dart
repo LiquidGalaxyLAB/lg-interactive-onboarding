@@ -74,6 +74,7 @@ class ModelRepository {
       <Model>
         <Link>
           <href>http://lg1:${AppConstants.lgHttpPort}/model/$remoteModelFile</href>
+          <href>http://lg1:${AppConstants.lgHttpPort}/model/$remoteModelFile</href>
         </Link>
         <Location>
           <latitude>${project.latitude ?? 0.0}</latitude>
@@ -103,6 +104,7 @@ class ModelRepository {
 
     return '''<Model>
   <Link>
+    <href>http://lg1:${AppConstants.lgHttpPort}/model/$remoteModelFile</href>
     <href>http://lg1:${AppConstants.lgHttpPort}/model/$remoteModelFile</href>
   </Link>
   <Location>
@@ -431,6 +433,12 @@ class ModelRepository {
         await _execute('chmod 644 "$_modelDir/${project.remoteModelFileName}"');
       }
 
+      // Set proper permissions for the web server to read the model and KML
+      await _execute('chmod 644 "$_wrapperDir/${project.remoteKmlFileName}"');
+      if (ext != '.kmz') {
+        await _execute('chmod 644 "$_modelDir/${project.remoteModelFileName}"');
+      }
+
       // 6. Build wrapper master.kml with NetworkLinks for ALL deployed models
       final allKmlFiles = <String>[
         ...existingDeployments.map((d) => d.remoteKmlFileName),
@@ -470,6 +478,8 @@ class ModelRepository {
     try {
       // 1. Rewrite wrapper master.kml with only the remaining models FIRST
       // This prevents Google Earth from trying to fetch a deleted model and throwing a 404 error
+      // 1. Rewrite wrapper master.kml with only the remaining models FIRST
+      // This prevents Google Earth from trying to fetch a deleted model and throwing a 404 error
       final remainingKmlFiles =
           remainingDeployments.map((d) => d.remoteKmlFileName).toList();
 
@@ -483,7 +493,17 @@ class ModelRepository {
       // 3. System master is handled by SystemKmlService
 
       // 4. Force refresh to unload the model in Google Earth
+      // 4. Force refresh to unload the model in Google Earth
       await _forceRefresh();
+      
+      // Wait a moment for Google Earth to process the refresh before deleting files
+      await Future.delayed(const Duration(seconds: 2));
+
+      // 5. Now it is safe to remove the model file AND its KML file
+      await _execute(
+        'rm -f $_modelDir/${model.remoteModelFileName} && '
+        'rm -f $_wrapperDir/${model.remoteKmlFileName}',
+      );
       
       // Wait a moment for Google Earth to process the refresh before deleting files
       await Future.delayed(const Duration(seconds: 2));
@@ -513,6 +533,9 @@ class ModelRepository {
       await _channelDelay();
 
       await _forceRefresh();
+      
+      await Future.delayed(const Duration(seconds: 2));
+      await _execute('rm -f $_modelDir/* && rm -f $_wrapperDir/*');
       
       await Future.delayed(const Duration(seconds: 2));
       await _execute('rm -f $_modelDir/* && rm -f $_wrapperDir/*');
@@ -559,6 +582,9 @@ class ModelRepository {
       await Future.delayed(const Duration(seconds: 2));
       await _execute('rm -rf $_modelDir/* && rm -rf $_wrapperDir/*');
 
+      await Future.delayed(const Duration(seconds: 2));
+      await _execute('rm -rf $_modelDir/* && rm -rf $_wrapperDir/*');
+
       return PushResult(success: true, message: 'Deep clean complete — all model files removed.');
     } catch (e) {
       debugPrint('Deep clean failed: $e');
@@ -573,6 +599,7 @@ class ModelRepository {
     <NetworkLink>
       <name>$kmlFile</name>
       <Link>
+        <href>http://lg1:${AppConstants.lgHttpPort}/3d_model_wrapper/$kmlFile</href>
         <href>http://lg1:${AppConstants.lgHttpPort}/3d_model_wrapper/$kmlFile</href>
       </Link>
     </NetworkLink>''').join('\n');
