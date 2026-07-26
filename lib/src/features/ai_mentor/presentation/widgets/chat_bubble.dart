@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 /// A styled chat message bubble for the AI Mentor conversation.
 ///
@@ -71,14 +72,39 @@ class ChatBubble extends StatelessWidget {
                   ),
                 ],
               ),
-              child: SelectableText(
-                text,
-                style: TextStyle(
-                  fontSize: 14.5,
-                  height: 1.45,
-                  color: isUser ? userTextColor : aiTextColor,
-                ),
-              ),
+              child: isUser
+                  ? SelectableText(
+                      text,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        height: 1.45,
+                        color: userTextColor,
+                      ),
+                    )
+                  : MarkdownBody(
+                      data: text,
+                      selectable: true,
+                      styleSheet: MarkdownStyleSheet(
+                        p: TextStyle(
+                          fontSize: 14.5,
+                          height: 1.45,
+                          color: aiTextColor,
+                        ),
+                        h1: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: aiTextColor),
+                        h2: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: aiTextColor),
+                        h3: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: aiTextColor),
+                        listBullet: TextStyle(color: aiTextColor),
+                        code: TextStyle(
+                          backgroundColor: isDark ? const Color(0xFF1E1E20) : const Color(0xFFE0E0E5),
+                          color: aiTextColor,
+                          fontFamily: 'monospace',
+                        ),
+                        codeblockDecoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E1E20) : const Color(0xFFE0E0E5),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
             ),
           ),
 
