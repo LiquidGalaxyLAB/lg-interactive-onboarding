@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lg_interactive_onboarding/src/common/lg/lg_service.dart';
+import 'package:lg_interactive_onboarding/src/features/kml_playground/data/kml_playground_service.dart';
 import 'package:lg_interactive_onboarding/src/features/kml_playground/domain/kml_generator.dart';
 import 'package:lg_interactive_onboarding/src/features/kml_playground/domain/kml_template.dart';
 import 'package:lg_interactive_onboarding/src/features/kml_playground/domain/kml_validator.dart';
@@ -197,10 +198,10 @@ class PlaygroundController extends Notifier<PlaygroundState> {
     state = state.copyWith(isPushing: true);
 
     try {
-      final lgService = ref.read(lgServiceProvider);
+      final playgroundService = ref.read(kmlPlaygroundServiceProvider);
 
       // 1. Upload the KML to the master screen.
-      final uploaded = await lgService.sendKml(kml);
+      final uploaded = await playgroundService.sendKml(kml);
       if (!uploaded) {
         debugPrint('Playground: KML upload failed.');
         state = state.copyWith(isPushing: false);
@@ -237,6 +238,7 @@ class PlaygroundController extends Notifier<PlaygroundState> {
         }
       }
 
+      final lgService = ref.read(lgServiceProvider);
       await lgService.flyTo(
         latitude: lat,
         longitude: lng,
@@ -259,8 +261,8 @@ class PlaygroundController extends Notifier<PlaygroundState> {
   /// Clears the KML from the Liquid Galaxy screens.
   Future<bool> clearFromLG() async {
     try {
-      final lgService = ref.read(lgServiceProvider);
-      return await lgService.clearKml();
+      final playgroundService = ref.read(kmlPlaygroundServiceProvider);
+      return await playgroundService.clearKml();
     } catch (e) {
       debugPrint('Playground: clearFromLG error: $e');
       return false;
