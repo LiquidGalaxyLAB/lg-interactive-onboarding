@@ -36,6 +36,7 @@ class ModelRepository {
   static const _modelDir = AppConstants.lgModelDir;
   static const _wrapperDir = AppConstants.lgWrapperDir;
   static const _wrapperMasterKml = AppConstants.lgWrapperMasterKml;
+  static const _systemMasterKml = AppConstants.lgSystemMasterKml;
 
   /// Small delay between SSH channel operations to avoid channel exhaustion.
   Future<void> _channelDelay() => Future.delayed(AppConstants.sshChannelDelay);
