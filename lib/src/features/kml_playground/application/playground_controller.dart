@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lg_interactive_onboarding/src/common/lg/lg_service.dart';
 import 'package:lg_interactive_onboarding/src/features/kml_playground/data/kml_playground_service.dart';
+import 'package:lg_interactive_onboarding/src/common/utils/geo_math.dart';
 import 'package:lg_interactive_onboarding/src/features/kml_playground/domain/kml_generator.dart';
 import 'package:lg_interactive_onboarding/src/features/kml_playground/domain/kml_template.dart';
 import 'package:lg_interactive_onboarding/src/features/kml_playground/domain/kml_validator.dart';
@@ -210,31 +211,19 @@ class PlaygroundController extends Notifier<PlaygroundState> {
 
       // 2. Fly the camera to the relevant location.
       final params = state.activeParameters;
-      double lat = _extractDouble(params, 'latitude') ??
-          _extractDouble(params, 'startLatitude') ??
+      double lat = GeoMath.extractDouble(params, 'latitude') ??
+          GeoMath.extractDouble(params, 'startLatitude') ??
           0.0;
-      double lng = _extractDouble(params, 'longitude') ??
-          _extractDouble(params, 'startLongitude') ??
+      double lng = GeoMath.extractDouble(params, 'longitude') ??
+          GeoMath.extractDouble(params, 'startLongitude') ??
           0.0;
 
       // If lat/lng are 0, check if this is a polygon with vertices and calculate centroid
       if (lat == 0.0 && lng == 0.0 && params['vertices'] != null) {
-        final vertices = params['vertices'];
-        if (vertices is List && vertices.isNotEmpty) {
-          double sumLat = 0;
-          double sumLng = 0;
-          int count = 0;
-          for (final v in vertices) {
-            if (v is Map) {
-              sumLat += (v['lat'] as num?)?.toDouble() ?? 0.0;
-              sumLng += (v['lng'] as num?)?.toDouble() ?? 0.0;
-              count++;
-            }
-          }
-          if (count > 0) {
-            lat = sumLat / count;
-            lng = sumLng / count;
-          }
+        final centroid = GeoMath.calculateCentroid(params['vertices']);
+        if (centroid.$1 != 0.0 || centroid.$2 != 0.0) {
+          lat = centroid.$1;
+          lng = centroid.$2;
         }
       }
 
@@ -242,10 +231,10 @@ class PlaygroundController extends Notifier<PlaygroundState> {
       await lgService.flyTo(
         latitude: lat,
         longitude: lng,
-        altitude: _extractDouble(params, 'altitude') ?? 0.0,
-        heading: _extractDouble(params, 'heading') ?? 0.0,
-        tilt: _extractDouble(params, 'tilt') ?? 45.0,
-        range: _extractDouble(params, 'range') ?? 1000.0,
+        altitude: GeoMath.extractDouble(params, 'altitude') ?? 0.0,
+        heading: GeoMath.extractDouble(params, 'heading') ?? 0.0,
+        tilt: GeoMath.extractDouble(params, 'tilt') ?? 45.0,
+        range: GeoMath.extractDouble(params, 'range') ?? 1000.0,
       );
 
       debugPrint('Playground: KML pushed and camera moved.');
@@ -327,14 +316,6 @@ class PlaygroundController extends Notifier<PlaygroundState> {
         validationError: 'Unsupported template type.',
       );
     }
-  }
-
-  double? _extractDouble(Map<String, dynamic> params, String key) {
-    final value = params[key];
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    if (value is String) return double.tryParse(value);
-    return null;
   }
 }
 
