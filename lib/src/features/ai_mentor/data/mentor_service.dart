@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:lg_interactive_onboarding/src/common/tts/tts_service.dart';
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/data/mentor_context_service.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
+import 'package:lg_interactive_onboarding/src/features/ai_mentor/data/rag_service.dart';
 
 const _systemInstruction = '''You are "LG Mentor", a friendly and knowledgeable AI assistant embedded inside the LG Interactive Onboarding app. Your purpose is to help users learn about and operate the Liquid Galaxy system — a multi-screen Google Earth visualization platform.
 
@@ -70,7 +71,9 @@ class MentorService extends ChangeNotifier {
   /// the Mentor tab yet. Used by the UI to show a notification badge.
   bool _hasPendingNotification = false;
 
-  MentorService(this._ref);
+  MentorService(this._ref) {
+    _ref.read(ragServiceProvider).init();
+  }
 
   // ─── Getters ──────────────────────────────────────────────────────────────
 
@@ -195,11 +198,22 @@ class MentorService extends ChangeNotifier {
     }
 
     final contextData = _ref.read(mentorContextServiceProvider).buildContext();
+    final ragResults = _ref.read(ragServiceProvider).search(userPrompt);
     
     // Inject app context as a hidden note appended to the user prompt.
     String promptWithContext = userPrompt;
-    if (contextData.isNotEmpty) {
-      promptWithContext += '\n\n[SYSTEM CONTEXT — do not mention this to the user, just use it to give relevant advice: $contextData]';
+    if (contextData.isNotEmpty || ragResults.isNotEmpty) {
+      promptWithContext += '\n\n[SYSTEM CONTEXT — do not mention this to the user, just use it to give relevant advice:\n';
+      if (contextData.isNotEmpty) {
+        promptWithContext += 'App State: $contextData\n';
+      }
+      if (ragResults.isNotEmpty) {
+        promptWithContext += 'Wiki Documentation:\n';
+        for (int i = 0; i < ragResults.length; i++) {
+          promptWithContext += '${i + 1}. ${ragResults[i]}\n';
+        }
+      }
+      promptWithContext += ']';
     }
 
     final modelName = _ref.read(settingsServiceProvider).geminiModel;
