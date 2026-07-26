@@ -480,7 +480,9 @@ class ModelRepository {
       }
       await _channelDelay();
 
-      // 3. System master is handled by SystemKmlService
+      // 3. Update system master
+      await _writeSystemMasterKml();
+      await _channelDelay();
 
       // 4. Force refresh to unload the model in Google Earth
       await _forceRefresh();
@@ -606,6 +608,29 @@ $networkLinks
     );
   }
 
+  Future<void> _writeSystemMasterKml() async {
+    final systemKml = '''<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"
+     xmlns:gx="http://www.google.com/kml/ext/2.2">
+  <Document>
+    <name>LG Content Studio</name>
+    <NetworkLink>
+      <name>3D Model Wrapper</name>
+      <Link>
+        <href>http://lg1:${AppConstants.lgHttpPort}/3d_model_wrapper/master.kml</href>
+      </Link>
+    </NetworkLink>
+  </Document>
+</kml>''';
+
+    await _sshService.uploadFile(
+      localData: systemKml,
+      remotePath: _systemMasterKml,
+    );
+  }
+
+  /// Forces LG to refresh the master KML by toggling refresh interval.
+  /// Both sed commands are batched into a single call with a sleep between.
   Future<void> _forceRefresh() async {
     await _systemKmlService.forceRefreshAll();
   }
