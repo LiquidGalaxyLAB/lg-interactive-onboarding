@@ -5,6 +5,7 @@ import 'package:lg_interactive_onboarding/src/features/ai_mentor/data/mentor_ser
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/presentation/widgets/chat_bubble.dart';
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/presentation/widgets/typing_indicator.dart';
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/presentation/widgets/suggested_prompts.dart';
+import 'package:lg_interactive_onboarding/src/features/ai_mentor/data/stt_service.dart';
 
 /// The AI Mentor chat screen — rendered as Tab 2 in the [AppShell].
 ///
@@ -55,9 +56,24 @@ class _MentorScreenState extends ConsumerState<MentorScreen> {
     });
   }
 
+  void _toggleListening() {
+    final stt = ref.read(sttServiceProvider);
+    if (stt.isListening) {
+      stt.stopListening();
+      if (_textController.text.trim().isNotEmpty) {
+        _send();
+      }
+    } else {
+      stt.startListening((text) {
+        _textController.text = text;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final mentor = ref.read(mentorServiceProvider);
+    final stt = ref.read(sttServiceProvider);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     const accent = Color(0xFF7C4DFF);
@@ -68,7 +84,7 @@ class _MentorScreenState extends ConsumerState<MentorScreen> {
     });
 
     return ListenableBuilder(
-      listenable: mentor,
+      listenable: Listenable.merge([mentor, stt]),
       builder: (context, _) {
     // Auto-scroll when new messages arrive.
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
@@ -165,7 +181,7 @@ class _MentorScreenState extends ConsumerState<MentorScreen> {
           ),
 
           // ── Input bar ────────────────────────────────────────────────────
-          _buildInputBar(isDark, accent),
+          _buildInputBar(isDark, accent, stt),
         ],
       ),
     );
@@ -239,7 +255,7 @@ class _MentorScreenState extends ConsumerState<MentorScreen> {
   }
 
   /// The bottom text input bar with send button.
-  Widget _buildInputBar(bool isDark, Color accent) {
+  Widget _buildInputBar(bool isDark, Color accent, SttService stt) {
     return Container(
       padding: EdgeInsets.only(
         left: 16,
@@ -301,6 +317,12 @@ class _MentorScreenState extends ConsumerState<MentorScreen> {
                 ),
               ),
             ),
+          ),
+          const SizedBox(width: 8),
+          _MicButton(
+            isDark: isDark,
+            isListening: stt.isListening,
+            onPressed: _toggleListening,
           ),
           const SizedBox(width: 8),
           _SendButton(accent: accent, onPressed: _send),
@@ -367,6 +389,56 @@ class _SendButton extends StatelessWidget {
           child: const Icon(
             Icons.send_rounded,
             color: Colors.white,
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Circular mic button for Speech-to-Text.
+class _MicButton extends StatelessWidget {
+  final bool isDark;
+  final bool isListening;
+  final VoidCallback onPressed;
+
+  const _MicButton({
+    required this.isDark,
+    required this.isListening,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isListening
+                ? Colors.redAccent
+                : (isDark ? const Color(0xFF2A2A2E) : const Color(0xFFF5F5F8)),
+            boxShadow: isListening
+                ? [
+                    BoxShadow(
+                      color: Colors.redAccent.withValues(alpha: 0.4),
+                      blurRadius: 12,
+                      spreadRadius: 2,
+                    )
+                  ]
+                : [],
+          ),
+          child: Icon(
+            isListening ? Icons.mic : Icons.mic_none,
+            color: isListening
+                ? Colors.white
+                : (isDark ? Colors.white70 : Colors.black54),
             size: 20,
           ),
         ),
