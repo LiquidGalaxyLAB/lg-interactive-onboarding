@@ -98,27 +98,15 @@ class RigControlsGrid extends ConsumerWidget {
                     isDark: isDark,
                     enabled: isConnected,
                     onTap: () async {
-                      try {
-                        await ref.read(systemKmlServiceProvider).forceRefreshAll();
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Master KML refreshed'),
-                              backgroundColor: AppPalette.sage,
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Refresh failed'),
-                              backgroundColor: AppPalette.terracotta,
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        }
+                      final ok = await ref.read(systemKmlServiceProvider).forceRefreshAll();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(ok ? 'Master KML refreshed' : 'Refresh failed'),
+                            backgroundColor: ok ? AppPalette.sage : AppPalette.terracotta,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
                       }
                     },
                   ),

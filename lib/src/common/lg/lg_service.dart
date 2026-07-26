@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
-import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 
 /// Service for controlling the Liquid Galaxy rig.

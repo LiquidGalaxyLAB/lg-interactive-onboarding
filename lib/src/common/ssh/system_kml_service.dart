@@ -135,7 +135,7 @@ class SystemKmlService {
   }
 
   /// Forces LG to refresh the master KML and all slave KMLs by toggling the refresh interval.
-  Future<void> forceRefreshAll() async {
+  Future<bool> forceRefreshAll() async {
     try {
       // 1. Refresh master KML
       await _execute(
@@ -155,8 +155,10 @@ class SystemKmlService {
         );
         await _channelDelay();
       }
+      return true;
     } catch (e) {
       debugPrint('SystemKmlService: Force refresh all failed: $e');
+      return false;
     }
   }
 }

@@ -29,7 +29,12 @@ class KmlPlaygroundService {
       }
 
       await Future.delayed(AppConstants.kmlRefreshDelay);
-      await _systemKmlService.forceRefreshAll();
+      final refreshOk = await _systemKmlService.forceRefreshAll();
+      
+      if (!refreshOk) {
+        debugPrint('KmlPlaygroundService: Refresh failed after sending KML');
+        return false;
+      }
 
       debugPrint('KmlPlaygroundService: KML sent to master');
       return true;
@@ -60,7 +65,12 @@ class KmlPlaygroundService {
 
       // Delay before refresh to avoid SSH channel exhaustion
       await Future.delayed(AppConstants.kmlClearDelay);
-      await _systemKmlService.forceRefreshAll();
+      final refreshOk = await _systemKmlService.forceRefreshAll();
+      
+      if (!refreshOk) {
+        debugPrint('KmlPlaygroundService: Refresh failed after clearing KML');
+        return false;
+      }
 
       debugPrint('KmlPlaygroundService: KML cleared');
       return true;
