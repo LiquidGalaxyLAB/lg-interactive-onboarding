@@ -24,8 +24,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late final TextEditingController _usernameCtrl;
   late final TextEditingController _passwordCtrl;
   late final TextEditingController _rigsCtrl;
-  late final TextEditingController _geminiApiKeyCtrl;
-  late final TextEditingController _geminiModelCtrl;
+  late final TextEditingController _openRouterApiKeyCtrl;
+  late final TextEditingController _openRouterModelCtrl;
 
   bool _isConnecting = false;
   bool _obscurePassword = true;
@@ -58,17 +58,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _portCtrl = TextEditingController(text: settings.port.toString());
     _usernameCtrl = TextEditingController(text: settings.username);
     _passwordCtrl = TextEditingController(text: settings.password);
-    _geminiApiKeyCtrl = TextEditingController(text: settings.geminiApiKey);
+    _openRouterApiKeyCtrl = TextEditingController(text: settings.openRouterApiKey);
     
-    final savedModel = settings.geminiModel;
+    final savedModel = settings.openRouterModel;
     if (_curatedModels.containsKey(savedModel)) {
       _selectedModelDropdown = savedModel;
       _showCustomModelInput = false;
-      _geminiModelCtrl = TextEditingController();
+      _openRouterModelCtrl = TextEditingController();
     } else {
       _selectedModelDropdown = 'other';
       _showCustomModelInput = true;
-      _geminiModelCtrl = TextEditingController(text: savedModel);
+      _openRouterModelCtrl = TextEditingController(text: savedModel);
     }
     
     _rigsCtrl = TextEditingController(text: settings.rigs.toString());
@@ -101,15 +101,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _portCtrl.dispose();
     _usernameCtrl.dispose();
     _passwordCtrl.dispose();
-    _geminiApiKeyCtrl.dispose();
-    _geminiModelCtrl.dispose();
+    _openRouterApiKeyCtrl.dispose();
+    _openRouterModelCtrl.dispose();
     _rigsCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _verifyAndApplyAiSettings() async {
-    final apiKey = _geminiApiKeyCtrl.text.trim();
-    final model = _showCustomModelInput ? _geminiModelCtrl.text.trim() : _selectedModelDropdown;
+    final apiKey = _openRouterApiKeyCtrl.text.trim();
+    final model = _showCustomModelInput ? _openRouterModelCtrl.text.trim() : _selectedModelDropdown;
     
     if (apiKey.isEmpty || model.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -133,8 +133,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
       if (res.statusCode == 200) {
         final settings = ref.read(settingsServiceProvider);
-        await settings.setGeminiApiKey(apiKey);
-        await settings.setGeminiModel(model);
+        await settings.setOpenRouterApiKey(apiKey);
+        await settings.setOpenRouterModel(model);
         
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -173,8 +173,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await settings.setPort(int.tryParse(_portCtrl.text) ?? 22);
     await settings.setUsername(_usernameCtrl.text.trim());
     await settings.setPassword(_passwordCtrl.text);
-    await settings.setGeminiApiKey(_geminiApiKeyCtrl.text.trim());
-    await settings.setGeminiModel(_geminiModelCtrl.text.trim());
+    await settings.setOpenRouterApiKey(_openRouterApiKeyCtrl.text.trim());
+    await settings.setOpenRouterModel(_openRouterModelCtrl.text.trim());
     await settings.setRigs(int.tryParse(_rigsCtrl.text) ?? 3);
 
     if (!mounted) return;
@@ -443,7 +443,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SizedBox(height: 14),
 
             TextField(
-              controller: _geminiApiKeyCtrl,
+              controller: _openRouterApiKeyCtrl,
               obscureText: _obscureApiKey,
               decoration: InputDecoration(
                 labelText: 'OpenRouter API Key',
@@ -489,7 +489,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             if (_showCustomModelInput) ...[
               const SizedBox(height: 12),
               TextField(
-                controller: _geminiModelCtrl,
+                controller: _openRouterModelCtrl,
                 decoration: const InputDecoration(
                   labelText: 'Custom Model Name',
                   prefixIcon: Icon(Icons.edit),

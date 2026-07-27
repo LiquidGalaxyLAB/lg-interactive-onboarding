@@ -28,7 +28,7 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   const secureStorage = FlutterSecureStorage();
   final initialPassword = await secureStorage.read(key: 'password') ?? '';
-  final initialGeminiApiKey = await secureStorage.read(key: 'geminiApiKey') ?? '';
+  final initialOpenRouterApiKey = await secureStorage.read(key: 'openRouterApiKey') ?? '';
 
   runApp(
     ProviderScope(
@@ -36,7 +36,7 @@ void main() async {
         sharedPreferencesProvider.overrideWithValue(prefs),
         secureStorageProvider.overrideWithValue(secureStorage),
         initialPasswordProvider.overrideWithValue(initialPassword),
-        initialGeminiApiKeyProvider.overrideWithValue(initialGeminiApiKey),
+        initialOpenRouterApiKeyProvider.overrideWithValue(initialOpenRouterApiKey),
       ],
       child: LGContentStudioApp(navigatorKey: rootNavigatorKey),
     ),

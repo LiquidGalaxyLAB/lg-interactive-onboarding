@@ -68,7 +68,7 @@ class RagService {
       return [];
     }
 
-    final apiKey = _ref.read(settingsServiceProvider).geminiApiKey;
+    final apiKey = _ref.read(settingsServiceProvider).openRouterApiKey;
     if (apiKey.isEmpty) {
       debugPrint('RagService: No API key available for embeddings.');
       return [];

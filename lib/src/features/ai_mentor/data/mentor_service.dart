@@ -229,7 +229,7 @@ class MentorService extends ChangeNotifier {
 
   /// Makes the API call to OpenRouter (OpenAI-compatible endpoint).
   Future<String> _callOpenRouter({required String userPrompt}) async {
-    final apiKey = _ref.read(settingsServiceProvider).geminiApiKey;
+    final apiKey = _ref.read(settingsServiceProvider).openRouterApiKey;
     if (apiKey.isEmpty) {
       throw Exception('No OpenRouter API key provided');
     }
@@ -253,7 +253,7 @@ class MentorService extends ChangeNotifier {
       promptWithContext += ']';
     }
 
-    final modelName = _ref.read(settingsServiceProvider).geminiModel;
+    final modelName = _ref.read(settingsServiceProvider).openRouterModel;
 
     // Build history for the OpenAI format.
     final messages = <Map<String, String>>[];
