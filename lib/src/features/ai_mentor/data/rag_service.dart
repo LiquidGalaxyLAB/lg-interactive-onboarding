@@ -68,12 +68,11 @@ class RagService {
       return [];
     }
 
-    try {
-      final apiKey = _ref.read(settingsServiceProvider).geminiApiKey;
-      if (apiKey.isEmpty) {
-        debugPrint('RagService: No API key available for embeddings.');
-        return [];
-      }
+    final apiKey = _ref.read(settingsServiceProvider).geminiApiKey;
+    if (apiKey.isEmpty) {
+      debugPrint('RagService: No API key available for embeddings.');
+      return [];
+    }
 
       // Get embedding for prompt
       final uri = Uri.parse('https://openrouter.ai/api/v1/embeddings');
@@ -90,8 +89,7 @@ class RagService {
       );
 
       if (response.statusCode != 200) {
-        debugPrint('RagService embedding failed: ${response.body}');
-        return [];
+        throw Exception('OpenRouter API error ${response.statusCode}: ${response.body}');
       }
 
       final resData = jsonDecode(response.body);
@@ -110,12 +108,8 @@ class RagService {
       // Sort descending
       scores.sort((a, b) => (b['score'] as double).compareTo(a['score'] as double));
 
-      // Return top 3
-      return scores.take(3).map((e) => e['text'] as String).toList();
-    } catch (e) {
-      debugPrint('RagService search error: $e');
-      return [];
-    }
+    // Return top 3
+    return scores.take(3).map((e) => e['text'] as String).toList();
   }
 }
 
