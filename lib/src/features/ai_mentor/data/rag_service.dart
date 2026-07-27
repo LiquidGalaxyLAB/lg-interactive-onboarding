@@ -3,131 +3,122 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
+import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
+import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 
-/// Service to handle local Retrieval-Augmented Generation (RAG) using TF-IDF.
+class VectorChunk {
+  final String text;
+  final List<double> vector;
+  
+  VectorChunk({required this.text, required this.vector});
+}
+
+/// Service to handle local Semantic Vector Retrieval-Augmented Generation (RAG).
 class RagService {
-  List<String> _chunks = [];
-  List<List<String>> _tokenizedChunks = [];
-  final Map<String, double> _idfMap = {};
-
+  final Ref _ref;
+  final List<VectorChunk> _chunks = [];
   bool _isInitialized = false;
 
-  /// Loads the Wiki chunks from assets and precomputes the TF-IDF index.
+  RagService(this._ref);
+
+  /// Loads the pre-computed Wiki embeddings from assets.
   Future<void> init() async {
     if (_isInitialized) return;
     try {
-      final jsonString = await rootBundle.loadString('assets/knowledge/lg_wiki_chunks.json');
-      final Map<String, dynamic> data = jsonDecode(jsonString);
-      final List<dynamic> pages = data['pages'] ?? [];
+      final jsonString = await rootBundle.loadString('assets/knowledge/lg_wiki_embeddings.json');
+      final List<dynamic> data = jsonDecode(jsonString);
       
       _chunks.clear();
-      for (final page in pages) {
-        final List<dynamic> pageChunks = page['chunks'] ?? [];
-        for (final chunk in pageChunks) {
-          final text = chunk['text'] as String?;
-          if (text != null && text.trim().isNotEmpty) {
-            _chunks.add(text.trim());
-          }
+      for (final item in data) {
+        final text = item['text'] as String?;
+        final embeddingList = item['embedding'] as List<dynamic>?;
+        
+        if (text != null && embeddingList != null) {
+          final vector = embeddingList.map((e) => (e as num).toDouble()).toList();
+          _chunks.add(VectorChunk(text: text, vector: vector));
         }
       }
 
-      _buildIndex();
       _isInitialized = true;
-      debugPrint('RagService initialized with ${_chunks.length} chunks.');
+      debugPrint('RagService initialized with ${_chunks.length} vector chunks.');
     } catch (e) {
       debugPrint('RagService failed to initialize: $e');
     }
   }
 
-  void _buildIndex() {
-    _tokenizedChunks = _chunks.map((c) => _tokenize(c)).toList();
-    final int nDocs = _chunks.length;
-    final Map<String, int> docFrequency = {};
+  /// Calculates cosine similarity between two vectors.
+  double _cosineSimilarity(List<double> a, List<double> b) {
+    if (a.length != b.length) return 0.0;
+    double dotProduct = 0.0;
+    double normA = 0.0;
+    double normB = 0.0;
+    for (int i = 0; i < a.length; i++) {
+      dotProduct += a[i] * b[i];
+      normA += a[i] * a[i];
+      normB += b[i] * b[i];
+    }
+    if (normA == 0.0 || normB == 0.0) return 0.0;
+    return dotProduct / (sqrt(normA) * sqrt(normB));
+  }
 
-    for (final tokens in _tokenizedChunks) {
-      final uniqueTokens = tokens.toSet();
-      for (final t in uniqueTokens) {
-        docFrequency[t] = (docFrequency[t] ?? 0) + 1;
-      }
+  /// Semantically searches the chunks for the top 3 most relevant results.
+  Future<List<String>> search(String prompt) async {
+    if (!_isInitialized || _chunks.isEmpty || prompt.trim().isEmpty) {
+      return [];
     }
 
-    _idfMap.clear();
-    docFrequency.forEach((term, freq) {
-      // Standard IDF formula with +1 smoothing
-      _idfMap[term] = log((nDocs + 1) / (freq + 1)) + 1;
-    });
-  }
-
-  List<String> _tokenize(String text) {
-    return text
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^\w\s]'), ' ')
-        .split(RegExp(r'\s+'))
-        .where((t) => t.isNotEmpty && !_stopWords.contains(t))
-        .toList();
-  }
-
-  /// Searches the local index and returns the top `k` most relevant chunks.
-  List<String> search(String query, {int k = 3}) {
-    if (!_isInitialized || _chunks.isEmpty) return [];
-
-    final queryTokens = _tokenize(query);
-    if (queryTokens.isEmpty) return [];
-
-    final List<MapEntry<int, double>> scores = [];
-
-    for (int i = 0; i < _chunks.length; i++) {
-      final docTokens = _tokenizedChunks[i];
-      if (docTokens.isEmpty) continue;
-
-      double score = 0.0;
-      for (final qt in queryTokens) {
-        if (!_idfMap.containsKey(qt)) continue;
-
-        // Calculate TF
-        int termCount = 0;
-        for (final dt in docTokens) {
-          if (dt == qt) termCount++;
-        }
-        
-        if (termCount > 0) {
-          final tf = termCount / docTokens.length;
-          final idf = _idfMap[qt]!;
-          score += (tf * idf);
-        }
+    try {
+      final apiKey = _ref.read(settingsServiceProvider).geminiApiKey;
+      if (apiKey.isEmpty) {
+        debugPrint('RagService: No API key available for embeddings.');
+        return [];
       }
+
+      // Get embedding for prompt
+      final uri = Uri.parse('https://openrouter.ai/api/v1/embeddings');
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+        body: jsonEncode({
+          'model': AppConstants.openRouterEmbeddingModel,
+          'input': [prompt.trim()]
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        debugPrint('RagService embedding failed: ${response.body}');
+        return [];
+      }
+
+      final resData = jsonDecode(response.body);
+      final List<dynamic>? data = resData['data'];
+      if (data == null || data.isEmpty) return [];
       
-      if (score > 0) {
-        scores.add(MapEntry(i, score));
+      final promptEmbedding = (data[0]['embedding'] as List<dynamic>).map((e) => (e as num).toDouble()).toList();
+
+      // Score all chunks
+      final scores = <Map<String, dynamic>>[];
+      for (final chunk in _chunks) {
+        final score = _cosineSimilarity(promptEmbedding, chunk.vector);
+        scores.add({'text': chunk.text, 'score': score});
       }
+
+      // Sort descending
+      scores.sort((a, b) => (b['score'] as double).compareTo(a['score'] as double));
+
+      // Return top 3
+      return scores.take(3).map((e) => e['text'] as String).toList();
+    } catch (e) {
+      debugPrint('RagService search error: $e');
+      return [];
     }
-
-    // Sort descending
-    scores.sort((a, b) => b.value.compareTo(a.value));
-
-    return scores.take(k).map((e) => _chunks[e.key]).toList();
   }
-
-  // Very basic list of English stop words to ignore
-  static const Set<String> _stopWords = {
-    'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours', 
-    'yourself', 'yourselves', 'he', 'him', 'his', 'himself', 'she', 'her', 'hers', 
-    'herself', 'it', 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves', 
-    'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those', 'am', 'is', 'are', 
-    'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 'do', 'does', 
-    'did', 'doing', 'a', 'an', 'the', 'and', 'but', 'if', 'or', 'because', 'as', 'until', 
-    'while', 'of', 'at', 'by', 'for', 'with', 'about', 'against', 'between', 'into', 
-    'through', 'during', 'before', 'after', 'above', 'below', 'to', 'from', 'up', 'down', 
-    'in', 'out', 'on', 'off', 'over', 'under', 'again', 'further', 'then', 'once', 'here', 
-    'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more', 
-    'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 
-    'than', 'too', 'very', 's', 't', 'can', 'will', 'just', 'don', 'should', 'now'
-  };
 }
 
 final ragServiceProvider = Provider<RagService>((ref) {
-  final service = RagService();
-  // We don't await init() here since Providers should ideally return synchronously.
-  // Instead, the app or MentorService can ensure init is called.
-  return service;
+  return RagService(ref);
 });
