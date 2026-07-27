@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/curriculum/guided_mode_controller.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
+import 'package:lg_interactive_onboarding/src/common/tts/tts_service.dart';
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/data/mentor_service.dart';
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/presentation/mentor_screen.dart';
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/presentation/widgets/mentor_avatar.dart';
@@ -71,6 +72,9 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
     // ── Sync local index ↔ provider (for programmatic tab switches) ────────
     // The MentorAvatar widget sets the provider to navigate here.
     ref.listen<int>(shellTabIndexProvider, (previous, next) {
+      if (previous == 2 && next != 2) {
+        ref.read(ttsServiceProvider).stop();
+      }
       if (next != _selectedIndex) {
         setState(() => _selectedIndex = next);
       }
@@ -104,6 +108,9 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
         builder: (context, _) => NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (i) {
+          if (_selectedIndex == 2 && i != 2) {
+            ref.read(ttsServiceProvider).stop();
+          }
           setState(() => _selectedIndex = i);
           ref.read(shellTabIndexProvider.notifier).set(i);
         },

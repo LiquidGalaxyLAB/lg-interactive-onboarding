@@ -107,13 +107,15 @@ class MentorService extends ChangeNotifier {
 
       // Speak the response if TTS is enabled.
       if (_ttsEnabled) {
-        _ref.read(ttsServiceProvider).speak(responseText);
+        final cleanText = _cleanTextForSpeech(responseText);
+        _ref.read(ttsServiceProvider).speak(cleanText);
       }
     } catch (e) {
       debugPrint('MentorService: API call failed — $e');
+      final friendlyMsg = _getFriendlyErrorMessage(e);
       _history.add(MentorMessage(
         role: 'model',
-        content: 'Sorry, I couldn\'t reach the AI service right now.\n\nError details: $e\n\nPlease check your API key in Settings and try again.',
+        content: friendlyMsg,
         timestamp: DateTime.now(),
       ));
     } finally {
@@ -156,10 +158,17 @@ class MentorService extends ChangeNotifier {
       ));
     } catch (e) {
       debugPrint('MentorService: System trigger failed — $e');
-      // Remove the trigger message on failure too.
+      // Remove the trigger message on failure.
       if (_history.isNotEmpty && _history.last.role == 'user') {
         _history.removeLast();
       }
+      
+      final friendlyMsg = _getFriendlyErrorMessage(e);
+      _history.add(MentorMessage(
+        role: 'model',
+        content: friendlyMsg,
+        timestamp: DateTime.now(),
+      ));
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -185,10 +194,38 @@ class MentorService extends ChangeNotifier {
   /// Clears all conversation history.
   void clearHistory() {
     _history.clear();
+    _ref.read(ttsServiceProvider).stop();
     notifyListeners();
   }
 
   // ─── Private ──────────────────────────────────────────────────────────────
+
+  String _cleanTextForSpeech(String text) {
+    var cleaned = text.replaceAll(RegExp(r'```[a-zA-Z]*'), ''); // Remove code block starts
+    cleaned = cleaned.replaceAll('```', ''); // Remove code block ends
+    cleaned = cleaned.replaceAll('`', ''); // Remove inline backticks
+    cleaned = cleaned.replaceAll('**', ''); // Remove bold
+    cleaned = cleaned.replaceAll('*', ''); // Remove italic/list
+    cleaned = cleaned.replaceAll('__', ''); // Remove underline
+    cleaned = cleaned.replaceAll(RegExp(r'#+\s'), ''); // Remove headers
+    return cleaned.trim();
+  }
+
+  String _getFriendlyErrorMessage(Object e) {
+    final errorStr = e.toString().toLowerCase();
+    
+    if (errorStr.contains('429') || errorStr.contains('rate limit') || errorStr.contains('rate_limit')) {
+      return 'I have reached my daily rate limit for the free AI model! To continue chatting today, you may need to add a few credits to your OpenRouter account, or wait until the limit resets tomorrow.';
+    } else if (errorStr.contains('401') || errorStr.contains('403') || errorStr.contains('unauthorized')) {
+      return 'My API key appears to be invalid or missing. Please tap the Settings tab and double-check your OpenRouter API key.';
+    } else if (errorStr.contains('402') || errorStr.contains('insufficient_quota')) {
+      return 'Your OpenRouter account has run out of credits. Please top up your balance on the OpenRouter dashboard to continue.';
+    } else if (errorStr.contains('socketexception') || errorStr.contains('failed host lookup') || errorStr.contains('network')) {
+      return 'I couldn\'t connect to the AI service. Please check the tablet\'s Wi-Fi connection and try again.';
+    }
+    
+    return 'Sorry, I ran into an unexpected hiccup trying to reach the AI service. Please try again in a moment.\n\n(Technical detail: $e)';
+  }
 
   /// Makes the API call to OpenRouter (OpenAI-compatible endpoint).
   Future<String> _callOpenRouter({required String userPrompt}) async {
