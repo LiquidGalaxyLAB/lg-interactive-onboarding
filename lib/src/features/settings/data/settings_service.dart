@@ -25,6 +25,7 @@ class SettingsService {
   static const _keyRigs = 'rigs';
   static const _keyThemeMode = 'themeMode';
   static const _keyVoiceNarration = 'voiceNarration';
+  static const _keyTtsVoice = 'ttsVoice';
 
   // ─── Getters ───────────────────────────────────────────────────────
   String get host => _prefs.getString(_keyHost) ?? AppConstants.defaultSshHost;
@@ -32,10 +33,11 @@ class SettingsService {
   String get username => _prefs.getString(_keyUsername) ?? AppConstants.defaultSshUsername;
   String get password => _cachedPassword;
   String get geminiApiKey => _cachedGeminiApiKey;
-  String get geminiModel => _cachedGeminiModel.isEmpty ? 'google/gemini-2.5-flash:free' : _cachedGeminiModel;
+  String get geminiModel => _cachedGeminiModel.isEmpty ? 'inclusionai/ling-3.0-flash:free' : _cachedGeminiModel;
   int get rigs => _prefs.getInt(_keyRigs) ?? AppConstants.defaultRigsCount;
   ThemeMode get themeMode => _parseThemeMode(_prefs.getString(_keyThemeMode));
   bool get voiceNarration => _prefs.getBool(_keyVoiceNarration) ?? true;
+  String get ttsVoice => _prefs.getString(_keyTtsVoice) ?? '';
 
   // ─── Setters ───────────────────────────────────────────────────────
   Future<void> setHost(String value) => _prefs.setString(_keyHost, value);
@@ -59,6 +61,8 @@ class SettingsService {
       _prefs.setString(_keyThemeMode, value.name);
   Future<void> setVoiceNarration(bool value) =>
       _prefs.setBool(_keyVoiceNarration, value);
+  Future<void> setTtsVoice(String value) =>
+      _prefs.setString(_keyTtsVoice, value);
 
   ThemeMode _parseThemeMode(String? value) {
     switch (value) {
@@ -98,7 +102,7 @@ final settingsServiceProvider = Provider<SettingsService>((ref) {
   final secureStorage = ref.watch(secureStorageProvider);
   final initialPassword = ref.watch(initialPasswordProvider);
   final initialGeminiApiKey = ref.watch(initialGeminiApiKeyProvider);
-  final initialGeminiModel = prefs.getString('geminiModel') ?? 'google/gemini-2.5-flash:free';
+  final initialGeminiModel = prefs.getString('geminiModel') ?? 'inclusionai/ling-3.0-flash:free';
   return SettingsService(prefs, secureStorage, initialPassword, initialGeminiApiKey, initialGeminiModel);
 });
 
