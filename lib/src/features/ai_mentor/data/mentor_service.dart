@@ -198,7 +198,7 @@ class MentorService extends ChangeNotifier {
     }
 
     final contextData = _ref.read(mentorContextServiceProvider).buildContext();
-    final ragResults = _ref.read(ragServiceProvider).search(userPrompt);
+    final ragResults = await _ref.read(ragServiceProvider).search(userPrompt);
     
     // Inject app context as a hidden note appended to the user prompt.
     String promptWithContext = userPrompt;
