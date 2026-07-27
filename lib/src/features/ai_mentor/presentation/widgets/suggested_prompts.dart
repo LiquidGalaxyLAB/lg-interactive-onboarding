@@ -9,11 +9,11 @@ class SuggestedPrompts extends StatelessWidget {
   const SuggestedPrompts({super.key, required this.onPromptTap});
 
   static const _suggestions = [
-    '🔌 How do I connect via SSH?',
-    '🌍 What is KML?',
-    '🖥️ Explain the LG rig architecture',
-    '🧊 How do I place a 3D model?',
-    '📚 What learning modules are available?',
+    'How do I connect via SSH?',
+    'What is KML?',
+    'Explain the LG rig architecture',
+    'How do I place a 3D model?',
+    'What learning modules are available?',
   ];
 
   @override

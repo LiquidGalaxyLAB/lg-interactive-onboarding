@@ -223,7 +223,7 @@ class _MentorScreenState extends ConsumerState<MentorScreen> {
             const SizedBox(height: 20),
 
             Text(
-              'Hi! I\'m LG Mentor 👋',
+              'Hi! I\'m LG Mentor',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
