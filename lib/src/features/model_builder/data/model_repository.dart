@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,7 +8,6 @@ import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/system_kml_service.dart';
-import 'package:path/path.dart' as p;
 
 /// Repository for 3D model operations: KML generation, file handling, SSH push.
 ///
@@ -88,9 +86,9 @@ class ModelRepository {
           <roll>${project.roll}</roll>
         </Orientation>
         <Scale>
-          <x>${project.scaleX}</x>
-          <y>${project.scaleY}</y>
-          <z>${project.scaleZ}</z>
+          <x>1.0</x>
+          <y>1.0</y>
+          <z>1.0</z>
         </Scale>
       </Model>
     </Placemark>
@@ -118,30 +116,11 @@ class ModelRepository {
     <roll>${project.roll}</roll>
   </Orientation>
   <Scale>
-    <x>${project.scaleX}</x>
-    <y>${project.scaleY}</y>
-    <z>${project.scaleZ}</z>
+    <x>1.0</x>
+    <y>1.0</y>
+    <z>1.0</z>
   </Scale>
 </Model>''';
-  }
-
-  // ─── KMZ Handling ────────────────────────────────────────────────
-
-  Future<List<MapEntry<String, Uint8List>>> extractKmz(String kmzPath) async {
-    final results = <MapEntry<String, Uint8List>>[];
-    try {
-      final bytes = await File(kmzPath).readAsBytes();
-      final archive = ZipDecoder().decodeBytes(bytes);
-      for (final file in archive.files) {
-        if (file.isFile) {
-          final data = file.content as List<int>;
-          results.add(MapEntry(file.name, Uint8List.fromList(data)));
-        }
-      }
-    } catch (e) {
-      debugPrint('KMZ extraction failed: $e');
-    }
-    return results;
   }
 
   // ─── Assimp Prerequisite Check ─────────────────────────────────
@@ -288,7 +267,7 @@ class ModelRepository {
   ///   2. Ensure `lxml` (Python dependency) is installed.
   ///   3. Run the script: input → temp output.
   ///   4. Overwrite the original with the triangulated result.
-  Future<void> _triangulateDaeWithScript(String remoteDaePath) async {
+  Future<void> _triangulateDaeWithScript(String remoteDaePath, double sx, double sy, double sz) async {
     if (!_sshService.isConnected) throw Exception('SSH not connected.');
     final triangulatedTempPath = '${remoteDaePath}_tri_tmp.dae';
     const remoteScriptPath = AppConstants.lgRemoteScriptPath;
@@ -309,8 +288,8 @@ class ModelRepository {
       // 2. Ensure lxml is available
       await _ensureLxmlInstalled();
 
-      // 3. Run the triangulation script
-      final triOutput = await _execute('python3 $remoteScriptPath "$remoteDaePath" "$triangulatedTempPath" 2>&1');
+      // 3. Run the triangulation script with scaling
+      final triOutput = await _execute('python3 $remoteScriptPath "$remoteDaePath" "$triangulatedTempPath" --scale-x $sx --scale-y $sy --scale-z $sz 2>&1');
       debugPrint('Triangulate: script output: $triOutput');
 
       // 4. Verify the triangulated file was created
@@ -351,72 +330,60 @@ class ModelRepository {
       await _execute('mkdir -p $_modelDir && mkdir -p $_wrapperDir && mkdir -p /var/www/html/kml');
 
       // 2. Upload and process model file
-      if (ext == '.kmz') {
-        // ── KMZ path: extract and upload contents (unchanged) ──
-        final entries = await extractKmz(project.filePath!);
-        for (final entry in entries) {
-          final remotePath = '$_modelDir/${project.id}_${entry.key}';
-          await _execute('mkdir -p ${p.posix.dirname(remotePath)}');
-          await _sshService.uploadBytes(bytes: entry.value, remotePath: remotePath);
-          await _channelDelay();
-        }
+      final fileBytes = await File(project.filePath!).readAsBytes();
+
+      // The final path on the server (what KML will reference)
+      final remoteModelPath = '$_modelDir/${project.remoteModelFileName}';
+
+      // Upload with a "raw_" prefix, then let Assimp process/triangulate it
+      final safeRawName = project.fileName?.replaceAll(' ', '_') ?? 'unnamed';
+      final rawUploadPath = '$_modelDir/raw_${project.id}_$safeRawName';
+
+      await _sshService.uploadBytes(bytes: fileBytes, remotePath: rawUploadPath);
+      await _channelDelay();
+
+      if (ext == '.dae' || ext == '.kmz') {
+        // Bypass Assimp conversion since the file is already a DAE or KMZ.
+        // The Python script will handle triangulation next.
+        await _execute('mv -f "$rawUploadPath" "$remoteModelPath"');
       } else {
-        // ── All other formats (DAE, OBJ, FBX, GLTF, GLB, etc.) ──
-        final fileBytes = await File(project.filePath!).readAsBytes();
-
-        // The final .dae path on the server (what KML will reference)
-        final remoteDaePath = '$_modelDir/${project.remoteModelFileName}';
-
-        // Upload with a "raw_" prefix, then let Assimp process/triangulate it
-        final safeRawName = project.fileName?.replaceAll(' ', '_') ?? 'unnamed';
-        final rawUploadPath = '$_modelDir/raw_${project.id}_$safeRawName';
-
-        await _sshService.uploadBytes(bytes: fileBytes, remotePath: rawUploadPath);
-        await _channelDelay();
-
-        if (ext == '.dae') {
-          // Bypass Assimp conversion since the file is already a DAE.
-          // The Python script will handle triangulation next.
-          await _execute('mv -f "$rawUploadPath" "$remoteDaePath"');
-        } else {
-          // Ensure assimp is available
-          try {
-            await _ensureAssimpInstalled();
-          } catch (e) {
-            await _execute('rm -f "$rawUploadPath"');
-            return PushResult(
-              success: false,
-              message: 'Failed to install assimp: $e',
-            );
-          }
-
-          // Convert/Triangulate to .dae (deletes the raw file on success)
-          try {
-            await _convertToCollada(
-              uploadedFilePath: rawUploadPath,
-              targetDaePath: remoteDaePath,
-            );
-          } catch (e) {
-            return PushResult(
-              success: false,
-              message: 'Model conversion failed: $e',
-            );
-          }
-          await _channelDelay();
+        // Ensure assimp is available
+        try {
+          await _ensureAssimpInstalled();
+        } catch (e) {
+          await _execute('rm -f "$rawUploadPath"');
+          return PushResult(
+            success: false,
+            message: 'Failed to install assimp: $e',
+          );
         }
 
-        // 3. Triangulate the .dae in-place using Python script
-        //    (converts <polylist>/<polygons> → <triangles> for Google Earth)
+        // Convert/Triangulate to .dae (deletes the raw file on success)
         try {
-          await _triangulateDaeWithScript(remoteDaePath);
+          await _convertToCollada(
+            uploadedFilePath: rawUploadPath,
+            targetDaePath: remoteModelPath,
+          );
         } catch (e) {
           return PushResult(
             success: false,
-            message: 'DAE triangulation failed: $e',
+            message: 'Model conversion failed: $e',
           );
         }
         await _channelDelay();
       }
+
+      // 3. Triangulate the model in-place using Python script
+      //    (converts <polylist>/<polygons> → <triangles> for Google Earth)
+      try {
+        await _triangulateDaeWithScript(remoteModelPath, project.scaleX, project.scaleY, project.scaleZ);
+      } catch (e) {
+        return PushResult(
+          success: false,
+          message: 'Model processing failed: $e',
+        );
+      }
+      await _channelDelay();
 
       // 5. Generate and upload this model's KML to wrapper directory
       final kml = generateKml(project);
@@ -428,9 +395,7 @@ class ModelRepository {
 
       // Set proper permissions for the web server to read the model and KML
       await _execute('chmod 644 "$_wrapperDir/${project.remoteKmlFileName}"');
-      if (ext != '.kmz') {
-        await _execute('chmod 644 "$_modelDir/${project.remoteModelFileName}"');
-      }
+      await _execute('chmod 644 "$_modelDir/${project.remoteModelFileName}"');
 
       // 6. Build wrapper master.kml with NetworkLinks for ALL deployed models
       final allKmlFiles = <String>[
