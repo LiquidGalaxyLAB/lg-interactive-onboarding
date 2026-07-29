@@ -21,7 +21,7 @@ class AppConstants {
   static const Duration pushStateResetDelay = Duration(seconds: 3);
 
   // ─── Model Builder Defaults ──────────────────────────────────────────
-  static const double defaultScale = 1000.0;
+  static const double defaultScale = 1.0;
   static const double defaultAltitude = 10.0;
   static const double defaultCameraTilt = 60.0;
   static const int idMaxRandom = 9999;
