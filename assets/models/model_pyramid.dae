@@ -5,8 +5,8 @@
       <author>Blender User</author>
       <authoring_tool>Blender 4.5.11 LTS commit date:2026-06-22, commit time:11:08, hash:4db51e9d1e1e</authoring_tool>
     </contributor>
-    <created>2026-06-30T18:58:51</created>
-    <modified>2026-06-30T18:58:51</modified>
+    <created>2026-07-29T15:10:51</created>
+    <modified>2026-07-29T15:10:51</modified>
     <unit name="meter" meter="1"/>
     <up_axis>Z_UP</up_axis>
   </asset>
@@ -21,9 +21,9 @@
             <diffuse>
               <color sid="diffuse">1 0 0 1</color>
             </diffuse>
-            <index_of_refraction>
-              <float sid="ior">1.5</float>
-            </index_of_refraction>
+            <reflectivity>
+              <float sid="specular">0.5</float>
+            </reflectivity>
           </lambert>
         </technique>
       </profile_COMMON>
@@ -38,9 +38,9 @@
             <diffuse>
               <color sid="diffuse">0 1 0 1</color>
             </diffuse>
-            <index_of_refraction>
-              <float sid="ior">1.5</float>
-            </index_of_refraction>
+            <reflectivity>
+              <float sid="specular">0.5</float>
+            </reflectivity>
           </lambert>
         </technique>
       </profile_COMMON>
@@ -55,9 +55,9 @@
             <diffuse>
               <color sid="diffuse">0 0 1 1</color>
             </diffuse>
-            <index_of_refraction>
-              <float sid="ior">1.5</float>
-            </index_of_refraction>
+            <reflectivity>
+              <float sid="specular">0.5</float>
+            </reflectivity>
           </lambert>
         </technique>
       </profile_COMMON>
@@ -72,9 +72,9 @@
             <diffuse>
               <color sid="diffuse">1 1 0 1</color>
             </diffuse>
-            <index_of_refraction>
-              <float sid="ior">1.5</float>
-            </index_of_refraction>
+            <reflectivity>
+              <float sid="specular">0.5</float>
+            </reflectivity>
           </lambert>
         </technique>
       </profile_COMMON>
@@ -89,9 +89,9 @@
             <diffuse>
               <color sid="diffuse">1 0 1 1</color>
             </diffuse>
-            <index_of_refraction>
-              <float sid="ior">1.5</float>
-            </index_of_refraction>
+            <reflectivity>
+              <float sid="specular">0.5</float>
+            </reflectivity>
           </lambert>
         </technique>
       </profile_COMMON>
@@ -106,9 +106,9 @@
             <diffuse>
               <color sid="diffuse">0 1 1 1</color>
             </diffuse>
-            <index_of_refraction>
-              <float sid="ior">1.5</float>
-            </index_of_refraction>
+            <reflectivity>
+              <float sid="specular">0.5</float>
+            </reflectivity>
           </lambert>
         </technique>
       </profile_COMMON>
@@ -149,7 +149,7 @@
           </technique_common>
         </source>
         <source id="PyramidMesh-mesh-normals">
-          <float_array id="PyramidMesh-mesh-normals-array" count="54">0 4.77711e-5 -1 -4.77711e-5 0 -1 3.37806e-5 -3.3778e-5 -1 0 -4.77711e-5 -1 4.77711e-5 0 -1 -3.37806e-5 3.3778e-5 -1 2.53611e-6 -0.9119223 0.410363 2.13459e-6 -0.9119223 0.410363 -7.72998e-7 -0.9119223 0.410363 0.9119223 2.53611e-6 0.410363 0.9119223 2.13459e-6 0.410363 0.9119223 -7.72998e-7 0.410363 -2.53611e-6 0.9119223 0.410363 -2.13459e-6 0.9119223 0.410363 7.72998e-7 0.9119223 0.410363 -0.9119223 -2.53611e-6 0.410363 -0.9119223 -2.13459e-6 0.410363 -0.9119223 7.72998e-7 0.410363</float_array>
+          <float_array id="PyramidMesh-mesh-normals-array" count="54">0 4.77711e-5 -1 -4.77711e-5 0 -1 3.37806e-5 -3.3778e-5 -1 0 -4.77711e-5 -1 4.77711e-5 0 -1 -3.37806e-5 3.3778e-5 -1 2.53611e-6 -0.9119223 0.410363 2.13459e-6 -0.9119223 0.410363 -1.82074e-6 -0.9119223 0.410363 0.9119223 2.53611e-6 0.410363 0.9119223 2.13459e-6 0.410363 0.9119223 -1.82074e-6 0.410363 -2.53611e-6 0.9119223 0.410363 -2.13459e-6 0.9119223 0.410363 1.82074e-6 0.9119223 0.410363 -0.9119223 -2.53611e-6 0.410363 -0.9119223 -2.13459e-6 0.410363 -0.9119223 1.82074e-6 0.410363</float_array>
           <technique_common>
             <accessor source="#PyramidMesh-mesh-normals-array" count="18" stride="3">
               <param name="X" type="float"/>
@@ -197,7 +197,7 @@
   <library_visual_scenes>
     <visual_scene id="Scene" name="Scene">
       <node id="Pyramid" name="Pyramid" type="NODE">
-        <matrix sid="transform">1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1</matrix>
+        <matrix sid="transform">25.00618 0 0 0 0 25.00618 0 0 0 0 25.00618 0 0 0 0 1</matrix>
         <instance_geometry url="#PyramidMesh-mesh" name="Pyramid">
           <bind_material>
             <technique_common>
