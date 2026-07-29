@@ -10,6 +10,7 @@ import 'package:lg_interactive_onboarding/src/common/theme/app_theme.dart';
 import 'package:lg_interactive_onboarding/src/features/architecture_explorer/presentation/architecture_explorer_screen.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/presentation/model_builder_screen.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
+import 'package:lg_interactive_onboarding/src/common/ssh/system_kml_service.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/presentation/settings_screen.dart';
 import 'package:lg_interactive_onboarding/src/features/splash/presentation/splash_screen.dart';
@@ -55,6 +56,9 @@ class LGContentStudioApp extends ConsumerWidget {
     // Activate the logo connection watcher for the full app lifetime.
     // This sends the logo on SSH connect and clears it on disconnect / app exit.
     ref.read(logoConnectionWatcherProvider);
+    
+    // Activate the system KML watcher to initialize static KML topology on connect.
+    ref.read(systemConnectionWatcherProvider);
 
     return MaterialApp(
       navigatorKey: navigatorKey,

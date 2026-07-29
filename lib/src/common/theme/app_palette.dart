@@ -53,6 +53,9 @@ class AppPalette {
   /// Google Blue used as the 3-D Model Builder feature accent.
   static const modelBuilderIndigo = Color(0xFF1A73E8);
 
+  /// Teal accent for the KML Playground feature card.
+  static const kmlPlaygroundTeal = Color(0xFF009688);
+
   // ── Dark-theme semantic overrides (for convenience references) ─────────────
   /// Success green on dark backgrounds.
   static const successDark   = Color(0xFF72DD87);

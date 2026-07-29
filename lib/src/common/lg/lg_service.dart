@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
-import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 
 /// Service for controlling the Liquid Galaxy rig.
@@ -11,7 +10,6 @@ import 'package:lg_interactive_onboarding/src/features/settings/data/settings_se
 class LGService {
   final SSHService _sshService;
   final SettingsService _settingsService;
-
   LGService(this._sshService, this._settingsService);
 
   /// Helper to ensure SSH is connected before running commands.
@@ -100,62 +98,6 @@ class LGService {
 
   // ─── KML Commands ─────────────────────────────────────────────────
 
-  /// Forces Google Earth to refresh the master KML by toggling refresh interval.
-  Future<bool> refreshMasterKml() async {
-    if (!_isReady) return false;
-
-    try {
-      // Add refresh interval
-      await _sshService.execute(
-        'sed -i "s|<href>[^<]*master.kml<\\/href>|&<refreshMode>onInterval<\\/refreshMode><refreshInterval>1<\\/refreshInterval>|" ~/earth/kml/master/myplaces.kml',
-      );
-
-      await Future.delayed(AppConstants.kmlRefreshDelay);
-
-      // Remove refresh interval (revert)
-      await _sshService.execute(
-        'sed -i "s|<href>[^<]*master.kml<\\/href><refreshMode>onInterval<\\/refreshMode><refreshInterval>[0-9]\\+<\\/refreshInterval>|<href>##LG_PHPIFACE##kml/master.kml<\\/href>|" ~/earth/kml/master/myplaces.kml',
-      );
-
-      debugPrint('LGService: Master KML refreshed');
-      return true;
-    } catch (e) {
-      debugPrint('LGService: Refresh master KML failed: $e');
-      return false;
-    }
-  }
-
-  /// Clears all KML from the master screen by writing an empty KML
-  /// to /var/www/html/kml/master.kml, removing all NetworkLinks.
-  Future<bool> clearKml() async {
-    if (!_isReady) return false;
-
-    try {
-      final blankKml = '''<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2">
-  <Document>
-    <name>Cleared</name>
-    <description>All content cleared</description>
-  </Document>
-</kml>''';
-
-      await _sshService.uploadFile(
-        localData: blankKml,
-        remotePath: '/var/www/html/kml/master.kml',
-      );
-
-      // Delay before refresh to avoid SSH channel exhaustion
-      await Future.delayed(AppConstants.kmlClearDelay);
-      await refreshMasterKml();
-
-      debugPrint('LGService: KML cleared');
-      return true;
-    } catch (e) {
-      debugPrint('LGService: Clear KML failed: $e');
-      return false;
-    }
-  }
-
   /// Commands Liquid Galaxy to fly to a specific coordinate and orientation.
   Future<bool> flyTo({
     required double latitude,
@@ -185,6 +127,33 @@ class LGService {
       return true;
     } catch (e) {
       debugPrint('LGService: FlyTo failed: $e');
+      return false;
+    }
+  }
+
+  /// Commands Liquid Galaxy to play a named gx:Tour in the loaded KML.
+  Future<bool> playTour(String tourName) async {
+    if (!_isReady) return false;
+    try {
+      final command = 'echo "playtour=$tourName" > /tmp/query.txt';
+      await _sshService.execute(command);
+      debugPrint('LGService: Playing tour "$tourName"');
+      return true;
+    } catch (e) {
+      debugPrint('LGService: playTour failed: $e');
+      return false;
+    }
+  }
+
+  /// Stops any currently playing tour on the Liquid Galaxy.
+  Future<bool> stopTour() async {
+    if (!_isReady) return false;
+    try {
+      await _sshService.execute('echo "exittour=true" > /tmp/query.txt');
+      debugPrint('LGService: Tour stopped');
+      return true;
+    } catch (e) {
+      debugPrint('LGService: stopTour failed: $e');
       return false;
     }
   }

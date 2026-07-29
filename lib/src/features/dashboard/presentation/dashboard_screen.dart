@@ -7,6 +7,7 @@ import 'package:lg_interactive_onboarding/src/features/model_builder/presentatio
 import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/presentation/settings_screen.dart';
+import 'package:lg_interactive_onboarding/src/features/kml_playground/presentation/kml_playground_screen.dart';
 
 import 'widgets/dashboard_palette.dart';
 import 'widgets/connection_chip.dart';
@@ -14,7 +15,6 @@ import 'widgets/status_banner.dart';
 import 'widgets/section_header.dart';
 import 'widgets/feature_card.dart';
 import 'widgets/deep_clean_card.dart';
-import 'widgets/clear_logo_card.dart';
 
 /// Main dashboard — the hub after connecting to the LG rig.
 ///
@@ -130,6 +130,23 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                 ),
 
+                const SizedBox(height: 12),
+
+                // KML Playground — experiment with KML elements
+                FeatureCard(
+                  title: 'KML Playground',
+                  subtitle: 'Create and tweak KML elements — push live to Liquid Galaxy',
+                  icon: Icons.science_outlined,
+                  accentColor: DashboardPalette.kmlPlaygroundTeal,
+                  isDark: isDark,
+                  spotlightKey: 'kml_playground_card',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const KmlPlaygroundScreen(),
+                    ),
+                  ),
+                ),
+
                 const SizedBox(height: 28),
 
                 // ─── Section: Maintenance ──────────────────────
@@ -142,11 +159,6 @@ class DashboardScreen extends ConsumerWidget {
 
                 // Deep Clean card
                 DeepCleanCard(isDark: isDark),
-
-                const SizedBox(height: 12),
-
-                // Clear Logo card
-                ClearLogoCard(isDark: isDark),
 
                 const SizedBox(height: 32),
               ]),

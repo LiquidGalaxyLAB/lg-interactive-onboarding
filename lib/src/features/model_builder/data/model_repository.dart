@@ -8,6 +8,7 @@ import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_project.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
+import 'package:lg_interactive_onboarding/src/common/ssh/system_kml_service.dart';
 import 'package:path/path.dart' as p;
 
 /// Repository for 3D model operations: KML generation, file handling, SSH push.
@@ -22,8 +23,9 @@ import 'package:path/path.dart' as p;
 class ModelRepository {
   final SSHService _sshService;
   final SettingsService _settingsService;
+  final SystemKmlService _systemKmlService;
 
-  ModelRepository(this._sshService, this._settingsService);
+  ModelRepository(this._sshService, this._settingsService, this._systemKmlService);
 
   /// Session-level cache: avoids re-checking assimp installation on every push.
   /// Also caches lxml (Python dependency for triangulation script).
@@ -33,7 +35,6 @@ class ModelRepository {
   // ─── Constants ───────────────────────────────────────────────────
   static const _modelDir = AppConstants.lgModelDir;
   static const _wrapperDir = AppConstants.lgWrapperDir;
-  static const _systemMasterKml = AppConstants.lgSystemMasterKml;
   static const _wrapperMasterKml = AppConstants.lgWrapperMasterKml;
 
   /// Small delay between SSH channel operations to avoid channel exhaustion.
@@ -73,6 +74,7 @@ class ModelRepository {
       <Model>
         <Link>
           <href>http://lg1:${AppConstants.lgHttpPort}/model/$remoteModelFile</href>
+          <href>http://lg1:${AppConstants.lgHttpPort}/model/$remoteModelFile</href>
         </Link>
         <Location>
           <latitude>${project.latitude ?? 0.0}</latitude>
@@ -102,6 +104,7 @@ class ModelRepository {
 
     return '''<Model>
   <Link>
+    <href>http://lg1:${AppConstants.lgHttpPort}/model/$remoteModelFile</href>
     <href>http://lg1:${AppConstants.lgHttpPort}/model/$remoteModelFile</href>
   </Link>
   <Location>
@@ -430,6 +433,12 @@ class ModelRepository {
         await _execute('chmod 644 "$_modelDir/${project.remoteModelFileName}"');
       }
 
+      // Set proper permissions for the web server to read the model and KML
+      await _execute('chmod 644 "$_wrapperDir/${project.remoteKmlFileName}"');
+      if (ext != '.kmz') {
+        await _execute('chmod 644 "$_modelDir/${project.remoteModelFileName}"');
+      }
+
       // 6. Build wrapper master.kml with NetworkLinks for ALL deployed models
       final allKmlFiles = <String>[
         ...existingDeployments.map((d) => d.remoteKmlFileName),
@@ -438,9 +447,7 @@ class ModelRepository {
       await _writeWrapperMasterKml(allKmlFiles);
       await _channelDelay();
 
-      // 7. Write system master.kml with NetworkLink to wrapper master
-      await _writeSystemMasterKml();
-      await _channelDelay();
+      // 7. System master KML is handled by SystemKmlService
 
       // 8. Force refresh
       await _forceRefresh();
@@ -471,6 +478,8 @@ class ModelRepository {
     try {
       // 1. Rewrite wrapper master.kml with only the remaining models FIRST
       // This prevents Google Earth from trying to fetch a deleted model and throwing a 404 error
+      // 1. Rewrite wrapper master.kml with only the remaining models FIRST
+      // This prevents Google Earth from trying to fetch a deleted model and throwing a 404 error
       final remainingKmlFiles =
           remainingDeployments.map((d) => d.remoteKmlFileName).toList();
 
@@ -481,12 +490,20 @@ class ModelRepository {
       }
       await _channelDelay();
 
-      // 3. Update system master
-      await _writeSystemMasterKml();
-      await _channelDelay();
+      // 3. System master is handled by SystemKmlService
 
       // 4. Force refresh to unload the model in Google Earth
+      // 4. Force refresh to unload the model in Google Earth
       await _forceRefresh();
+      
+      // Wait a moment for Google Earth to process the refresh before deleting files
+      await Future.delayed(const Duration(seconds: 2));
+
+      // 5. Now it is safe to remove the model file AND its KML file
+      await _execute(
+        'rm -f $_modelDir/${model.remoteModelFileName} && '
+        'rm -f $_wrapperDir/${model.remoteKmlFileName}',
+      );
       
       // Wait a moment for Google Earth to process the refresh before deleting files
       await Future.delayed(const Duration(seconds: 2));
@@ -515,10 +532,10 @@ class ModelRepository {
       await _writeEmptyWrapperMasterKml();
       await _channelDelay();
 
-      await _writeSystemMasterKml();
-      await _channelDelay();
-
       await _forceRefresh();
+      
+      await Future.delayed(const Duration(seconds: 2));
+      await _execute('rm -f $_modelDir/* && rm -f $_wrapperDir/*');
       
       await Future.delayed(const Duration(seconds: 2));
       await _execute('rm -f $_modelDir/* && rm -f $_wrapperDir/*');
@@ -538,9 +555,6 @@ class ModelRepository {
 
     try {
       await _writeEmptyWrapperMasterKml();
-      await _channelDelay();
-
-      await _writeSystemMasterKml();
       await _channelDelay();
 
       await _forceRefresh();
@@ -563,10 +577,10 @@ class ModelRepository {
       await _writeEmptyWrapperMasterKml();
       await _channelDelay();
 
-      await _writeSystemMasterKml();
-      await _channelDelay();
-
       await _forceRefresh();
+
+      await Future.delayed(const Duration(seconds: 2));
+      await _execute('rm -rf $_modelDir/* && rm -rf $_wrapperDir/*');
 
       await Future.delayed(const Duration(seconds: 2));
       await _execute('rm -rf $_modelDir/* && rm -rf $_wrapperDir/*');
@@ -585,6 +599,7 @@ class ModelRepository {
     <NetworkLink>
       <name>$kmlFile</name>
       <Link>
+        <href>http://lg1:${AppConstants.lgHttpPort}/3d_model_wrapper/$kmlFile</href>
         <href>http://lg1:${AppConstants.lgHttpPort}/3d_model_wrapper/$kmlFile</href>
       </Link>
     </NetworkLink>''').join('\n');
@@ -618,40 +633,8 @@ $networkLinks
     );
   }
 
-  Future<void> _writeSystemMasterKml() async {
-    final systemKml = '''<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2"
-     xmlns:gx="http://www.google.com/kml/ext/2.2">
-  <Document>
-    <name>LG Content Studio</name>
-    <NetworkLink>
-      <name>3D Model Wrapper</name>
-      <Link>
-        <href>http://lg1:${AppConstants.lgHttpPort}/3d_model_wrapper/master.kml</href>
-      </Link>
-    </NetworkLink>
-  </Document>
-</kml>''';
-
-    await _sshService.uploadFile(
-      localData: systemKml,
-      remotePath: _systemMasterKml,
-    );
-  }
-
-  /// Forces LG to refresh the master KML by toggling refresh interval.
-  /// Both sed commands are batched into a single call with a sleep between.
   Future<void> _forceRefresh() async {
-    try {
-      // Batch both sed commands with a sleep between them into ONE channel
-      await _execute(
-        'sed -i "s|<href>[^<]*master.kml<\\/href>|&<refreshMode>onInterval<\\/refreshMode><refreshInterval>1<\\/refreshInterval>|" ~/earth/kml/master/myplaces.kml && '
-        'sleep 1 && '
-        'sed -i "s|<href>[^<]*master.kml<\\/href><refreshMode>onInterval<\\/refreshMode><refreshInterval>[0-9]\\+<\\/refreshInterval>|<href>##LG_PHPIFACE##kml/master.kml<\\/href>|" ~/earth/kml/master/myplaces.kml',
-      );
-    } catch (e) {
-      debugPrint('Force refresh failed: $e');
-    }
+    await _systemKmlService.forceRefreshAll();
   }
 
   // ─── DAE Info Extraction ─────────────────────────────────────────
@@ -699,5 +682,6 @@ final modelRepositoryProvider = Provider<ModelRepository>((ref) {
   return ModelRepository(
     ref.watch(sshServiceProvider),
     ref.watch(settingsServiceProvider),
+    ref.watch(systemKmlServiceProvider),
   );
 });

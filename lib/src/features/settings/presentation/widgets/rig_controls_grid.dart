@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/common/lg/lg_service.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
+import 'package:lg_interactive_onboarding/src/common/ssh/system_kml_service.dart';
+import 'package:lg_interactive_onboarding/src/features/kml_playground/data/kml_playground_service.dart';
 import 'package:lg_interactive_onboarding/src/common/theme/app_palette.dart';
 
 class RigControlsGrid extends ConsumerWidget {
@@ -96,13 +98,11 @@ class RigControlsGrid extends ConsumerWidget {
                     isDark: isDark,
                     enabled: isConnected,
                     onTap: () async {
-                      final ok = await ref.read(lgServiceProvider).refreshMasterKml();
+                      final ok = await ref.read(systemKmlServiceProvider).forceRefreshAll();
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(ok
-                                ? 'Master KML refreshed'
-                                : 'Refresh failed'),
+                            content: Text(ok ? 'Master KML refreshed' : 'Refresh failed'),
                             backgroundColor: ok ? AppPalette.sage : AppPalette.terracotta,
                             duration: const Duration(seconds: 2),
                           ),
@@ -127,7 +127,7 @@ class RigControlsGrid extends ConsumerWidget {
                     isDark: isDark,
                     enabled: isConnected,
                     onTap: () async {
-                      final ok = await ref.read(lgServiceProvider).clearKml();
+                      final ok = await ref.read(kmlPlaygroundServiceProvider).clearKml();
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(

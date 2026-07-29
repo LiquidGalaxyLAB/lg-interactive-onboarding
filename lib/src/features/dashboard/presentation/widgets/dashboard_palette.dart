@@ -16,4 +16,5 @@ class DashboardPalette {
   static const inkDark        = AppPalette.inkDark;
   static const deepCleanRed   = AppPalette.deepCleanRed;
   static const modelBuilderIndigo = AppPalette.modelBuilderIndigo;
+  static const kmlPlaygroundTeal  = AppPalette.kmlPlaygroundTeal;
 }
