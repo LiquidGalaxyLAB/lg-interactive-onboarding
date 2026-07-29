@@ -44,6 +44,9 @@ Compatible with Python 3.4+.
 import sys
 import os
 import argparse
+import zipfile
+import tempfile
+import glob
 from lxml import etree
 
 # ---------------------------------------------------------------------------
@@ -300,14 +303,78 @@ def _strip_transparency(root):
     if count > 0:
         print("NOTE  : Removed %d transparency-related tags to prevent Google Earth invisibility bug." % count)
 
+def _normalize_shaders(root):
+    """
+    Downgrade <phong> to <lambert> to prevent physical rig shader crashes.
+    Remove <index_of_refraction>.
+    Brighten dark <diffuse> <color> arrays so models aren't pure black when unlit.
+    """
+    phong_count = 0
+    ior_count = 0
+    diffuse_brightened = 0
+
+    # 1. Downgrade phong to lambert
+    for phong in root.iter(_ns("phong")):
+        phong.tag = _ns("lambert")
+        phong_count += 1
+    
+    # 2. Strip IOR
+    for ior in root.iter(_ns("index_of_refraction")):
+        parent = ior.getparent()
+        if parent is not None:
+            parent.remove(ior)
+            ior_count += 1
+
+    if phong_count > 0:
+        print("NOTE  : Downgraded %d <phong> shaders to <lambert>." % phong_count)
+    if ior_count > 0:
+        print("NOTE  : Removed %d <index_of_refraction> tags." % ior_count)
+
+def _apply_vertex_scale(root, sx, sy, sz):
+    """
+    Multiply all vertex coordinates by the given scale factors.
+    """
+    if sx == 1.0 and sy == 1.0 and sz == 1.0:
+        return
+
+    count = 0
+    position_source_ids = set()
+    for vertices in root.iter(_ns("vertices")):
+        for inp in vertices.findall(_ns("input")):
+            if inp.get("semantic") == "POSITION":
+                src = inp.get("source", "")
+                if src.startswith("#"):
+                    position_source_ids.add(src[1:])
+    
+    for source_id in position_source_ids:
+        for source in root.iter(_ns("source")):
+            if source.get("id") == source_id:
+                float_array = source.find(_ns("float_array"))
+                if float_array is not None and (float_array.text or "").strip():
+                    parts = float_array.text.split()
+                    try:
+                        # parts is [x, y, z, x, y, z...]
+                        floats = []
+                        for i in range(0, len(parts), 3):
+                            floats.append(float(parts[i]) * sx)
+                            floats.append(float(parts[i+1]) * sy)
+                            floats.append(float(parts[i+2]) * sz)
+                        float_array.text = " ".join("{0:.6f}".format(v) for v in floats)
+                        count += 1
+                    except ValueError:
+                        pass
+    
+    if count > 0:
+        print("NOTE  : Applied vertex scale factors X:%.2f Y:%.2f Z:%.2f to %d position arrays." % (sx, sy, sz, count))
+
 # ---------------------------------------------------------------------------
 # Main conversion
 # ---------------------------------------------------------------------------
 
-def convert_dae(input_path, output_path):
+def convert_dae_file(input_path, output_path, sx=1.0, sy=1.0, sz=1.0):
     """
     Parse input_path, triangulate all polylist/polygons primitives,
-    write result to output_path.
+    apply vertex scaling, write result to output_path.
 
     Returns the number of primitive elements converted.
     """
@@ -327,6 +394,8 @@ def convert_dae(input_path, output_path):
 
     _normalize_scale_unit(root)
     _strip_transparency(root)
+    _normalize_shaders(root)
+    _apply_vertex_scale(root, sx, sy, sz)
     # Collect ALL polylist / polygons elements anywhere in the document
     primitives = []
     for tag in PRIMITIVE_TAGS:
@@ -427,8 +496,33 @@ def build_parser():
     )
     p.add_argument("input",  help="Path to the source .dae file")
     p.add_argument("output", help="Path for the triangulated output .dae file")
+    p.add_argument("--scale-x", type=float, default=1.0, help="Scale factor for X axis")
+    p.add_argument("--scale-y", type=float, default=1.0, help="Scale factor for Y axis")
+    p.add_argument("--scale-z", type=float, default=1.0, help="Scale factor for Z axis")
     return p
 
+
+def process_kmz(input_path, output_path, sx=1.0, sy=1.0, sz=1.0):
+    print("Extracting KMZ: %s" % input_path)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with zipfile.ZipFile(input_path, 'r') as zf:
+            zf.extractall(tmpdir)
+            
+        dae_files = glob.glob(os.path.join(tmpdir, "**/*.dae"), recursive=True)
+        if not dae_files:
+            print("ERROR: No .dae file found inside KMZ")
+            sys.exit(1)
+            
+        for dae_path in dae_files:
+            convert_dae_file(dae_path, dae_path, sx, sy, sz)
+            
+        print("Re-zipping into: %s" % output_path)
+        with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for root, dirs, files in os.walk(tmpdir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, tmpdir)
+                    zf.write(file_path, arcname)
 
 def main():
     parser = build_parser()
@@ -450,7 +544,10 @@ def main():
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
 
-    convert_dae(input_path, output_path)
+    if input_path.lower().endswith('.kmz'):
+        process_kmz(input_path, output_path, args.scale_x, args.scale_y, args.scale_z)
+    else:
+        convert_dae_file(input_path, output_path, args.scale_x, args.scale_y, args.scale_z)
 
 
 if __name__ == "__main__":
