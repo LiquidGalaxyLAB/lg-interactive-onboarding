@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
@@ -11,6 +12,10 @@ class LGService {
   final SSHService _sshService;
   final SettingsService _settingsService;
   LGService(this._sshService, this._settingsService);
+
+  bool _orbitPlaying = false;
+  Timer? _orbitTimer;
+  bool get isOrbitPlaying => _orbitPlaying;
 
   /// Helper to ensure SSH is connected before running commands.
   bool get _isReady => _sshService.isConnected;
@@ -108,6 +113,9 @@ class LGService {
     double range = 1000,
   }) async {
     if (!_isReady) return false;
+    
+    // Stop any active orbit stream before manually flying
+    await orbitStop();
 
     try {
       final lookAt = '<LookAt>'
@@ -131,6 +139,37 @@ class LGService {
     }
   }
 
+  /// Commands Liquid Galaxy to fly to a coordinate, wait for arrival, and then start an orbit.
+  Future<bool> flyToAndOrbit({
+    required double latitude,
+    required double longitude,
+    required double altitude,
+    required double heading,
+    required double tilt,
+    double range = 1000,
+    int delaySeconds = 6, // Approx time for Google Earth to complete the trailing tour
+  }) async {
+    final success = await flyTo(
+      latitude: latitude,
+      longitude: longitude,
+      altitude: altitude,
+      heading: heading,
+      tilt: tilt,
+      range: range,
+    );
+    if (success) {
+      Future.delayed(Duration(seconds: delaySeconds), () {
+        orbitPlay(
+          latitude: latitude,
+          longitude: longitude,
+          range: range,
+          tilt: tilt,
+        );
+      });
+    }
+    return success;
+  }
+
   /// Commands Liquid Galaxy to play a named gx:Tour in the loaded KML.
   Future<bool> playTour(String tourName) async {
     if (!_isReady) return false;
@@ -149,14 +188,108 @@ class LGService {
   Future<bool> stopTour() async {
     if (!_isReady) return false;
     try {
-      await _sshService.execute('echo "exittour=true" > /tmp/query.txt');
-      debugPrint('LGService: Tour stopped');
+      final command = 'echo "exittour=true" > /tmp/query.txt';
+      await _sshService.execute(command);
+      debugPrint('LGService: Stopped tour');
       return true;
     } catch (e) {
       debugPrint('LGService: stopTour failed: $e');
       return false;
     }
   }
+
+  // ─── Live Stream Orbit ──────────────────────────────────────────────
+
+  /// Flies to a specific LookAt configuration for the orbit frame.
+  Future<void> _flyToOrbit(
+    double latitude,
+    double longitude,
+    double range,
+    double tilt,
+    double heading,
+  ) async {
+    try {
+      final String lookAt = '<LookAt>'
+          '<longitude>$longitude</longitude>'
+          '<latitude>$latitude</latitude>'
+          '<heading>$heading</heading>'
+          '<tilt>$tilt</tilt>'
+          '<range>$range</range>'
+          '<gx:altitudeMode>relativeToGround</gx:altitudeMode>'
+          '</LookAt>';
+      await _sshService.execute('echo "flytoview=$lookAt" > /tmp/query.txt');
+    } catch (error) {
+      debugPrint('LGService: Error in _flyToOrbit: $error');
+    }
+  }
+
+  /// Starts a live streaming orbit around a destination point.
+  Future<bool> orbitPlay({
+    required double latitude,
+    required double longitude,
+    required double range,
+    required double tilt,
+  }) async {
+    if (_orbitPlaying) return false;
+    if (!_isReady) {
+      debugPrint('LGService: Cannot start orbit: LG not connected');
+      return false;
+    }
+
+    // Ensure any existing tour is stopped to prevent conflicts
+    await stopTour();
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    _orbitPlaying = true;
+
+    try {
+      const int steps = 60;
+      const int stepDuration = 400; // milliseconds
+      int currentStep = 0;
+      bool isMoving = false;
+
+      _orbitTimer = Timer.periodic(const Duration(milliseconds: stepDuration), (timer) async {
+        if (!_orbitPlaying || currentStep >= steps) {
+          timer.cancel();
+          _orbitPlaying = false;
+          try {
+            await stopTour(); // Sends exittour=true to stabilize
+          } catch (e) {
+            debugPrint('LGService: Error stopping tour after orbit: $e');
+          }
+          return;
+        }
+
+        if (isMoving) return;
+
+        try {
+          isMoving = true;
+          // Calculate heading
+          double heading = (currentStep * (360.0 / steps)) % 360.0;
+          await _flyToOrbit(latitude, longitude, range, tilt, heading);
+          currentStep++;
+          isMoving = false;
+        } catch (e) {
+          debugPrint('LGService: Error during orbit step $currentStep: $e');
+          currentStep++;
+          isMoving = false;
+        }
+      });
+      return true;
+    } catch (e) {
+      _orbitPlaying = false;
+      debugPrint('LGService: Error initializing orbit: $e');
+      return false;
+    }
+  }
+
+  /// Stops the currently streaming orbit.
+  Future<void> orbitStop() async {
+    _orbitTimer?.cancel();
+    _orbitTimer = null;
+    _orbitPlaying = false;
+    await stopTour(); // stabilize
+}
 }
 
 // ─── Provider ──────────────────────────────────────────────────────────
