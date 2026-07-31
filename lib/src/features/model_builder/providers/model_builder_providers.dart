@@ -372,7 +372,7 @@ class PushNotifier extends Notifier<PushState> {
         // We increase the multiplier here so the camera doesn't end up inside very large models.
         final range = (project.altitude + (project.scaleX * 15)).clamp(1000.0, 100000.0);
         
-        ref.read(lgServiceProvider).flyTo(
+        ref.read(lgServiceProvider).flyToAndOrbit(
           latitude: project.latitude!,
           longitude: project.longitude!,
           altitude: project.altitude,
