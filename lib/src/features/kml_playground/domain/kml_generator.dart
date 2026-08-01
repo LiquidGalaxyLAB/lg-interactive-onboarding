@@ -267,6 +267,40 @@ $coordString
     final range = _d(params, 'range', fallback: 5000.0);
     final tilt = _d(params, 'tilt', fallback: 45.0);
 
+    StringBuffer playlistBuffer = StringBuffer();
+
+    // 1. Initial jump to start location
+    playlistBuffer.writeln('''        <gx:FlyTo>
+          <gx:duration>0.1</gx:duration>
+          <gx:flyToMode>bounce</gx:flyToMode>
+          <LookAt>
+            <longitude>$startLng</longitude>
+            <latitude>$startLat</latitude>
+            <heading>0</heading>
+            <tilt>$tilt</tilt>
+            <range>$range</range>
+          </LookAt>
+        </gx:FlyTo>
+        <gx:Wait>
+          <gx:duration>2.0</gx:duration>
+        </gx:Wait>
+        <gx:FlyTo>
+          <gx:duration>$duration</gx:duration>
+          <gx:flyToMode>smooth</gx:flyToMode>
+          <LookAt>
+            <longitude>$endLng</longitude>
+            <latitude>$endLat</latitude>
+            <heading>0</heading>
+            <tilt>$tilt</tilt>
+            <range>$range</range>
+          </LookAt>
+        </gx:FlyTo>''');
+
+    // 2. Wait slightly to ensure smooth arrival before any future commands
+    playlistBuffer.writeln('''        <gx:Wait>
+          <gx:duration>0.5</gx:duration>
+        </gx:Wait>''');
+
     return '''<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"
      xmlns:gx="http://www.google.com/kml/ext/2.2">
@@ -276,38 +310,11 @@ $coordString
     <gx:Tour>
       <name>$name</name>
       <gx:Playlist>
-        <gx:FlyTo>
-          <gx:duration>0.1</gx:duration>
-          <gx:flyToMode>bounce</gx:flyToMode>
-          <LookAt>
-            <longitude>$startLng</longitude>
-            <latitude>$startLat</latitude>
-            <altitude>0</altitude>
-            <heading>0</heading>
-            <tilt>$tilt</tilt>
-            <range>$range</range>
-          </LookAt>
-        </gx:FlyTo>
-        <gx:Wait>
-          <gx:duration>2</gx:duration>
-        </gx:Wait>
-        <gx:FlyTo>
-          <gx:duration>$duration</gx:duration>
-          <gx:flyToMode>smooth</gx:flyToMode>
-          <LookAt>
-            <longitude>$endLng</longitude>
-            <latitude>$endLat</latitude>
-            <altitude>0</altitude>
-            <heading>0</heading>
-            <tilt>$tilt</tilt>
-            <range>$range</range>
-          </LookAt>
-        </gx:FlyTo>
-      </gx:Playlist>
+${playlistBuffer.toString()}      </gx:Playlist>
     </gx:Tour>
   </Document>
 </kml>''';
-  }
+}
 
   // ─── Helpers ─────────────────────────────────────────────────────
 
