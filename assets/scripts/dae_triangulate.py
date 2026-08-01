@@ -346,23 +346,22 @@ def _apply_vertex_scale(root, sx, sy, sz):
                 if src.startswith("#"):
                     position_source_ids.add(src[1:])
     
-    for source_id in position_source_ids:
-        for source in root.iter(_ns("source")):
-            if source.get("id") == source_id:
-                float_array = source.find(_ns("float_array"))
-                if float_array is not None and (float_array.text or "").strip():
-                    parts = float_array.text.split()
-                    try:
-                        # parts is [x, y, z, x, y, z...]
-                        floats = []
-                        for i in range(0, len(parts), 3):
-                            floats.append(float(parts[i]) * sx)
-                            floats.append(float(parts[i+1]) * sy)
-                            floats.append(float(parts[i+2]) * sz)
-                        float_array.text = " ".join("{0:.6f}".format(v) for v in floats)
-                        count += 1
-                    except ValueError:
-                        pass
+    for source in root.iter(_ns("source")):
+        if source.get("id") in position_source_ids:
+            float_array = source.find(_ns("float_array"))
+            if float_array is not None and (float_array.text or "").strip():
+                parts = float_array.text.split()
+                try:
+                    # parts is [x, y, z, x, y, z...]
+                    floats = []
+                    for i in range(0, len(parts), 3):
+                        floats.append(float(parts[i]) * sx)
+                        floats.append(float(parts[i+1]) * sy)
+                        floats.append(float(parts[i+2]) * sz)
+                    float_array.text = " ".join("{0:.6f}".format(v) for v in floats)
+                    count += 1
+                except ValueError:
+                    pass
     
     if count > 0:
         print("NOTE  : Applied vertex scale factors X:%.2f Y:%.2f Z:%.2f to %d position arrays." % (sx, sy, sz, count))
