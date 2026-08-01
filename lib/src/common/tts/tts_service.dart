@@ -85,60 +85,30 @@ class TTSService extends ChangeNotifier {
     final voices = await _flutterTts.getVoices;
     if (voices == null) return [];
 
-    final maleNames = ['Alex', 'Daniel', 'Thomas', 'Oliver', 'George'];
-    final femaleNames = ['Samantha', 'Karen', 'Moira', 'Fiona', 'Isla'];
-    
-    List<Map<String, String>> finalVoices = [];
-    int maleCount = 0;
-    int femaleCount = 0;
-    
-    for (var v in voices) {
-      final map = Map<String, String>.from(v as Map);
-      final locale = map['locale']?.toLowerCase() ?? '';
-      final name = map['name']?.toLowerCase() ?? '';
-      
-      if (locale.startsWith('en')) {
-        if (name.contains('female') && femaleCount < femaleNames.length) {
-          finalVoices.add({
-            'name': map['name'] ?? '',
-            'locale': map['locale'] ?? '',
-            'displayName': femaleNames[femaleCount],
-          });
-          femaleCount++;
-        } else if (name.contains('male') && !name.contains('female') && maleCount < maleNames.length) {
-          finalVoices.add({
-            'name': map['name'] ?? '',
-            'locale': map['locale'] ?? '',
-            'displayName': maleNames[maleCount],
-          });
-          maleCount++;
-        }
-      }
-      
-      if (maleCount >= 5 && femaleCount >= 5) break;
-    }
-    
-    // Fallback: If the device doesn't use "male"/"female" in its internal voice names,
-    // we use gender-neutral names so they are accurate regardless of the actual voice gender.
-    if (finalVoices.isEmpty) {
-      int idx = 0;
-      final neutralNames = ['Taylor', 'Jordan', 'Casey', 'Riley', 'Morgan', 'Avery', 'Quinn', 'Peyton', 'Cameron', 'Skyler'];
-      for (var v in voices) {
-        final map = Map<String, String>.from(v as Map);
-        final locale = map['locale']?.toLowerCase() ?? '';
-        if (locale.startsWith('en')) {
-          finalVoices.add({
-            'name': map['name'] ?? '',
-            'locale': map['locale'] ?? '',
-            'displayName': neutralNames[idx],
-          });
-          idx++;
-          if (idx >= 10) break;
-        }
-      }
-    }
+    return (voices as Iterable)
+        .map<Map<String, String>>((v) => Map<String, String>.from(v as Map))
+        .where((map) => (map['locale']?.toLowerCase() ?? '').startsWith('en'))
+        .take(10) // Limit to 10 voices
+        .map<Map<String, String>>((map) => {
+              'name': map['name'] ?? '',
+              'locale': map['locale'] ?? '',
+              'displayName': _formatVoiceName(map['name'] ?? 'Voice'),
+            })
+        .toList();
+  }
 
-    return finalVoices;
+  String _formatVoiceName(String internalName) {
+    String name = internalName;
+    // Try to extract the readable part if it's a bundle ID format (e.g. com.apple...)
+    if (name.contains('.')) {
+      name = name.split('.').last;
+    }
+    
+    // Capitalize first letter
+    if (name.isNotEmpty) {
+      name = name[0].toUpperCase() + name.substring(1);
+    }
+    return name;
   }
 
   /// Sets the TTS voice by name.
