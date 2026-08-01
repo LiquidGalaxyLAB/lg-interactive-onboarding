@@ -11,6 +11,7 @@ import 'package:lg_interactive_onboarding/src/features/architecture_explorer/pre
 import 'package:lg_interactive_onboarding/src/features/model_builder/presentation/model_builder_screen.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/system_kml_service.dart';
+import 'package:lg_interactive_onboarding/src/features/ai_mentor/data/proactive_trigger_service.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/presentation/settings_screen.dart';
 import 'package:lg_interactive_onboarding/src/features/splash/presentation/splash_screen.dart';
@@ -27,6 +28,7 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   const secureStorage = FlutterSecureStorage();
   final initialPassword = await secureStorage.read(key: 'password') ?? '';
+  final initialOpenRouterApiKey = await secureStorage.read(key: 'openRouterApiKey') ?? '';
 
   runApp(
     ProviderScope(
@@ -34,6 +36,7 @@ void main() async {
         sharedPreferencesProvider.overrideWithValue(prefs),
         secureStorageProvider.overrideWithValue(secureStorage),
         initialPasswordProvider.overrideWithValue(initialPassword),
+        initialOpenRouterApiKeyProvider.overrideWithValue(initialOpenRouterApiKey),
       ],
       child: LGContentStudioApp(navigatorKey: rootNavigatorKey),
     ),
@@ -59,6 +62,9 @@ class LGContentStudioApp extends ConsumerWidget {
     
     // Activate the system KML watcher to initialize static KML topology on connect.
     ref.read(systemConnectionWatcherProvider);
+
+    // Activate proactive AI Mentor triggers (SSH failures, dwell time, etc.).
+    ref.read(proactiveTriggerProvider);
 
     return MaterialApp(
       navigatorKey: navigatorKey,

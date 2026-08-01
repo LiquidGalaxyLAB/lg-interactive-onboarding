@@ -53,6 +53,12 @@ dependencies:
   # Text-to-speech (voice narration for guided mode & Architecture Explorer)
   flutter_tts: ^3.8.0
 
+  # HTTP client (AI Mentor → Firebase Cloud Function)
+  http: ^1.6.0
+  flutter_markdown: ^0.7.7+1
+  speech_to_text: ^7.4.0
+  permission_handler: ^12.0.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -71,6 +77,7 @@ flutter:
     - assets/scripts/dae_triangulate.py
     - assets/logos/logo_banner.png
     - assets/logos/apk_logo.png
+    - assets/knowledge/
 
 flutter_launcher_icons:
   android: "launcher_icon"

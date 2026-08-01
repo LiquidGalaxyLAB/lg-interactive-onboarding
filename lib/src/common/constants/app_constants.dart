@@ -33,4 +33,7 @@ class AppConstants {
   static const int logoOverlayWidth = 554;
   static const int logoOverlayHeight = 500;
   static const String lgSlaveKmlDir = '/var/www/html/kml';
+  // ─── AI Mentor Settings ──────────────────────────────────────────────
+  static const String openRouterEmbeddingModel = 'nvidia/nemotron-3-embed-1b:free';
+
 }
