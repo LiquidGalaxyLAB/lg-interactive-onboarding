@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
 import 'package:lg_interactive_onboarding/src/common/tts/tts_service.dart';
@@ -23,10 +24,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late final TextEditingController _usernameCtrl;
   late final TextEditingController _passwordCtrl;
   late final TextEditingController _rigsCtrl;
+  late final TextEditingController _openRouterApiKeyCtrl;
+  late final TextEditingController _openRouterModelCtrl;
 
   bool _isConnecting = false;
   bool _obscurePassword = true;
+  bool _obscureApiKey = true;
+  bool _isVerifyingAi = false;
   late bool _voiceNarration;
+  
+  String _selectedModelDropdown = 'inclusionai/ling-3.0-flash:free';
+  bool _showCustomModelInput = false;
+
+  static const _curatedModels = {
+    'inclusionai/ling-3.0-flash:free': 'Ling-3.0-flash (free)',
+    'nvidia/nemotron-3-ultra-550b-a55b:free': 'NVIDIA: Nemotron 3 Ultra (free)',
+    'poolside/laguna-s-2.1:free': 'Poolside: Laguna S 2.1 (free)',
+    'poolside/laguna-xs-2.1:free': 'Poolside: Laguna XS 2.1 (free)',
+    'cohere/north-mini-code:free': 'Cohere: North Mini Code (free)',
+    'nvidia/nemotron-3-super-120b-a12b:free': 'NVIDIA: Nemotron 3 Super (free)',
+    'nvidia/nemotron-3-nano-30b-a3b:free': 'NVIDIA: Nemotron 3 Nano 30B A3B (free)',
+    'openai/gpt-oss-20b:free': 'OpenAI: gpt-oss-20b (free)',
+  };
+  
+  List<Map<String, String>> _availableVoices = [];
+  String? _selectedVoice;
 
   @override
   void initState() {
@@ -36,10 +58,41 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _portCtrl = TextEditingController(text: settings.port.toString());
     _usernameCtrl = TextEditingController(text: settings.username);
     _passwordCtrl = TextEditingController(text: settings.password);
+    _openRouterApiKeyCtrl = TextEditingController(text: settings.openRouterApiKey);
+    
+    final savedModel = settings.openRouterModel;
+    if (_curatedModels.containsKey(savedModel)) {
+      _selectedModelDropdown = savedModel;
+      _showCustomModelInput = false;
+      _openRouterModelCtrl = TextEditingController();
+    } else {
+      _selectedModelDropdown = 'other';
+      _showCustomModelInput = true;
+      _openRouterModelCtrl = TextEditingController(text: savedModel);
+    }
+    
     _rigsCtrl = TextEditingController(text: settings.rigs.toString());
     _voiceNarration = settings.voiceNarration;
     // Sync TTS service with persisted preference on screen load.
     ref.read(ttsServiceProvider).setEnabled(_voiceNarration);
+    _loadVoices();
+  }
+
+  Future<void> _loadVoices() async {
+    final tts = ref.read(ttsServiceProvider);
+    final voices = await tts.getAvailableVoices();
+    final settings = ref.read(settingsServiceProvider);
+    
+    if (mounted) {
+      setState(() {
+        _availableVoices = voices;
+        if (voices.any((v) => v['name'] == settings.ttsVoice)) {
+          _selectedVoice = settings.ttsVoice;
+        } else if (voices.isNotEmpty) {
+          _selectedVoice = voices.first['name'];
+        }
+      });
+    }
   }
 
   @override
@@ -48,8 +101,68 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _portCtrl.dispose();
     _usernameCtrl.dispose();
     _passwordCtrl.dispose();
+    _openRouterApiKeyCtrl.dispose();
+    _openRouterModelCtrl.dispose();
     _rigsCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _verifyAndApplyAiSettings() async {
+    final apiKey = _openRouterApiKeyCtrl.text.trim();
+    final model = _showCustomModelInput ? _openRouterModelCtrl.text.trim() : _selectedModelDropdown;
+    
+    if (apiKey.isEmpty || model.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('API Key and Model cannot be empty'),
+          backgroundColor: Color(0xFFB3261E),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isVerifyingAi = true);
+
+    try {
+      final res = await http.get(
+        Uri.parse('https://openrouter.ai/api/v1/auth/key'),
+        headers: {'Authorization': 'Bearer $apiKey'},
+      );
+
+      if (!mounted) return;
+
+      if (res.statusCode == 200) {
+        final settings = ref.read(settingsServiceProvider);
+        await settings.setOpenRouterApiKey(apiKey);
+        await settings.setOpenRouterModel(model);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('AI Mentor settings verified and saved!'),
+            backgroundColor: Color(0xFF1E8E3E),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid API Key (OpenRouter rejected it)'),
+            backgroundColor: Color(0xFFB3261E),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Validation failed: $e'),
+          backgroundColor: const Color(0xFFB3261E),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isVerifyingAi = false);
+      }
+    }
   }
 
   Future<void> _saveAndConnect() async {
@@ -60,6 +173,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await settings.setPort(int.tryParse(_portCtrl.text) ?? 22);
     await settings.setUsername(_usernameCtrl.text.trim());
     await settings.setPassword(_passwordCtrl.text);
+    await settings.setOpenRouterApiKey(_openRouterApiKeyCtrl.text.trim());
+    await settings.setOpenRouterModel(_openRouterModelCtrl.text.trim());
     await settings.setRigs(int.tryParse(_rigsCtrl.text) ?? 3);
 
     if (!mounted) return;
@@ -323,6 +438,87 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
             const SizedBox(height: 32),
 
+            // ─── AI Mentor Configuration ──────────────────────────
+            _SectionLabel(label: 'AI MENTOR', isDark: isDark),
+            const SizedBox(height: 14),
+
+            TextField(
+              controller: _openRouterApiKeyCtrl,
+              obscureText: _obscureApiKey,
+              decoration: InputDecoration(
+                labelText: 'OpenRouter API Key',
+                prefixIcon: const Icon(Icons.vpn_key),
+                hintText: 'sk-or-v1-...',
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscureApiKey ? Icons.visibility : Icons.visibility_off,
+                  ),
+                  onPressed: () {
+                    setState(() => _obscureApiKey = !_obscureApiKey);
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              isExpanded: true,
+              initialValue: _selectedModelDropdown,
+              decoration: const InputDecoration(
+                labelText: 'OpenRouter Model',
+                prefixIcon: Icon(Icons.psychology_alt),
+              ),
+              items: [
+                ..._curatedModels.entries.map((e) => DropdownMenuItem(
+                      value: e.key,
+                      child: Text(e.value),
+                    )),
+                const DropdownMenuItem(
+                  value: 'other',
+                  child: Text('Other (Custom Model)'),
+                ),
+              ],
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    _selectedModelDropdown = val;
+                    _showCustomModelInput = val == 'other';
+                  });
+                }
+              },
+            ),
+            if (_showCustomModelInput) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _openRouterModelCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Custom Model Name',
+                  prefixIcon: Icon(Icons.edit),
+                  hintText: 'e.g. anthropic/claude-3-haiku',
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 52,
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _isVerifyingAi ? null : _verifyAndApplyAiSettings,
+                icon: _isVerifyingAi
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.check_circle_outline),
+                label: Text(_isVerifyingAi ? 'Verifying...' : 'Verify & Save AI Settings'),
+              ),
+            ),
+
+            const SizedBox(height: 32),
+
             // ─── Appearance ─────────────────────────────────────
             _SectionLabel(label: 'APPEARANCE', isDark: isDark),
             const SizedBox(height: 14),
@@ -376,6 +572,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               activeThumbColor: const Color(0xFF1A73E8),
               contentPadding: EdgeInsets.zero,
             ),
+            
+            if (_availableVoices.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                isExpanded: true,
+                initialValue: _selectedVoice,
+                decoration: const InputDecoration(
+                  labelText: 'Narration Voice',
+                  prefixIcon: Icon(Icons.record_voice_over),
+                ),
+                items: _availableVoices.map((v) {
+                  return DropdownMenuItem<String>(
+                    value: v['name'],
+                    child: Text(v['displayName'] ?? v['name'] ?? ''),
+                  );
+                }).toList(),
+                onChanged: _voiceNarration ? (val) async {
+                  if (val != null) {
+                    setState(() => _selectedVoice = val);
+                    final settings = ref.read(settingsServiceProvider);
+                    await settings.setTtsVoice(val);
+                    final selectedVoiceMap = _availableVoices.firstWhere((v) => v['name'] == val);
+                    ref.read(ttsServiceProvider).setVoice(val, selectedVoiceMap['locale'] ?? 'en-US');
+                  }
+                } : null,
+              ),
+            ],
 
             const SizedBox(height: 32),
           ],

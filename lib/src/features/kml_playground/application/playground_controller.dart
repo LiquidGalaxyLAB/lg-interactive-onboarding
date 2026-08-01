@@ -228,7 +228,7 @@ class PlaygroundController extends Notifier<PlaygroundState> {
       }
 
       final lgService = ref.read(lgServiceProvider);
-      await lgService.flyTo(
+      await lgService.flyToAndOrbit(
         latitude: lat,
         longitude: lng,
         altitude: GeoMath.extractDouble(params, 'altitude') ?? 0.0,
@@ -272,12 +272,14 @@ class PlaygroundController extends Notifier<PlaygroundState> {
     }
   }
 
-  /// Stops the currently playing tour on Liquid Galaxy.
+  /// Stops the currently playing tour and any active orbit streams on Liquid Galaxy.
   Future<bool> stopTour() async {
     try {
       final lgService = ref.read(lgServiceProvider);
+      await lgService.orbitStop();
       final ok = await lgService.stopTour();
-      if (ok) state = state.copyWith(isTourPlaying: false);
+      
+      state = state.copyWith(isTourPlaying: false);
       return ok;
     } catch (e) {
       debugPrint('Playground: stopTour error: $e');
