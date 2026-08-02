@@ -16,12 +16,13 @@ class EducationalBalloonKmlModel {
         ? '<div style="margin-bottom: 20px;"><img src="$iconUrl" style="width: 120px; height: 120px; object-fit: contain;" /></div>'
         : '';
 
+    final cleanId = id.replaceAll(' ', '_');
     return '''<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"
      xmlns:gx="http://www.google.com/kml/ext/2.2">
   <Document>
     <name>${title} Information</name>
-    <Style id="educational_balloon_style_$id">
+    <Style id="educational_balloon_style_$cleanId">
       <BalloonStyle>
         <bgColor>ff1e1e1e</bgColor>
         <text><![CDATA[
@@ -36,9 +37,10 @@ class EducationalBalloonKmlModel {
       </BalloonStyle>
     </Style>
 
-    <Placemark id="balloon_$id">
+    <Placemark id="balloon_$cleanId">
       <name>$title</name>
-      <styleUrl>#educational_balloon_style_$id</styleUrl>
+      <description>Educational Balloon for $title</description>
+      <styleUrl>#educational_balloon_style_$cleanId</styleUrl>
       <gx:balloonVisibility>1</gx:balloonVisibility>
       <Point>
         <coordinates>$longitude,$latitude,0</coordinates>
