@@ -103,6 +103,46 @@ class LGService {
 
   // ─── KML Commands ─────────────────────────────────────────────────
 
+  /// Calculates the ID of the rightmost screen.
+  int get _rightMostScreen {
+    final screens = _settingsService.rigs;
+    return (screens / 2).floor() + 1;
+  }
+
+  /// Sends a KML balloon string to the Liquid Galaxy rig.
+  Future<bool> sendBalloonKml(String kmlContent) async {
+    if (!_isReady) return false;
+    try {
+      final command = "echo '$kmlContent' > /var/www/html/kml/balloon.kml";
+      await _sshService.execute(command);
+      debugPrint('LGService: Sent balloon KML');
+      return true;
+    } catch (e) {
+      debugPrint('LGService: sendBalloonKml failed: $e');
+      return false;
+    }
+  }
+
+  /// Cleans the balloon from the Liquid Galaxy rig.
+  Future<bool> cleanBalloonKML() async {
+    if (!_isReady) return false;
+    try {
+      final emptyKml = '''<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Empty</name>
+  </Document>
+</kml>''';
+      final command = "echo '$emptyKml' > /var/www/html/kml/balloon.kml";
+      await _sshService.execute(command);
+      debugPrint('LGService: Cleaned balloon KML');
+      return true;
+    } catch (e) {
+      debugPrint('LGService: cleanBalloonKML failed: $e');
+      return false;
+    }
+  }
+
   /// Commands Liquid Galaxy to fly to a specific coordinate and orientation.
   Future<bool> flyTo({
     required double latitude,
