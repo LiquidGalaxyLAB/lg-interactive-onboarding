@@ -27,29 +27,34 @@ class DeepCleanCard extends ConsumerWidget {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
+              color: enabled
+                  ? DashboardPalette.deepCleanRed
+                  : Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: enabled
-                    ? DashboardPalette.deepCleanRed.withValues(alpha: isDark ? 0.2 : 0.12)
-                    : Colors.transparent,
-              ),
+              boxShadow: [
+                if (enabled)
+                  BoxShadow(
+                    color: DashboardPalette.deepCleanRed.withValues(alpha: 0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+              ],
             ),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: DashboardPalette.deepCleanRed.withValues(
-                      alpha: enabled ? (isDark ? 0.15 : 0.08) : 0.04,
-                    ),
+                    color: enabled
+                        ? Colors.white.withValues(alpha: 0.15)
+                        : DashboardPalette.deepCleanRed.withValues(alpha: 0.04),
                     borderRadius: BorderRadius.circular(11),
                   ),
                   child: Icon(
                     Icons.delete_forever_rounded,
                     size: 22,
                     color: enabled
-                        ? DashboardPalette.deepCleanRed
+                        ? Colors.white
                         : DashboardPalette.deepCleanRed.withValues(alpha: 0.4),
                   ),
                 ),
@@ -64,7 +69,7 @@ class DeepCleanCard extends ConsumerWidget {
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: enabled
-                              ? (isDark ? Colors.white : DashboardPalette.inkDark)
+                              ? Colors.white
                               : (isDark ? Colors.white38 : DashboardPalette.warmGrey),
                         ),
                       ),
@@ -74,7 +79,7 @@ class DeepCleanCard extends ConsumerWidget {
                         style: TextStyle(
                           fontSize: 11,
                           color: enabled
-                              ? (isDark ? Colors.white54 : DashboardPalette.warmGrey)
+                              ? Colors.white.withValues(alpha: 0.8)
                               : (isDark
                                   ? Colors.white24
                                   : DashboardPalette.warmGrey.withValues(alpha: 0.4)),
