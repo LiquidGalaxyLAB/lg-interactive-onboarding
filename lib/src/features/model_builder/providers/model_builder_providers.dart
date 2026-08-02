@@ -9,6 +9,8 @@ import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_repository.dart';
 import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 import 'package:lg_interactive_onboarding/src/common/lg/lg_service.dart';
+import 'package:lg_interactive_onboarding/src/common/kml/educational_balloon_kml_model.dart';
+import 'package:lg_interactive_onboarding/src/common/constants/educational_content.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -381,6 +383,29 @@ class PushNotifier extends Notifier<PushState> {
           tilt: AppConstants.defaultCameraTilt, 
           range: range,
         );
+
+        // Send Educational Balloon KML if applicable.
+        String? key;
+        final projectName = (project.fileName ?? project.assetPath ?? '').toLowerCase();
+        if (projectName.contains('tree')) key = 'Tree';
+        else if (projectName.contains('car')) key = 'Car';
+        else if (projectName.contains('pyramid')) key = 'Pyramid';
+        else if (projectName.contains('football') || projectName.contains('ball')) key = 'Football';
+
+        if (key != null) {
+          final content = EducationalConstants.modelContent[key];
+          if (content != null) {
+            final balloonKml = EducationalBalloonKmlModel.generateBalloonKml(
+              id: key.toLowerCase(),
+              title: content.title,
+              description: content.description,
+              iconUrl: content.iconUrl,
+              latitude: project.latitude!,
+              longitude: project.longitude!,
+            );
+            ref.read(lgServiceProvider).sendBalloonKml(balloonKml);
+          }
+        }
       }
     }
 
@@ -414,6 +439,7 @@ class PushNotifier extends Notifier<PushState> {
 
     if (result.success) {
       ref.read(deployedModelsProvider.notifier).removeDeployment(model.id);
+      ref.read(lgServiceProvider).cleanBalloonKML();
     }
 
     state = PushState(
@@ -443,6 +469,7 @@ class PushNotifier extends Notifier<PushState> {
 
     if (result.success) {
       ref.read(deployedModelsProvider.notifier).clearAll();
+      ref.read(lgServiceProvider).cleanBalloonKML();
     }
 
     state = PushState(

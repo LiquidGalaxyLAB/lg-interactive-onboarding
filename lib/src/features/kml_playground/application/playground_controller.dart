@@ -7,7 +7,8 @@ import 'package:lg_interactive_onboarding/src/common/utils/geo_math.dart';
 import 'package:lg_interactive_onboarding/src/features/kml_playground/domain/kml_generator.dart';
 import 'package:lg_interactive_onboarding/src/features/kml_playground/domain/kml_template.dart';
 import 'package:lg_interactive_onboarding/src/features/kml_playground/domain/kml_validator.dart';
-
+import 'package:lg_interactive_onboarding/src/common/kml/educational_balloon_kml_model.dart';
+import 'package:lg_interactive_onboarding/src/common/constants/educational_content.dart';
 // ─── State ─────────────────────────────────────────────────────────────
 
 /// Immutable state snapshot for the KML Playground.
@@ -200,16 +201,14 @@ class PlaygroundController extends Notifier<PlaygroundState> {
 
     try {
       final playgroundService = ref.read(kmlPlaygroundServiceProvider);
+      final lgService = ref.read(lgServiceProvider);
 
-      // 1. Upload the KML to the master screen.
-      final uploaded = await playgroundService.sendKml(kml);
-      if (!uploaded) {
-        debugPrint('Playground: KML upload failed.');
-        state = state.copyWith(isPushing: false);
-        return false;
-      }
+      // Stop any running background tours or orbits before pushing new KML
+      await lgService.orbitStop();
+      await lgService.stopTour();
+      await Future.delayed(const Duration(milliseconds: 100)); // Brief pause for GE to stabilize
 
-      // 2. Fly the camera to the relevant location.
+      // 1. Extract lat/long depending on the template type to point the camera there
       final params = state.activeParameters;
       double lat = GeoMath.extractDouble(params, 'latitude') ??
           GeoMath.extractDouble(params, 'startLatitude') ??
@@ -227,7 +226,39 @@ class PlaygroundController extends Notifier<PlaygroundState> {
         }
       }
 
-      final lgService = ref.read(lgServiceProvider);
+      // 2. Send Educational Balloon KML if applicable.
+      // Doing this BEFORE sending the main KML ensures the balloon file is already on the 
+      // server when the forced refresh is triggered.
+      final templateName = state.activeTemplate?.name;
+      if (templateName != null) {
+        String key = templateName;
+        if (templateName.contains('Placemark')) key = 'Placemark';
+        else if (templateName.contains('Polygon')) key = 'Polygon';
+        else if (templateName.contains('Path') || templateName.contains('LineString')) key = 'LineString';
+
+        final content = EducationalConstants.kmlContent[key];
+        if (content != null) {
+          final balloonKml = EducationalBalloonKmlModel.generateBalloonKml(
+            id: key.toLowerCase(),
+            title: content.title,
+            description: content.description,
+            iconUrl: content.iconUrl,
+            latitude: lat,
+            longitude: lng,
+          );
+          await lgService.sendBalloonKml(balloonKml);
+        }
+      }
+
+      // 3. Upload the KML to the master screen (triggers force refresh).
+      final uploaded = await playgroundService.sendKml(kml);
+      if (!uploaded) {
+        debugPrint('Playground: KML upload failed.');
+        state = state.copyWith(isPushing: false);
+        return false;
+      }
+
+      // 4. Fly the camera to the relevant location.
       await lgService.flyToAndOrbit(
         latitude: lat,
         longitude: lng,
@@ -251,12 +282,21 @@ class PlaygroundController extends Notifier<PlaygroundState> {
   Future<bool> clearFromLG() async {
     try {
       final playgroundService = ref.read(kmlPlaygroundServiceProvider);
+      final lgService = ref.read(lgServiceProvider);
+      
+      // Stop any running background tours or orbits before clearing
+      await lgService.orbitStop();
+      await lgService.stopTour();
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      await lgService.cleanBalloonKML();
       return await playgroundService.clearKml();
     } catch (e) {
       debugPrint('Playground: clearFromLG error: $e');
       return false;
     }
   }
+
 
   /// Tells the Liquid Galaxy to start playing the tour named in parameters.
   Future<bool> playTour() async {

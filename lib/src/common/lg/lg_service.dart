@@ -15,6 +15,7 @@ class LGService {
 
   bool _orbitPlaying = false;
   Timer? _orbitTimer;
+  Timer? _orbitDelayTimer;
   bool get isOrbitPlaying => _orbitPlaying;
 
   /// Helper to ensure SSH is connected before running commands.
@@ -103,6 +104,57 @@ class LGService {
 
   // ─── KML Commands ─────────────────────────────────────────────────
 
+
+  /// Sends a KML balloon string to the Liquid Galaxy rig.
+  Future<bool> sendBalloonKml(String kmlContent) async {
+    if (!_isReady) return false;
+    try {
+      final result = await _sshService.uploadFile(
+        localData: kmlContent,
+        remotePath: '/var/www/html/kml/balloon.kml',
+      );
+      
+      if (result is SSHUploadFailure) {
+        debugPrint('LGService: Send balloon KML upload failed: ${result.message}');
+        return false;
+      }
+      
+      debugPrint('LGService: Sent balloon KML');
+      return true;
+    } catch (e) {
+      debugPrint('LGService: sendBalloonKml failed: $e');
+      return false;
+    }
+  }
+
+  /// Cleans the balloon from the Liquid Galaxy rig.
+  Future<bool> cleanBalloonKML() async {
+    if (!_isReady) return false;
+    try {
+      final emptyKml = '''<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Empty</name>
+  </Document>
+</kml>''';
+      final result = await _sshService.uploadFile(
+        localData: emptyKml,
+        remotePath: '/var/www/html/kml/balloon.kml',
+      );
+      
+      if (result is SSHUploadFailure) {
+        debugPrint('LGService: Clean balloon KML upload failed: ${result.message}');
+        return false;
+      }
+      
+      debugPrint('LGService: Cleaned balloon KML');
+      return true;
+    } catch (e) {
+      debugPrint('LGService: cleanBalloonKML failed: $e');
+      return false;
+    }
+  }
+
   /// Commands Liquid Galaxy to fly to a specific coordinate and orientation.
   Future<bool> flyTo({
     required double latitude,
@@ -158,7 +210,8 @@ class LGService {
       range: range,
     );
     if (success) {
-      Future.delayed(Duration(seconds: delaySeconds), () {
+      _orbitDelayTimer?.cancel();
+      _orbitDelayTimer = Timer(Duration(seconds: delaySeconds), () {
         orbitPlay(
           latitude: latitude,
           longitude: longitude,
@@ -285,6 +338,8 @@ class LGService {
 
   /// Stops the currently streaming orbit.
   Future<void> orbitStop() async {
+    _orbitDelayTimer?.cancel();
+    _orbitDelayTimer = null;
     _orbitTimer?.cancel();
     _orbitTimer = null;
     _orbitPlaying = false;

@@ -71,16 +71,29 @@ class SystemKmlService {
       // 2. Write the slave_X.kml for all slave screens
       final rigsCount = _settingsService.rigs;
       final leftmostScreen = _getLeftSlaveScreen();
+      // The rightmost screen is typically calculated as (rigsCount / 2).floor() + 1
+      final rightmostScreen = (rigsCount / 2).floor() + 1;
 
       for (int i = 2; i <= rigsCount; i++) {
         // Build the KML string based on whether this is the leftmost screen
         final isLeftmost = (i == leftmostScreen);
+        final isRightmost = (i == rightmostScreen);
         
         final logoLink = isLeftmost ? '''
     <NetworkLink>
       <name>Logo Overlay</name>
       <Link>
         <href>http://lg1:${AppConstants.lgHttpPort}/kml/logo.kml</href>
+      </Link>
+    </NetworkLink>''' : '';
+
+        final balloonLink = isRightmost ? '''
+    <NetworkLink>
+      <name>Educational Balloon</name>
+      <Link>
+        <href>http://lg1:${AppConstants.lgHttpPort}/kml/balloon.kml</href>
+        <refreshMode>onInterval</refreshMode>
+        <refreshInterval>2</refreshInterval>
       </Link>
     </NetworkLink>''' : '';
 
@@ -100,7 +113,7 @@ class SystemKmlService {
       <Link>
         <href>http://lg1:${AppConstants.lgHttpPort}/kml/playground.kml</href>
       </Link>
-    </NetworkLink>$logoLink
+    </NetworkLink>$logoLink$balloonLink
   </Document>
 </kml>''';
 
