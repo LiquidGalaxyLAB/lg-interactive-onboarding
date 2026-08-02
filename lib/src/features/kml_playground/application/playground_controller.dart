@@ -7,7 +7,8 @@ import 'package:lg_interactive_onboarding/src/common/utils/geo_math.dart';
 import 'package:lg_interactive_onboarding/src/features/kml_playground/domain/kml_generator.dart';
 import 'package:lg_interactive_onboarding/src/features/kml_playground/domain/kml_template.dart';
 import 'package:lg_interactive_onboarding/src/features/kml_playground/domain/kml_validator.dart';
-
+import 'package:lg_interactive_onboarding/src/common/kml/educational_balloon_kml_model.dart';
+import 'package:lg_interactive_onboarding/src/common/constants/educational_content.dart';
 // ─── State ─────────────────────────────────────────────────────────────
 
 /// Immutable state snapshot for the KML Playground.
@@ -237,6 +238,29 @@ class PlaygroundController extends Notifier<PlaygroundState> {
         range: GeoMath.extractDouble(params, 'range') ?? 1000.0,
       );
 
+      // 3. Send Educational Balloon KML if applicable.
+      final templateName = state.activeTemplate?.name;
+      if (templateName != null) {
+        // Try to match template name (e.g. "Simple Placemark" -> "Placemark")
+        String key = templateName;
+        if (templateName.contains('Placemark')) key = 'Placemark';
+        else if (templateName.contains('Polygon')) key = 'Polygon';
+        else if (templateName.contains('Path') || templateName.contains('LineString')) key = 'LineString';
+
+        final content = EducationalConstants.kmlContent[key];
+        if (content != null) {
+          final balloonKml = EducationalBalloonKmlModel.generateBalloonKml(
+            id: key.toLowerCase(),
+            title: content.title,
+            description: content.description,
+            iconUrl: content.iconUrl,
+            latitude: lat,
+            longitude: lng,
+          );
+          await lgService.sendBalloonKml(balloonKml);
+        }
+      }
+
       debugPrint('Playground: KML pushed and camera moved.');
       state = state.copyWith(isPushing: false);
       return true;
@@ -251,12 +275,15 @@ class PlaygroundController extends Notifier<PlaygroundState> {
   Future<bool> clearFromLG() async {
     try {
       final playgroundService = ref.read(kmlPlaygroundServiceProvider);
+      final lgService = ref.read(lgServiceProvider);
+      await lgService.cleanBalloonKML();
       return await playgroundService.clearKml();
     } catch (e) {
       debugPrint('Playground: clearFromLG error: $e');
       return false;
     }
   }
+
 
   /// Tells the Liquid Galaxy to start playing the tour named in parameters.
   Future<bool> playTour() async {
