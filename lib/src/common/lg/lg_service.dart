@@ -15,6 +15,7 @@ class LGService {
 
   bool _orbitPlaying = false;
   Timer? _orbitTimer;
+  Timer? _orbitDelayTimer;
   bool get isOrbitPlaying => _orbitPlaying;
 
   /// Helper to ensure SSH is connected before running commands.
@@ -198,7 +199,8 @@ class LGService {
       range: range,
     );
     if (success) {
-      Future.delayed(Duration(seconds: delaySeconds), () {
+      _orbitDelayTimer?.cancel();
+      _orbitDelayTimer = Timer(Duration(seconds: delaySeconds), () {
         orbitPlay(
           latitude: latitude,
           longitude: longitude,
@@ -325,6 +327,8 @@ class LGService {
 
   /// Stops the currently streaming orbit.
   Future<void> orbitStop() async {
+    _orbitDelayTimer?.cancel();
+    _orbitDelayTimer = null;
     _orbitTimer?.cancel();
     _orbitTimer = null;
     _orbitPlaying = false;
