@@ -6,6 +6,7 @@ import 'package:lg_interactive_onboarding/src/features/ai_mentor/presentation/wi
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/presentation/widgets/typing_indicator.dart';
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/presentation/widgets/suggested_prompts.dart';
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/data/stt_service.dart';
+import 'package:lg_interactive_onboarding/src/common/tts/tts_service.dart';
 
 /// The AI Mentor chat screen — rendered as Tab 2 in the [AppShell].
 ///
@@ -72,8 +73,9 @@ class _MentorScreenState extends ConsumerState<MentorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final mentor = ref.read(mentorServiceProvider);
-    final stt = ref.read(sttServiceProvider);
+    final mentor = ref.watch(mentorServiceProvider);
+    final stt = ref.watch(sttServiceProvider);
+    final tts = ref.watch(ttsServiceProvider);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     const accent = Color(0xFF7C4DFF);
@@ -83,9 +85,6 @@ class _MentorScreenState extends ConsumerState<MentorScreen> {
       mentor.clearNotification();
     });
 
-    return ListenableBuilder(
-      listenable: Listenable.merge([mentor, stt]),
-      builder: (context, _) {
     // Auto-scroll when new messages arrive.
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
 
@@ -127,14 +126,14 @@ class _MentorScreenState extends ConsumerState<MentorScreen> {
           // TTS toggle
           IconButton(
             icon: Icon(
-              mentor.ttsEnabled
+              tts.isEnabled
                   ? Icons.volume_up_rounded
                   : Icons.volume_off_rounded,
-              color: mentor.ttsEnabled
+              color: tts.isEnabled
                   ? accent
                   : (isDark ? Colors.white38 : Colors.black38),
             ),
-            tooltip: mentor.ttsEnabled ? 'Mute voice' : 'Unmute voice',
+            tooltip: tts.isEnabled ? 'Mute voice' : 'Unmute voice',
             onPressed: () => ref.read(mentorServiceProvider).toggleTts(),
           ),
 
@@ -152,7 +151,6 @@ class _MentorScreenState extends ConsumerState<MentorScreen> {
         ],
       ),
 
-      // ── Body ─────────────────────────────────────────────────────────────
       body: Column(
         children: [
           // ── Messages ─────────────────────────────────────────────────────
@@ -184,8 +182,6 @@ class _MentorScreenState extends ConsumerState<MentorScreen> {
           _buildInputBar(isDark, accent, stt),
         ],
       ),
-    );
-    },
     );
   }
 

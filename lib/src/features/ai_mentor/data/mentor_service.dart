@@ -65,7 +65,6 @@ class MentorService extends ChangeNotifier {
   final Ref _ref;
   final List<MentorMessage> _history = [];
   bool _isLoading = false;
-  bool _ttsEnabled = true;
 
   /// True when a proactive trigger has fired and the user hasn't opened
   /// the Mentor tab yet. Used by the UI to show a notification badge.
@@ -79,7 +78,7 @@ class MentorService extends ChangeNotifier {
 
   List<MentorMessage> get history => List.unmodifiable(_history);
   bool get isLoading => _isLoading;
-  bool get ttsEnabled => _ttsEnabled;
+  bool get ttsEnabled => _ref.read(ttsServiceProvider).isEnabled;
   bool get hasPendingNotification => _hasPendingNotification;
 
   // ─── Public API ───────────────────────────────────────────────────────────
@@ -105,8 +104,8 @@ class MentorService extends ChangeNotifier {
         timestamp: DateTime.now(),
       ));
 
-      // Speak the response if TTS is enabled.
-      if (_ttsEnabled) {
+      // Speak the response if TTS is enabled globally.
+      if (_ref.read(ttsServiceProvider).isEnabled) {
         final cleanText = _cleanTextForSpeech(responseText);
         _ref.read(ttsServiceProvider).speak(cleanText);
       }
@@ -182,12 +181,9 @@ class MentorService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Toggles text-to-speech on/off for mentor responses.
   void toggleTts() {
-    _ttsEnabled = !_ttsEnabled;
-    if (!_ttsEnabled) {
-      _ref.read(ttsServiceProvider).stop();
-    }
+    final tts = _ref.read(ttsServiceProvider);
+    tts.setEnabled(!tts.isEnabled);
     notifyListeners();
   }
 
@@ -199,6 +195,7 @@ class MentorService extends ChangeNotifier {
   }
 
   // ─── Private ──────────────────────────────────────────────────────────────
+
 
   String _cleanTextForSpeech(String text) {
     var cleaned = text.replaceAll(RegExp(r'```[a-zA-Z]*'), ''); // Remove code block starts
