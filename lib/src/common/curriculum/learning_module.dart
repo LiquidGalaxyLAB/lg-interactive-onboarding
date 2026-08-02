@@ -116,4 +116,5 @@ abstract final class AppRoutes {
   static const architectureExplorer = '/architecture-explorer';
   static const learn = '/learn';
   static const mentor = '/mentor';
+  static const kmlPlayground = '/kml-playground';
 }
