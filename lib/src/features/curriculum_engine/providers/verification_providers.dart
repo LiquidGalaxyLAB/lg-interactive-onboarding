@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lg_interactive_onboarding/src/common/curriculum/analytics_service.dart';
+import 'package:lg_interactive_onboarding/src/common/curriculum/verification_keys.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
 
@@ -28,46 +29,66 @@ typedef VerificationCheck = bool Function(Ref ref);
 final verificationCheckProvider = Provider<Map<String, VerificationCheck>>((ref) {
   return {
     // ── Module 1: Connect to Liquid Galaxy ─────────────────────────────────
-    'ssh_connected': (ref) {
+    VerificationKeys.sshConnected: (ref) {
       final ssh = ref.read(sshServiceProvider);
       return ssh.isConnected;
     },
 
     // ── Module 2: Upload Your First 3D Model ──────────────────────────────
-    'model_imported': (ref) {
+    VerificationKeys.modelImported: (ref) {
       final project = ref.read(modelBuilderProvider);
       return project.fileName != null;
     },
-    'model_placed': (ref) {
+    VerificationKeys.modelPlaced: (ref) {
       final project = ref.read(modelBuilderProvider);
       return project.latitude != null && project.longitude != null;
     },
-    'model_pushed': (ref) {
+    VerificationKeys.modelPushed: (ref) {
       return ref.read(modelPushSuccessProvider);
     },
 
     // ── Module 3: Understanding KML ───────────────────────────────────────
-    'kml_preview_viewed': (ref) {
+    VerificationKeys.kmlPreviewViewed: (ref) {
       final analytics = ref.read(analyticsServiceProvider);
       return analytics.hasOpenedKmlPreview();
     },
     // "Read the KML" step — always true (relies on a 10-second delay in the
     // controller before it starts polling, or the controller can just pass
     // this immediately and let the polling interval cover the delay).
-    'kml_read_pause': (_) => true,
+    VerificationKeys.kmlReadPause: (_) => true,
+
+    // ── Module 4: KML Playground ──────────────────────────────────────────
+    VerificationKeys.playgroundOpened: (ref) {
+      final analytics = ref.read(analyticsServiceProvider);
+      return analytics.hasOpenedPlayground();
+    },
+    VerificationKeys.playgroundKmlPushed: (ref) {
+      final analytics = ref.read(analyticsServiceProvider);
+      return analytics.hasPushedPlaygroundKml();
+    },
+
+    // ── Module 5: AI Mentor ───────────────────────────────────────────────
+    VerificationKeys.mentorOpened: (ref) {
+      final analytics = ref.read(analyticsServiceProvider);
+      return analytics.hasOpenedMentor();
+    },
+    VerificationKeys.mentorQuestionAsked: (ref) {
+      final analytics = ref.read(analyticsServiceProvider);
+      return analytics.hasAskedMentorQuestion();
+    },
 
     // ── Module 6: SSH & LG Architecture ───────────────────────────────────
-    'diagram_viewed': (ref) {
+    VerificationKeys.diagramViewed: (ref) {
       final analytics = ref.read(analyticsServiceProvider);
       return analytics.getTotalDiagramViews() > 0;
     },
-    'diagram_hotspot_tapped': (ref) {
+    VerificationKeys.diagramHotspotTapped: (ref) {
       final analytics = ref.read(analyticsServiceProvider);
       return analytics.getTotalDiagramViews() >= 2;
     },
 
     // ── Module 7: Deep Clean & Troubleshooting ────────────────────────────
-    'deep_clean_confirmed': (ref) {
+    VerificationKeys.deepCleanConfirmed: (ref) {
       final analytics = ref.read(analyticsServiceProvider);
       return analytics.hasConfirmedDeepClean();
     },
@@ -75,6 +96,6 @@ final verificationCheckProvider = Provider<Map<String, VerificationCheck>>((ref)
     // ── Fallback for navigation-only steps ────────────────────────────────
     // Steps with `requiresManualConfirmation: true` never reach this map,
     // but if one slips through, this ensures it doesn't auto-advance.
-    'manual_navigation': (_) => false,
+    VerificationKeys.manualNavigation: (_) => false,
   };
 });

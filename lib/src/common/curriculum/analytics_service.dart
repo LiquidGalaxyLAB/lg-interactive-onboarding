@@ -23,6 +23,14 @@ class AnalyticsService {
   static const _kmlPreviewKey = 'analytics_kml_preview_opened';
   static const _deepCleanKey = 'analytics_deep_clean_confirmed';
 
+  // KML Playground
+  static const _playgroundOpenedKey = 'analytics_playground_opened';
+  static const _playgroundKmlPushedKey = 'analytics_playground_kml_pushed';
+
+  // AI Mentor
+  static const _mentorOpenedKey = 'analytics_mentor_opened';
+  static const _mentorQuestionAskedKey = 'analytics_mentor_question_asked';
+
   // ─── Diagram Views ────────────────────────────────────────────────────────
 
   /// Increments the view count for [diagramId].
@@ -67,6 +75,50 @@ class AnalyticsService {
   /// Returns true if the deep clean has been confirmed at least once.
   bool hasConfirmedDeepClean() {
     return _prefs.getBool(_deepCleanKey) ?? false;
+  }
+
+  // ─── KML Playground ───────────────────────────────────────────────────────
+
+  /// Records that the user opened the KML Playground.
+  Future<void> recordPlaygroundOpened() async {
+    await _prefs.setBool(_playgroundOpenedKey, true);
+  }
+
+  /// Returns true if the KML Playground has been opened.
+  bool hasOpenedPlayground() {
+    return _prefs.getBool(_playgroundOpenedKey) ?? false;
+  }
+
+  /// Records that the user pushed KML from the Playground.
+  Future<void> recordPlaygroundKmlPushed() async {
+    await _prefs.setBool(_playgroundKmlPushedKey, true);
+  }
+
+  /// Returns true if the user pushed KML from the Playground.
+  bool hasPushedPlaygroundKml() {
+    return _prefs.getBool(_playgroundKmlPushedKey) ?? false;
+  }
+
+  // ─── AI Mentor ────────────────────────────────────────────────────────────
+
+  /// Records that the user opened the AI Mentor screen.
+  Future<void> recordMentorOpened() async {
+    await _prefs.setBool(_mentorOpenedKey, true);
+  }
+
+  /// Returns true if the AI Mentor screen has been opened.
+  bool hasOpenedMentor() {
+    return _prefs.getBool(_mentorOpenedKey) ?? false;
+  }
+
+  /// Records that the user asked a question to the AI Mentor.
+  Future<void> recordMentorQuestionAsked() async {
+    await _prefs.setBool(_mentorQuestionAskedKey, true);
+  }
+
+  /// Returns true if the user asked a question to the AI Mentor.
+  bool hasAskedMentorQuestion() {
+    return _prefs.getBool(_mentorQuestionAskedKey) ?? false;
   }
 
   // ─── Reset (for testing / dev) ────────────────────────────────────────────

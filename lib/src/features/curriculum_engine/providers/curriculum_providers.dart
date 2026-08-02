@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lg_interactive_onboarding/src/common/curriculum/learning_module.dart';
+import 'package:lg_interactive_onboarding/src/common/curriculum/verification_keys.dart';
 import 'package:lg_interactive_onboarding/src/features/curriculum_engine/data/curriculum_repository.dart';
 
 
@@ -37,7 +38,7 @@ List<LearningModule> _buildModules(Ref ref) {
           instruction:
               'Open the Settings tab and fill in your Liquid Galaxy '
               'host address, port, username, and password.',
-          verificationKey: 'manual_navigation',
+          verificationKey: VerificationKeys.manualNavigation,
           requiresManualConfirmation: true,
         ),
         ModuleStep(
@@ -46,7 +47,7 @@ List<LearningModule> _buildModules(Ref ref) {
               'Tap the "Save & Connect" button. The app will attempt to '
               'reach your LG master node via SSH.',
           targetWidgetKey: 'connectButton',
-          verificationKey: 'ssh_connected',
+          verificationKey: VerificationKeys.sshConnected,
         ),
       ],
     ),
@@ -67,14 +68,14 @@ List<LearningModule> _buildModules(Ref ref) {
           instruction:
               'Tap "Import Model" or choose a bundled sample model '
               'to get started. Accepted formats: .dae, .obj, .glb, .gltf, .kmz.',
-          verificationKey: 'model_imported',
+          verificationKey: VerificationKeys.modelImported,
         ),
         ModuleStep(
           id: 'place_on_map',
           instruction:
               'Long-press anywhere on the map to drop a placement pin '
               'for your model.',
-          verificationKey: 'model_placed',
+          verificationKey: VerificationKeys.modelPlaced,
         ),
         ModuleStep(
           id: 'push_model',
@@ -82,7 +83,7 @@ List<LearningModule> _buildModules(Ref ref) {
               'Tap the "Push to LG" button to upload the model and '
               'generate the KML. This may take a moment.',
           targetWidgetKey: 'pushToLGButton',
-          verificationKey: 'model_pushed',
+          verificationKey: VerificationKeys.modelPushed,
         ),
       ],
     ),
@@ -104,7 +105,7 @@ List<LearningModule> _buildModules(Ref ref) {
               'Expand the "KML Preview" panel at the bottom of the '
               '3D Model Builder screen to see the generated XML.',
           targetWidgetKey: 'kmlPreviewExpand',
-          verificationKey: 'kml_preview_viewed',
+          verificationKey: VerificationKeys.kmlPreviewViewed,
         ),
         ModuleStep(
           id: 'read_kml',
@@ -112,8 +113,63 @@ List<LearningModule> _buildModules(Ref ref) {
               'Read through the <Model> block. Notice the <Location>, '
               '<Orientation>, and <Scale> elements — these map directly to '
               'the sliders you configured.',
-          verificationKey: 'kml_read_pause',
+          verificationKey: VerificationKeys.kmlReadPause,
           requiresManualConfirmation: true,
+        ),
+      ],
+    ),
+
+    // ── Module 4: Interactive KML Playground ─────────────────────────────────
+    LearningModule(
+      id: 'kml_playground',
+      title: 'Interactive KML Playground',
+      description:
+          'Experiment with custom KML code. Write, edit, and push raw KML '
+          'directly to your Liquid Galaxy rig.',
+      estimatedTime: const Duration(minutes: 5),
+      targetFeatureRoute: AppRoutes.kmlPlayground,
+      prerequisites: ['understand_kml'],
+      steps: [
+        ModuleStep(
+          id: 'open_playground',
+          instruction:
+              'Open the KML Playground from the main menu or dashboard.',
+          verificationKey: VerificationKeys.playgroundOpened,
+        ),
+        ModuleStep(
+          id: 'push_playground_kml',
+          instruction:
+              'Write some custom KML (or use the default) and tap "Push KML" '
+              'to send it to the rig.',
+          targetWidgetKey: 'pushKmlButton',
+          verificationKey: VerificationKeys.playgroundKmlPushed,
+        ),
+      ],
+    ),
+
+    // ── Module 5: Meet Your AI Mentor ─────────────────────────────────────────
+    LearningModule(
+      id: 'ai_mentor',
+      title: 'Meet Your AI Mentor',
+      description:
+          'Get unstuck quickly by asking the AI Mentor. It knows about your '
+          'app state, SSH connection, and KML errors.',
+      estimatedTime: const Duration(minutes: 3),
+      targetFeatureRoute: AppRoutes.mentor,
+      prerequisites: ['upload_3d_model'],
+      steps: [
+        ModuleStep(
+          id: 'open_mentor',
+          instruction:
+              'Navigate to the AI Mentor screen.',
+          verificationKey: VerificationKeys.mentorOpened,
+        ),
+        ModuleStep(
+          id: 'ask_question',
+          instruction:
+              'Type a question in the chat and send it to the Mentor.',
+          targetWidgetKey: 'mentorChatInput',
+          verificationKey: VerificationKeys.mentorQuestionAsked,
         ),
       ],
     ),
@@ -127,21 +183,21 @@ List<LearningModule> _buildModules(Ref ref) {
           'master-slave topology, ViewSync, SSH, and KML propagation work.',
       estimatedTime: const Duration(minutes: 5),
       targetFeatureRoute: AppRoutes.architectureExplorer,
-      prerequisites: ['understand_kml'],
+      prerequisites: ['kml_playground'], // Modified prerequisite to chain properly
       steps: [
         ModuleStep(
           id: 'open_explorer',
           instruction:
               'Open the Architecture Explorer. You can find it in the '
               '"Learn" tab or by tapping the ⓘ icon in any screen\'s app bar.',
-          verificationKey: 'diagram_viewed',
+          verificationKey: VerificationKeys.diagramViewed,
         ),
         ModuleStep(
           id: 'tap_hotspot',
           instruction:
               'Tap on at least one highlighted component in a diagram '
               'to see a detailed explanation.',
-          verificationKey: 'diagram_hotspot_tapped',
+          verificationKey: VerificationKeys.diagramHotspotTapped,
         ),
       ],
     ),
@@ -162,7 +218,7 @@ List<LearningModule> _buildModules(Ref ref) {
           instruction:
               'On the Dashboard, scroll down to the "Maintenance" section '
               'and locate the "Deep Clean" card.',
-          verificationKey: 'manual_navigation',
+          verificationKey: VerificationKeys.manualNavigation,
           requiresManualConfirmation: true,
         ),
         ModuleStep(
@@ -171,7 +227,7 @@ List<LearningModule> _buildModules(Ref ref) {
               'Tap "Deep Clean" and confirm the dialog. This will wipe '
               'all model files from the LG rig.',
           targetWidgetKey: 'deepCleanButton',
-          verificationKey: 'deep_clean_confirmed',
+          verificationKey: VerificationKeys.deepCleanConfirmed,
         ),
       ],
     ),

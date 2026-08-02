@@ -13,6 +13,8 @@ import 'package:lg_interactive_onboarding/src/features/ai_mentor/data/proactive_
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/presentation/settings_screen.dart';
 import 'package:lg_interactive_onboarding/src/features/splash/presentation/splash_screen.dart';
+import 'package:lg_interactive_onboarding/src/features/kml_playground/presentation/kml_playground_screen.dart';
+import 'package:lg_interactive_onboarding/src/features/ai_mentor/presentation/mentor_screen.dart';
 
 /// Root navigator key — injected into [GuidedModeController] so the overlay
 /// can be inserted into the navigator overlay and survive tab switches.
@@ -79,6 +81,8 @@ class LGContentStudioApp extends ConsumerWidget {
         AppRoutes.modelBuilder: (_) => const ModelBuilderScreen(),
         AppRoutes.architectureExplorer: (_) =>
             const ArchitectureExplorerScreen(),
+        AppRoutes.mentor: (_) => const MentorScreen(),
+        AppRoutes.kmlPlayground: (_) => const KmlPlaygroundScreen(),
       },
     );
   }
