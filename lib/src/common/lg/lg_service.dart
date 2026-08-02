@@ -104,18 +104,21 @@ class LGService {
 
   // ─── KML Commands ─────────────────────────────────────────────────
 
-  /// Calculates the ID of the rightmost screen.
-  int get _rightMostScreen {
-    final screens = _settingsService.rigs;
-    return (screens / 2).floor() + 1;
-  }
 
   /// Sends a KML balloon string to the Liquid Galaxy rig.
   Future<bool> sendBalloonKml(String kmlContent) async {
     if (!_isReady) return false;
     try {
-      final command = "echo '$kmlContent' > /var/www/html/kml/balloon.kml";
-      await _sshService.execute(command);
+      final result = await _sshService.uploadFile(
+        localData: kmlContent,
+        remotePath: '/var/www/html/kml/balloon.kml',
+      );
+      
+      if (result is SSHUploadFailure) {
+        debugPrint('LGService: Send balloon KML upload failed: ${result.message}');
+        return false;
+      }
+      
       debugPrint('LGService: Sent balloon KML');
       return true;
     } catch (e) {
@@ -134,8 +137,16 @@ class LGService {
     <name>Empty</name>
   </Document>
 </kml>''';
-      final command = "echo '$emptyKml' > /var/www/html/kml/balloon.kml";
-      await _sshService.execute(command);
+      final result = await _sshService.uploadFile(
+        localData: emptyKml,
+        remotePath: '/var/www/html/kml/balloon.kml',
+      );
+      
+      if (result is SSHUploadFailure) {
+        debugPrint('LGService: Clean balloon KML upload failed: ${result.message}');
+        return false;
+      }
+      
       debugPrint('LGService: Cleaned balloon KML');
       return true;
     } catch (e) {
