@@ -201,16 +201,14 @@ class PlaygroundController extends Notifier<PlaygroundState> {
 
     try {
       final playgroundService = ref.read(kmlPlaygroundServiceProvider);
+      final lgService = ref.read(lgServiceProvider);
 
-      // 1. Upload the KML to the master screen.
-      final uploaded = await playgroundService.sendKml(kml);
-      if (!uploaded) {
-        debugPrint('Playground: KML upload failed.');
-        state = state.copyWith(isPushing: false);
-        return false;
-      }
+      // Stop any running background tours or orbits before pushing new KML
+      await lgService.orbitStop();
+      await lgService.stopTour();
+      await Future.delayed(const Duration(milliseconds: 100)); // Brief pause for GE to stabilize
 
-      // 2. Fly the camera to the relevant location.
+      // 1. Extract lat/long depending on the template type to point the camera there
       final params = state.activeParameters;
       double lat = GeoMath.extractDouble(params, 'latitude') ??
           GeoMath.extractDouble(params, 'startLatitude') ??
@@ -228,20 +226,11 @@ class PlaygroundController extends Notifier<PlaygroundState> {
         }
       }
 
-      final lgService = ref.read(lgServiceProvider);
-      await lgService.flyToAndOrbit(
-        latitude: lat,
-        longitude: lng,
-        altitude: GeoMath.extractDouble(params, 'altitude') ?? 0.0,
-        heading: GeoMath.extractDouble(params, 'heading') ?? 0.0,
-        tilt: GeoMath.extractDouble(params, 'tilt') ?? 45.0,
-        range: GeoMath.extractDouble(params, 'range') ?? 1000.0,
-      );
-
-      // 3. Send Educational Balloon KML if applicable.
+      // 2. Send Educational Balloon KML if applicable.
+      // Doing this BEFORE sending the main KML ensures the balloon file is already on the 
+      // server when the forced refresh is triggered.
       final templateName = state.activeTemplate?.name;
       if (templateName != null) {
-        // Try to match template name (e.g. "Simple Placemark" -> "Placemark")
         String key = templateName;
         if (templateName.contains('Placemark')) key = 'Placemark';
         else if (templateName.contains('Polygon')) key = 'Polygon';
@@ -261,6 +250,24 @@ class PlaygroundController extends Notifier<PlaygroundState> {
         }
       }
 
+      // 3. Upload the KML to the master screen (triggers force refresh).
+      final uploaded = await playgroundService.sendKml(kml);
+      if (!uploaded) {
+        debugPrint('Playground: KML upload failed.');
+        state = state.copyWith(isPushing: false);
+        return false;
+      }
+
+      // 4. Fly the camera to the relevant location.
+      await lgService.flyToAndOrbit(
+        latitude: lat,
+        longitude: lng,
+        altitude: GeoMath.extractDouble(params, 'altitude') ?? 0.0,
+        heading: GeoMath.extractDouble(params, 'heading') ?? 0.0,
+        tilt: GeoMath.extractDouble(params, 'tilt') ?? 45.0,
+        range: GeoMath.extractDouble(params, 'range') ?? 1000.0,
+      );
+
       debugPrint('Playground: KML pushed and camera moved.');
       state = state.copyWith(isPushing: false);
       return true;
@@ -276,6 +283,12 @@ class PlaygroundController extends Notifier<PlaygroundState> {
     try {
       final playgroundService = ref.read(kmlPlaygroundServiceProvider);
       final lgService = ref.read(lgServiceProvider);
+      
+      // Stop any running background tours or orbits before clearing
+      await lgService.orbitStop();
+      await lgService.stopTour();
+      await Future.delayed(const Duration(milliseconds: 100));
+      
       await lgService.cleanBalloonKML();
       return await playgroundService.clearKml();
     } catch (e) {
