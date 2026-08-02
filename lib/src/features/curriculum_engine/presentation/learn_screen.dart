@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lg_interactive_onboarding/src/common/theme/app_palette.dart';
 
 import 'package:lg_interactive_onboarding/src/common/curriculum/guided_mode_controller.dart';
 import 'package:lg_interactive_onboarding/src/common/curriculum/learning_module.dart';
@@ -155,7 +156,7 @@ class _ProgressCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final progress = total > 0 ? completed / total : 0.0;
     final bg = isDark ? const Color(0xFF2A2A2D) : Colors.white;
-    const accent = Color(0xFF1A73E8);
+    const accent = AppPalette.lgYellow;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -277,16 +278,16 @@ class _ActiveModuleBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A73E8).withValues(alpha: 0.12),
+        color: AppPalette.lgYellow.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFF1A73E8).withValues(alpha: 0.3),
+          color: AppPalette.lgYellow.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
         children: [
           const Icon(Icons.play_circle_outline_rounded,
-              color: Color(0xFF1A73E8), size: 18),
+              color: AppPalette.lgYellow, size: 18),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -294,7 +295,7 @@ class _ActiveModuleBanner extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: const Color(0xFF1A73E8),
+                color: AppPalette.lgYellow,
               ),
             ),
           ),
@@ -326,7 +327,7 @@ class _ModuleCard extends ConsumerWidget {
 
     final bg = isDark ? const Color(0xFF2A2A2D) : Colors.white;
     final border = isActiveModule
-        ? const Color(0xFF1A73E8).withValues(alpha: 0.5)
+        ? AppPalette.lgYellow.withValues(alpha: 0.5)
         : isDark
             ? Colors.white.withValues(alpha: isLocked ? 0.04 : 0.07)
             : Colors.black.withValues(alpha: isLocked ? 0.04 : 0.06);
@@ -347,7 +348,7 @@ class _ModuleCard extends ConsumerWidget {
             boxShadow: isActiveModule
                 ? [
                     BoxShadow(
-                      color: const Color(0xFF1A73E8).withValues(alpha: 0.15),
+                      color: AppPalette.lgYellow.withValues(alpha: 0.15),
                       blurRadius: 12,
                     )
                   ]
@@ -484,7 +485,7 @@ class _ModuleCard extends ConsumerWidget {
       case ModuleStatus.locked:
         return Colors.grey;
       case ModuleStatus.available:
-        return const Color(0xFF1A73E8);
+        return AppPalette.lgYellow;
       case ModuleStatus.inProgress:
         return const Color(0xFFE37400);
       case ModuleStatus.completed:
@@ -506,7 +507,7 @@ class _StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final (label, color) = switch (status) {
       ModuleStatus.locked => ('Locked', Colors.grey),
-      ModuleStatus.available => ('Available', const Color(0xFF1A73E8)),
+      ModuleStatus.available => ('Available', AppPalette.lgYellow),
       ModuleStatus.inProgress => ('In Progress', const Color(0xFFE37400)),
       ModuleStatus.completed => ('Completed', const Color(0xFF1E8E3E)),
     };

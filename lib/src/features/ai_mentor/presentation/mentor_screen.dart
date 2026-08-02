@@ -7,6 +7,7 @@ import 'package:lg_interactive_onboarding/src/features/ai_mentor/presentation/wi
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/presentation/widgets/suggested_prompts.dart';
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/data/stt_service.dart';
 import 'package:lg_interactive_onboarding/src/common/tts/tts_service.dart';
+import 'package:lg_interactive_onboarding/src/common/theme/app_palette.dart';
 
 /// The AI Mentor chat screen — rendered as Tab 2 in the [AppShell].
 ///
@@ -78,7 +79,7 @@ class _MentorScreenState extends ConsumerState<MentorScreen> {
     final tts = ref.watch(ttsServiceProvider);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    const accent = Color(0xFF7C4DFF);
+    const accent = AppPalette.lgRed;
 
     // Clear notification when user is viewing this tab.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -187,7 +188,7 @@ class _MentorScreenState extends ConsumerState<MentorScreen> {
 
   /// Shows a centered welcome + suggested prompts when chat is empty.
   Widget _buildEmptyState(bool isDark) {
-    const accent = Color(0xFF7C4DFF);
+    const accent = AppPalette.lgRed;
 
     return Center(
       child: SingleChildScrollView(
