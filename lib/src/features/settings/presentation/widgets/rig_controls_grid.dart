@@ -4,7 +4,6 @@ import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/common/lg/lg_service.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/system_kml_service.dart';
-import 'package:lg_interactive_onboarding/src/features/kml_playground/data/kml_playground_service.dart';
 import 'package:lg_interactive_onboarding/src/common/theme/app_palette.dart';
 
 class RigControlsGrid extends ConsumerWidget {
@@ -115,38 +114,15 @@ class RigControlsGrid extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
 
-            // Row 3: Clear KML + Clear Logo
+            // Row 3: Clear Logo
             Row(
               children: [
                 Expanded(
-                  flex: 3,
-                  child: RigControlCard(
-                    title: 'Clear KML',
-                    icon: Icons.layers_clear_rounded,
-                    accentColor: AppPalette.warmGrey,
-                    isDark: isDark,
-                    enabled: isConnected,
-                    onTap: () async {
-                      final ok = await ref.read(kmlPlaygroundServiceProvider).clearKml();
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(ok ? 'KML cleared' : 'Clear failed'),
-                            backgroundColor: ok ? AppPalette.sage : AppPalette.terracotta,
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
+                  flex: 1,
                   child: RigControlCard(
                     title: 'Clear Logo',
                     icon: Icons.hide_image_outlined,
-                    accentColor: AppPalette.dustyBlue,
+                    accentColor: AppPalette.lgRed,
                     isDark: isDark,
                     enabled: isConnected,
                     onTap: () => _confirmDangerous(

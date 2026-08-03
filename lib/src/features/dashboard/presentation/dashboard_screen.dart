@@ -14,6 +14,7 @@ import 'widgets/connection_chip.dart';
 import 'widgets/status_banner.dart';
 import 'widgets/section_header.dart';
 import 'widgets/feature_card.dart';
+import 'widgets/clear_kml_card.dart';
 import 'widgets/deep_clean_card.dart';
 
 /// Main dashboard — the hub after connecting to the LG rig.
@@ -155,6 +156,10 @@ class DashboardScreen extends ConsumerWidget {
                   icon: Icons.build_outlined,
                   isDark: isDark,
                 ),
+                const SizedBox(height: 12),
+                
+                // Clear KML card
+                ClearKmlCard(isDark: isDark),
                 const SizedBox(height: 12),
 
                 // Deep Clean card
