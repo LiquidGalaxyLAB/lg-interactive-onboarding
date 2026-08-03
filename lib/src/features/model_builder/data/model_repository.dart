@@ -34,7 +34,6 @@ class ModelRepository {
   static const _modelDir = AppConstants.lgModelDir;
   static const _wrapperDir = AppConstants.lgWrapperDir;
   static const _wrapperMasterKml = AppConstants.lgWrapperMasterKml;
-  static const _systemMasterKml = AppConstants.lgSystemMasterKml;
 
   /// Small delay between SSH channel operations to avoid channel exhaustion.
   Future<void> _channelDelay() => Future.delayed(AppConstants.sshChannelDelay);
@@ -540,7 +539,7 @@ class ModelRepository {
     }
 
     try {
-      await _writeEmptyWrapperMasterKml();
+      await _writeEmptyDeepCleanKmls();
       await _channelDelay();
 
       await _forceRefresh();
@@ -551,7 +550,7 @@ class ModelRepository {
       await Future.delayed(const Duration(seconds: 2));
       await _execute('rm -rf $_modelDir/* && rm -rf $_wrapperDir/*');
 
-      return PushResult(success: true, message: 'Deep clean complete — all model files removed.');
+      return PushResult(success: true, message: 'Deep clean complete — all content removed.');
     } catch (e) {
       debugPrint('Deep clean failed: $e');
       return PushResult(success: false, message: 'Deep clean failed: $e');
@@ -596,6 +595,30 @@ $networkLinks
     await _sshService.uploadFile(
       localData: emptyKml,
       remotePath: _wrapperMasterKml,
+    );
+  }
+
+  Future<void> _writeEmptyDeepCleanKmls() async {
+    final emptyKml = '''<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Empty</name>
+  </Document>
+</kml>''';
+
+    await _sshService.uploadFile(
+      localData: emptyKml,
+      remotePath: _wrapperMasterKml,
+    );
+    await _channelDelay();
+    await _sshService.uploadFile(
+      localData: emptyKml,
+      remotePath: '/var/www/html/kml/playground.kml',
+    );
+    await _channelDelay();
+    await _sshService.uploadFile(
+      localData: emptyKml,
+      remotePath: '/var/www/html/kml/balloon.kml',
     );
   }
 

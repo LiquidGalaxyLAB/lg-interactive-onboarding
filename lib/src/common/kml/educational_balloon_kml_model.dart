@@ -23,6 +23,9 @@ class EducationalBalloonKmlModel {
   <Document>
     <name>${title} Information</name>
     <Style id="educational_balloon_style_$cleanId">
+      <IconStyle>
+        <scale>0</scale>
+      </IconStyle>
       <BalloonStyle>
         <bgColor>ff1e1e1e</bgColor>
         <text><![CDATA[

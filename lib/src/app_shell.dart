@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/curriculum/guided_mode_controller.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
+import 'package:lg_interactive_onboarding/src/common/ssh/system_kml_service.dart';
 import 'package:lg_interactive_onboarding/src/common/theme/app_palette.dart';
 import 'package:lg_interactive_onboarding/src/common/tts/tts_service.dart';
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/data/mentor_service.dart';
@@ -61,9 +62,12 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
     if (state == AppLifecycleState.detached) {
       final ssh = ref.read(sshServiceProvider);
       if (ssh.isConnected) {
+        final kmlService = ref.read(systemKmlServiceProvider);
         final logo = ref.read(logoOverlayServiceProvider);
         // Fire-and-forget — best-effort before process is killed.
-        logo.clearLogo().then((_) => ssh.disconnect());
+        logo.clearLogo().then((_) {
+          kmlService.cleanUp().then((_) => ssh.disconnect());
+        });
       }
     }
   }

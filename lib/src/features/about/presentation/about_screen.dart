@@ -77,11 +77,12 @@ class AboutScreen extends StatelessWidget {
                 const SizedBox(height: 32),
                 Text(
                   'Project Contributions:\n\n'
-                  '• Serves as a comprehensive, interactive onboarding suite for the Liquid Galaxy platform.\n'
-                  '• Lowers the barrier to entry for new developers and community members.\n'
-                  '• Provides an intuitive interface to learn the system\'s architecture and interact with the rig.\n'
-                  '• Streamlines the deployment of custom KML content and 3D models with extended format support.\n'
-                  '• Empowers the community to create richer spatial experiences and accelerates new application development.',
+                  '• OpenRouter AI Mentor with Local Vector RAG and Full Speech Accessibility.\n'
+                  '• Interactive KML Playground & System KML Slot Architecture.\n'
+                  '• Rebuilt 3D Model Rendering Pipeline (fixing distortion & shaders on LG rig).\n'
+                  '• Live-Streamed Orbital Tours & Educational KML Balloon integrations.\n'
+                  '• Curriculum Engine with auto-verification & Minimal Surface UI integration.\n'
+                  '• Ultimate Deep Clean system for flawless Liquid Galaxy state management.',
                   style: TextStyle(
                     fontSize: 15,
                     height: 1.6,
