@@ -78,6 +78,7 @@ flutter:
     - assets/logos/logo_banner.png
     - assets/logos/apk_logo.png
     - assets/knowledge/
+    - assets/kml_icons/
 
 flutter_launcher_icons:
   android: "launcher_icon"

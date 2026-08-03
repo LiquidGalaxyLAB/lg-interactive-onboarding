@@ -289,6 +289,16 @@ class SSHService extends ChangeNotifier {
     required String localData,
     required String remotePath,
   }) async {
+    return uploadBinaryFile(
+      localData: Uint8List.fromList(localData.codeUnits),
+      remotePath: remotePath,
+    );
+  }
+
+  Future<SSHUploadResult> uploadBinaryFile({
+    required Uint8List localData,
+    required String remotePath,
+  }) async {
     if (!isConnected) {
       debugPrint('SSH: Not connected, cannot upload to $remotePath');
       return SSHUploadFailure('Not connected');
@@ -307,13 +317,12 @@ class SSHService extends ChangeNotifier {
             SftpFileOpenMode.truncate |
             SftpFileOpenMode.write,
       );
-      final bytes = Uint8List.fromList(localData.codeUnits);
-      await file.write(_chunkedStream(bytes));
+      await file.write(_chunkedStream(localData));
       await file.close();
-      debugPrint('SSH: File uploaded to $remotePath');
+      debugPrint('SSH: Binary file uploaded to $remotePath');
       return const SSHUploadSuccess();
     } catch (e) {
-      debugPrint('SSH: SFTP upload failed: $e');
+      debugPrint('SSH: SFTP binary upload failed: $e');
       return SSHUploadFailure('$e');
     }
   }
