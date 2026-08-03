@@ -545,6 +545,9 @@ class PushNotifier extends Notifier<PushState> {
       message: 'Deep cleaning LG rig...',
     );
 
+    // Disrupt any ongoing tours or orbits (this also calls stopTour internally)
+    await ref.read(lgServiceProvider).orbitStop();
+
     final result = await repo.deepClean();
 
     if (result.success) {
