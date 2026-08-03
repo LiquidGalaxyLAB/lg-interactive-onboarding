@@ -77,112 +77,123 @@ class _MentorScreenState extends ConsumerState<MentorScreen> {
     final mentor = ref.watch(mentorServiceProvider);
     final stt = ref.watch(sttServiceProvider);
     final tts = ref.watch(ttsServiceProvider);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    const accent = AppPalette.lgRed;
 
-    // Clear notification when user is viewing this tab.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      mentor.clearNotification();
-    });
+    return ListenableBuilder(
+      listenable: Listenable.merge([mentor, stt, tts]),
+      builder: (context, _) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+        const accent = AppPalette.lgRed;
 
-    // Auto-scroll when new messages arrive.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+        // Clear notification when user is viewing this tab.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          mentor.clearNotification();
+        });
 
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121214) : const Color(0xFFFAFAFC),
+        // Auto-scroll when new messages arrive.
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
 
-      // ── App Bar ──────────────────────────────────────────────────────────
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: isDark ? const Color(0xFF1E1E20) : Colors.white,
-        surfaceTintColor: Colors.transparent,
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.psychology_alt,
-                color: accent,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              'AI Mentor',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.3,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          // TTS toggle
-          IconButton(
-            icon: Icon(
-              tts.isEnabled
-                  ? Icons.volume_up_rounded
-                  : Icons.volume_off_rounded,
-              color: tts.isEnabled
-                  ? accent
-                  : (isDark ? Colors.white38 : Colors.black38),
-            ),
-            tooltip: tts.isEnabled ? 'Mute voice' : 'Unmute voice',
-            onPressed: () => ref.read(mentorServiceProvider).toggleTts(),
-          ),
+        return Scaffold(
+          backgroundColor: isDark ? const Color(0xFF121214) : const Color(0xFFFAFAFC),
 
-          // Clear history
-          if (mentor.history.isNotEmpty)
-            IconButton(
-              icon: Icon(
-                Icons.delete_outline_rounded,
-                color: isDark ? Colors.white38 : Colors.black38,
-              ),
-              tooltip: 'Clear chat',
-              onPressed: () => _showClearDialog(context),
-            ),
-          const SizedBox(width: 8),
-        ],
-      ),
-
-      body: Column(
-        children: [
-          // ── Messages ─────────────────────────────────────────────────────
-          Expanded(
-            child: mentor.history.isEmpty && !mentor.isLoading
-                ? _buildEmptyState(isDark)
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.only(top: 16, bottom: 8),
-                    itemCount: mentor.history.length +
-                        (mentor.isLoading ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      // Typing indicator at the end
-                      if (index == mentor.history.length) {
-                        return const TypingIndicator();
-                      }
-
-                      final message = mentor.history[index];
-                      return ChatBubble(
-                        text: message.content,
-                        isUser: message.role == 'user',
-                        timestamp: message.timestamp,
-                      );
-                    },
+          // ── App Bar ──────────────────────────────────────────────────────────
+          appBar: AppBar(
+            automaticallyImplyLeading: false,
+            backgroundColor: isDark ? const Color(0xFF1E1E20) : Colors.white,
+            surfaceTintColor: Colors.transparent,
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
+                  child: const Icon(
+                    Icons.psychology_alt,
+                    color: accent,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'AI Mentor',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              // TTS toggle
+              IconButton(
+                icon: Icon(
+                  tts.isEnabled
+                      ? Icons.volume_up_rounded
+                      : Icons.volume_off_rounded,
+                  color: tts.isEnabled
+                      ? accent
+                      : (isDark ? Colors.white38 : Colors.black38),
+                ),
+                tooltip: tts.isEnabled ? 'Mute voice' : 'Unmute voice',
+                onPressed: () => ref.read(mentorServiceProvider).toggleTts(),
+              ),
+
+              // Clear history
+              if (mentor.history.isNotEmpty)
+                IconButton(
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    color: isDark ? Colors.white38 : Colors.black38,
+                  ),
+                  tooltip: 'Clear chat',
+                  onPressed: () => _showClearDialog(context),
+                ),
+              const SizedBox(width: 8),
+            ],
           ),
 
-          // ── Input bar ────────────────────────────────────────────────────
-          _buildInputBar(isDark, accent, stt),
-        ],
-      ),
+          body: Column(
+            children: [
+              // ── Messages ─────────────────────────────────────────────────────
+              Expanded(
+                child: mentor.history.isEmpty && !mentor.isLoading
+                    ? _buildEmptyState(isDark)
+                    : ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.only(top: 16, bottom: 8),
+                        itemCount: mentor.history.length +
+                            (mentor.isLoading ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          // Typing indicator at the end
+                          if (index == mentor.history.length) {
+                            return const TypingIndicator();
+                          }
+
+                          // Safety check for out of bounds
+                          if (index >= mentor.history.length) {
+                            return const SizedBox.shrink();
+                          }
+
+                          final message = mentor.history[index];
+                          return ChatBubble(
+                            text: message.content,
+                            isUser: message.role == 'user',
+                            timestamp: message.timestamp,
+                          );
+                        },
+                      ),
+              ),
+
+              // ── Input bar ────────────────────────────────────────────────────
+              _buildInputBar(isDark, accent, stt),
+            ],
+          ),
+        );
+      },
     );
   }
 
