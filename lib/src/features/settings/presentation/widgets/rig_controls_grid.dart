@@ -123,7 +123,7 @@ class RigControlsGrid extends ConsumerWidget {
                   child: RigControlCard(
                     title: 'Clear KML',
                     icon: Icons.layers_clear_rounded,
-                    accentColor: AppPalette.warmGrey,
+                    accentColor: AppPalette.lgYellow,
                     isDark: isDark,
                     enabled: isConnected,
                     onTap: () async {
@@ -131,7 +131,7 @@ class RigControlsGrid extends ConsumerWidget {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(ok ? 'KML cleared' : 'Clear failed'),
+                            content: Text(ok ? 'KML cleared' : 'Failed to clear KML'),
                             backgroundColor: ok ? AppPalette.sage : AppPalette.terracotta,
                             duration: const Duration(seconds: 2),
                           ),
@@ -142,7 +142,7 @@ class RigControlsGrid extends ConsumerWidget {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  flex: 2,
+                  flex: 3,
                   child: RigControlCard(
                     title: 'Clear Logo',
                     icon: Icons.hide_image_outlined,
@@ -274,14 +274,14 @@ class _RigControlCardState extends State<RigControlCard> {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: widget.enabled
-                ? widget.accentColor.withValues(alpha: widget.isDark ? 0.2 : 0.15)
+                ? (widget.isDark ? Colors.white12 : const Color(0xFFDADCE0))
                 : Colors.transparent,
           ),
           boxShadow: [
             if (widget.enabled && !_pressed)
               BoxShadow(
-                color: widget.accentColor.withValues(alpha: 0.08),
-                blurRadius: 12,
+                color: Colors.black.withValues(alpha: widget.isDark ? 0.2 : 0.04),
+                blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
           ],

@@ -56,7 +56,25 @@ class AboutScreen extends StatelessWidget {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Image.asset(
+                        'assets/logos/logo_banner.png',
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 32),
                 Text(
                   'Project Contributions:\n\n'
                   '• Serves as a comprehensive, interactive onboarding suite for the Liquid Galaxy platform.\n'

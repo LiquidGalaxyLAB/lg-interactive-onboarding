@@ -120,7 +120,7 @@ class DashboardScreen extends ConsumerWidget {
                   title: '3D Model Builder',
                   subtitle: 'Import, place, and push 3D models to Liquid Galaxy',
                   icon: Icons.view_in_ar_outlined,
-                  accentColor: DashboardPalette.modelBuilderIndigo,
+                  accentColor: DashboardPalette.lgGreen,
                   isDark: isDark,
                   spotlightKey: 'model_builder_card',
                   onTap: () => Navigator.of(context).push(
@@ -137,7 +137,7 @@ class DashboardScreen extends ConsumerWidget {
                   title: 'KML Playground',
                   subtitle: 'Create and tweak KML elements — push live to Liquid Galaxy',
                   icon: Icons.science_outlined,
-                  accentColor: DashboardPalette.kmlPlaygroundTeal,
+                  accentColor: DashboardPalette.lgBlue,
                   isDark: isDark,
                   spotlightKey: 'kml_playground_card',
                   onTap: () => Navigator.of(context).push(
@@ -156,7 +156,7 @@ class DashboardScreen extends ConsumerWidget {
                   isDark: isDark,
                 ),
                 const SizedBox(height: 12),
-
+                
                 // Deep Clean card
                 DeepCleanCard(isDark: isDark),
 

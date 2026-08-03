@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:lg_interactive_onboarding/src/common/curriculum/guided_mode_controller.dart';
-import 'dashboard_palette.dart';
 
 class FeatureCard extends StatefulWidget {
   final String title;
@@ -31,9 +30,10 @@ class _FeatureCardState extends State<FeatureCard> {
 
   @override
   Widget build(BuildContext context) {
-    final surfaceColor = widget.isDark
-        ? const Color(0xFF2A2A2D)   // M3 dark surface variant
-        : Colors.white;
+    final theme = Theme.of(context);
+    final surfaceColor = widget.isDark ? const Color(0xFF2A2A2D) : Colors.white;
+    final textColor = theme.colorScheme.onSurface;
+    final subTextColor = theme.colorScheme.onSurfaceVariant;
 
     return GestureDetector(
       key: widget.spotlightKey != null ? GuidedModeController.spotlightKey(widget.spotlightKey!) : null,
@@ -54,16 +54,14 @@ class _FeatureCardState extends State<FeatureCard> {
           color: surfaceColor,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: widget.accentColor.withValues(
-              alpha: widget.isDark ? 0.15 : 0.1,
-            ),
+            color: widget.isDark ? Colors.white12 : const Color(0xFFDADCE0),
           ),
           boxShadow: [
             if (!_pressed)
               BoxShadow(
-                color: widget.accentColor.withValues(alpha: 0.06),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
+                color: Colors.black.withValues(alpha: widget.isDark ? 0.2 : 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
           ],
         ),
@@ -72,9 +70,7 @@ class _FeatureCardState extends State<FeatureCard> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: widget.accentColor.withValues(
-                  alpha: widget.isDark ? 0.15 : 0.08,
-                ),
+                color: widget.accentColor.withValues(alpha: widget.isDark ? 0.15 : 0.1),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
@@ -93,7 +89,7 @@ class _FeatureCardState extends State<FeatureCard> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: widget.isDark ? Colors.white : DashboardPalette.inkDark,
+                      color: textColor,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -101,9 +97,7 @@ class _FeatureCardState extends State<FeatureCard> {
                     widget.subtitle,
                     style: TextStyle(
                       fontSize: 12,
-                      color: widget.isDark
-                          ? Colors.white54
-                          : DashboardPalette.warmGrey,
+                      color: subTextColor,
                     ),
                   ),
                 ],
@@ -112,9 +106,7 @@ class _FeatureCardState extends State<FeatureCard> {
             Icon(
               Icons.arrow_forward_ios_rounded,
               size: 16,
-              color: widget.isDark
-                  ? Colors.white30
-                  : DashboardPalette.warmGrey.withValues(alpha: 0.5),
+              color: textColor.withValues(alpha: 0.6),
             ),
           ],
         ),

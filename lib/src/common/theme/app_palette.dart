@@ -11,6 +11,22 @@ import 'package:flutter/material.dart';
 class AppPalette {
   AppPalette._();
 
+  // ── Liquid Galaxy Brand Colors ─────────────────────────────────────────────
+  /// LG Red — AI Mentor module accent.
+  static const lgRed    = Color(0xFFEA4335);
+
+  /// LG Blue — Connection & Settings module accent.
+  static const lgBlue   = Color(0xFF4285F4);
+
+  /// LG Yellow — Learn & Curriculum module accent.
+  static const lgYellow = Color(0xFFFBBC05);
+
+  /// LG Green — Model Builder & Upload module accent.
+  static const lgGreen  = Color(0xFF34A853);
+
+  /// Ordered gradient stops for the LG brand stripe (Red → Yellow → Green → Blue).
+  static const lgGradientColors = [lgRed, lgYellow, lgGreen, lgBlue];
+
   // ── Primary ────────────────────────────────────────────────────────────────
   /// Google Blue — primary brand colour (same as Google Workspace).
   static const primary = Color(0xFF1A73E8);

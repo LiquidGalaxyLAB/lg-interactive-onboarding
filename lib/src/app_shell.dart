@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/curriculum/guided_mode_controller.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
+import 'package:lg_interactive_onboarding/src/common/theme/app_palette.dart';
 import 'package:lg_interactive_onboarding/src/common/tts/tts_service.dart';
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/data/mentor_service.dart';
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/presentation/mentor_screen.dart';
@@ -32,6 +33,13 @@ class AppShell extends ConsumerStatefulWidget {
 
 class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver {
   int _selectedIndex = 0;
+
+  /// Per-tab accent color from the LG brand palette.
+  static const _tabColors = [
+    AppPalette.lgBlue,   // Home / Connect
+    AppPalette.lgYellow, // Learn
+    AppPalette.lgRed,    // AI Mentor
+  ];
 
   @override
   void initState() {
@@ -66,8 +74,7 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
     final mentor = ref.read(mentorServiceProvider);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    const accent = Color(0xFF1A73E8);
-    const mentorAccent = Color(0xFF7C4DFF);
+    final activeColor = _tabColors[_selectedIndex];
 
     // ── Sync local index ↔ provider (for programmatic tab switches) ────────
     // The MentorAvatar widget sets the provider to navigate here.
@@ -105,7 +112,19 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
       // ── Bottom navigation bar ──────────────────────────────────────────
       bottomNavigationBar: ListenableBuilder(
         listenable: mentor,
-        builder: (context, _) => NavigationBar(
+        builder: (context, _) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── LG brand gradient line ────────────────────────────────────
+            Container(
+              height: 2,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: AppPalette.lgGradientColors,
+                ),
+              ),
+            ),
+            NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (i) {
           if (_selectedIndex == 2 && i != 2) {
@@ -115,7 +134,7 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
           ref.read(shellTabIndexProvider.notifier).set(i);
         },
         backgroundColor: isDark ? const Color(0xFF1E1E20) : Colors.white,
-        indicatorColor: accent.withValues(alpha: 0.15),
+        indicatorColor: activeColor.withValues(alpha: 0.15),
         shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
@@ -124,45 +143,45 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
             icon: Icon(
               Icons.home_outlined,
               color: _selectedIndex == 0
-                  ? accent
+                  ? _tabColors[0]
                   : (isDark ? Colors.white38 : Colors.black38),
             ),
-            selectedIcon: const Icon(Icons.home_rounded, color: Color(0xFF1A73E8)),
+            selectedIcon: Icon(Icons.home_rounded, color: _tabColors[0]),
             label: 'Home',
           ),
           NavigationDestination(
             icon: Badge(
               isLabelVisible: guidedState.isActive && _selectedIndex != 1,
-              backgroundColor: const Color(0xFFB3261E),
+              backgroundColor: _tabColors[1],
               child: Icon(
                 Icons.school_outlined,
                 color: _selectedIndex == 1
-                    ? accent
+                    ? _tabColors[1]
                     : (isDark ? Colors.white38 : Colors.black38),
               ),
             ),
-            selectedIcon:
-                const Icon(Icons.school_rounded, color: Color(0xFF1A73E8)),
+            selectedIcon: Icon(Icons.school_rounded, color: _tabColors[1]),
             label: 'Learn',
           ),
           NavigationDestination(
             icon: Badge(
               isLabelVisible:
                   mentor.hasPendingNotification && _selectedIndex != 2,
-              backgroundColor: mentorAccent,
+              backgroundColor: _tabColors[2],
               child: Icon(
                 Icons.psychology_alt_outlined,
                 color: _selectedIndex == 2
-                    ? mentorAccent
+                    ? _tabColors[2]
                     : (isDark ? Colors.white38 : Colors.black38),
               ),
             ),
-            selectedIcon:
-                const Icon(Icons.psychology_alt, color: Color(0xFF7C4DFF)),
+            selectedIcon: Icon(Icons.psychology_alt, color: _tabColors[2]),
             label: 'AI Mentor',
           ),
         ],
       ),
+          ],
+        ),
       ),
     );
   }
