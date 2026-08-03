@@ -74,7 +74,7 @@ class DeepCleanCard extends ConsumerWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Remove all files from /model & /3d_model_wrapper, reset master KML',
+                        'Completely clears the screens and wipes all uploaded files from the rig.',
                         style: TextStyle(
                           fontSize: 11,
                           color: subTextColor,
