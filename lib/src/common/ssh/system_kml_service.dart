@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
@@ -125,8 +126,52 @@ class SystemKmlService {
       }
 
       debugPrint('SystemKmlService: Static KMLs initialized successfully.');
+      
+      // Upload the local KML icons to the rig
+      await _uploadKmlIcons();
     } catch (e) {
       debugPrint('SystemKmlService: Failed to initialize static KMLs: $e');
+    }
+  }
+
+  /// Uploads local KML balloon icons from assets to the LG rig's web server.
+  Future<void> _uploadKmlIcons() async {
+    const icons = [
+      'tree.png', 'car.png', 'pyramid.png', 'football.png',
+      'placemark.png', 'polygon.png', 'linestring.png',
+      'ground_overlay.png', 'screen_overlay.png', 'tour.png'
+    ];
+    
+    try {
+      await _execute('mkdir -p /var/www/html/kml_icons');
+      await _channelDelay();
+      
+      for (final icon in icons) {
+        final byteData = await rootBundle.load('assets/kml_icons/$icon');
+        final bytes = byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes);
+        await _sshService.uploadBinaryFile(
+          localData: bytes,
+          remotePath: '/var/www/html/kml_icons/$icon',
+        );
+        await _channelDelay();
+      }
+      debugPrint('SystemKmlService: KML icons uploaded successfully.');
+    } catch (e) {
+      debugPrint('SystemKmlService: Failed to upload KML icons: $e');
+    }
+  }
+
+  /// Cleans up any static assets uploaded by this service (e.g. kml_icons directory, model wrapper, and models).
+  Future<void> cleanUp() async {
+    if (!_sshService.isConnected) return;
+    try {
+      await _execute('rm -rf /var/www/html/kml_icons');
+      await _execute('rm -rf ${AppConstants.lgModelDir}');
+      await _execute('rm -rf ${AppConstants.lgWrapperDir}');
+      await _execute('rm -f /var/www/html/kml/balloon.kml /var/www/html/kml/logo.kml /var/www/html/kml/playground.kml');
+      debugPrint('SystemKmlService: Cleaned up KML icons, models, wrappers, and dynamic KMLs.');
+    } catch (e) {
+      debugPrint('SystemKmlService: Failed to clean up: $e');
     }
   }
 

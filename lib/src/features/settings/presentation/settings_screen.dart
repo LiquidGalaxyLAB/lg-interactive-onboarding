@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
+import 'package:lg_interactive_onboarding/src/common/ssh/system_kml_service.dart';
 import 'package:lg_interactive_onboarding/src/common/tts/tts_service.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 import 'widgets/rig_controls_grid.dart';
@@ -180,9 +181,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!mounted) return;
     setState(() => _isConnecting = true);
 
-    // Clear logo while SSH is still connected, then disconnect.
+    // Clear logo visually first, then clean up all files, then disconnect.
     if (ssh.isConnected) {
       await ref.read(logoOverlayServiceProvider).clearLogo();
+      await ref.read(systemKmlServiceProvider).cleanUp();
     }
     await ssh.disconnect();
     final result = await ssh.connect(
@@ -414,8 +416,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 height: 52,
                 child: OutlinedButton.icon(
                   onPressed: () async {
-                    // Clear logo while SSH is still connected, then disconnect.
+                    // Clear logo visually first, then clean up all files, then disconnect.
                     await ref.read(logoOverlayServiceProvider).clearLogo();
+                    await ref.read(systemKmlServiceProvider).cleanUp();
                     await ssh.disconnect();
                     setState(() {});
                   },
