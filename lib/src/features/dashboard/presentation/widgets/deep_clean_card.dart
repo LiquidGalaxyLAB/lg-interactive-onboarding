@@ -20,6 +20,11 @@ class DeepCleanCard extends ConsumerWidget {
       builder: (context, _) {
         final isConnected = ssh.isConnected;
         final enabled = isConnected && !isPushing;
+        final theme = Theme.of(context);
+        final surfaceColor = isDark ? const Color(0xFF2A2A2D) : Colors.white;
+        final textColor = enabled ? theme.colorScheme.onSurface : (isDark ? Colors.white38 : DashboardPalette.warmGrey);
+        final subTextColor = enabled ? theme.colorScheme.onSurfaceVariant : (isDark ? Colors.white24 : DashboardPalette.warmGrey.withValues(alpha: 0.4));
+        final accentColor = DashboardPalette.deepCleanRed;
 
         return GestureDetector(
           key: GuidedModeController.spotlightKey('deep_clean_btn'),
@@ -27,17 +32,17 @@ class DeepCleanCard extends ConsumerWidget {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: enabled
-                  ? DashboardPalette.deepCleanRed
-                  : Theme.of(context).colorScheme.surface,
+              color: surfaceColor,
               borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isDark ? Colors.white12 : const Color(0xFFDADCE0),
+              ),
               boxShadow: [
-                if (enabled)
-                  BoxShadow(
-                    color: DashboardPalette.deepCleanRed.withValues(alpha: 0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
               ],
             ),
             child: Row(
@@ -45,17 +50,13 @@ class DeepCleanCard extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: enabled
-                        ? Colors.white.withValues(alpha: 0.15)
-                        : DashboardPalette.deepCleanRed.withValues(alpha: 0.04),
+                    color: accentColor.withValues(alpha: enabled ? (isDark ? 0.15 : 0.1) : 0.04),
                     borderRadius: BorderRadius.circular(11),
                   ),
                   child: Icon(
                     Icons.delete_forever_rounded,
                     size: 22,
-                    color: enabled
-                        ? Colors.white
-                        : DashboardPalette.deepCleanRed.withValues(alpha: 0.4),
+                    color: enabled ? accentColor : accentColor.withValues(alpha: 0.4),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -68,9 +69,7 @@ class DeepCleanCard extends ConsumerWidget {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: enabled
-                              ? Colors.white
-                              : (isDark ? Colors.white38 : DashboardPalette.warmGrey),
+                          color: textColor,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -78,11 +77,7 @@ class DeepCleanCard extends ConsumerWidget {
                         'Remove all files from /model & /3d_model_wrapper, reset master KML',
                         style: TextStyle(
                           fontSize: 11,
-                          color: enabled
-                              ? Colors.white.withValues(alpha: 0.8)
-                              : (isDark
-                                  ? Colors.white24
-                                  : DashboardPalette.warmGrey.withValues(alpha: 0.4)),
+                          color: subTextColor,
                         ),
                       ),
                     ],

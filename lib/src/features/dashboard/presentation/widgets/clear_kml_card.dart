@@ -20,10 +20,13 @@ class _ClearKmlCardState extends ConsumerState<ClearKmlCard> {
   Widget build(BuildContext context) {
     final ssh = ref.watch(sshServiceProvider);
     final isConnected = ssh.isConnected;
+    final theme = Theme.of(context);
+    final surfaceColor = widget.isDark ? const Color(0xFF2A2A2D) : Colors.white;
+    final txtColor = isConnected ? theme.colorScheme.onSurface : (widget.isDark ? Colors.white38 : DashboardPalette.warmGrey);
+    final subTxtColor = isConnected ? theme.colorScheme.onSurfaceVariant : (widget.isDark ? Colors.white24 : DashboardPalette.warmGrey.withValues(alpha: 0.4));
     
-    // Using LG Yellow to complete the 4-color harmony on the dashboard
+    // Using LG Yellow as an accent
     const accentColor = DashboardPalette.lgYellow;
-    final textColor = accentColor.computeLuminance() > 0.5 ? Colors.black87 : Colors.white;
 
     return GestureDetector(
       key: GuidedModeController.spotlightKey('clear_kml_btn'),
@@ -41,17 +44,17 @@ class _ClearKmlCardState extends ConsumerState<ClearKmlCard> {
         ),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isConnected
-              ? accentColor
-              : Theme.of(context).colorScheme.surface,
+          color: surfaceColor,
           borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: widget.isDark ? Colors.white12 : const Color(0xFFDADCE0),
+          ),
           boxShadow: [
-            if (isConnected && !_pressed)
-              BoxShadow(
-                color: accentColor.withValues(alpha: 0.3),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: widget.isDark ? 0.2 : 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
           ],
         ),
         child: Row(
@@ -59,17 +62,13 @@ class _ClearKmlCardState extends ConsumerState<ClearKmlCard> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: isConnected
-                    ? textColor.withValues(alpha: 0.15)
-                    : accentColor.withValues(alpha: 0.04),
+                color: accentColor.withValues(alpha: isConnected ? (widget.isDark ? 0.15 : 0.1) : 0.04),
                 borderRadius: BorderRadius.circular(11),
               ),
               child: Icon(
                 Icons.layers_clear_rounded,
                 size: 22,
-                color: isConnected
-                    ? textColor
-                    : accentColor.withValues(alpha: 0.4),
+                color: isConnected ? accentColor : accentColor.withValues(alpha: 0.4),
               ),
             ),
             const SizedBox(width: 14),
@@ -82,9 +81,7 @@ class _ClearKmlCardState extends ConsumerState<ClearKmlCard> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: isConnected
-                          ? textColor
-                          : (widget.isDark ? Colors.white38 : DashboardPalette.warmGrey),
+                      color: txtColor,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -92,11 +89,7 @@ class _ClearKmlCardState extends ConsumerState<ClearKmlCard> {
                     'Remove standard KML layers from the Liquid Galaxy display',
                     style: TextStyle(
                       fontSize: 11,
-                      color: isConnected
-                          ? textColor.withValues(alpha: 0.8)
-                          : (widget.isDark
-                              ? Colors.white24
-                              : DashboardPalette.warmGrey.withValues(alpha: 0.4)),
+                      color: subTxtColor,
                     ),
                   ),
                 ],

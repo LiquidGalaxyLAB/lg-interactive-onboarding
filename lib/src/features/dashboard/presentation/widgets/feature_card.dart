@@ -30,12 +30,10 @@ class _FeatureCardState extends State<FeatureCard> {
 
   @override
   Widget build(BuildContext context) {
-    // Determine if the accent color is light (like LG Yellow) or dark (like LG Blue/Red/Green)
-    // to ensure the text and icons contrast perfectly against the solid background.
-    final textColor = widget.accentColor.computeLuminance() > 0.5
-        ? Colors.black87
-        : Colors.white;
-    final subTextColor = textColor.withValues(alpha: 0.8);
+    final theme = Theme.of(context);
+    final surfaceColor = widget.isDark ? const Color(0xFF2A2A2D) : Colors.white;
+    final textColor = theme.colorScheme.onSurface;
+    final subTextColor = theme.colorScheme.onSurfaceVariant;
 
     return GestureDetector(
       key: widget.spotlightKey != null ? GuidedModeController.spotlightKey(widget.spotlightKey!) : null,
@@ -53,14 +51,17 @@ class _FeatureCardState extends State<FeatureCard> {
         ),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: widget.accentColor, // Solid LG Color
+          color: surfaceColor,
           borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: widget.isDark ? Colors.white12 : const Color(0xFFDADCE0),
+          ),
           boxShadow: [
             if (!_pressed)
               BoxShadow(
-                color: widget.accentColor.withValues(alpha: widget.isDark ? 0.2 : 0.3),
-                blurRadius: 15,
-                offset: const Offset(0, 6),
+                color: Colors.black.withValues(alpha: widget.isDark ? 0.2 : 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
           ],
         ),
@@ -69,13 +70,13 @@ class _FeatureCardState extends State<FeatureCard> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: textColor.withValues(alpha: 0.15), // Subtle tint over the solid color
+                color: widget.accentColor.withValues(alpha: widget.isDark ? 0.15 : 0.1),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
                 widget.icon,
                 size: 28,
-                color: textColor,
+                color: widget.accentColor,
               ),
             ),
             const SizedBox(width: 16),
