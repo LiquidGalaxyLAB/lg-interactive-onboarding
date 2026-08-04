@@ -33,6 +33,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late final TextEditingController _claudeModelCtrl;
   late final TextEditingController _ollamaBaseUrlCtrl;
   late final TextEditingController _ollamaModelCtrl;
+  late final TextEditingController _groqApiKeyCtrl;
+  late final TextEditingController _groqModelCtrl;
 
   bool _isConnecting = false;
   bool _obscurePassword = true;
@@ -64,6 +66,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _claudeModelCtrl = TextEditingController(text: settings.claudeModel);
     _ollamaBaseUrlCtrl = TextEditingController(text: settings.ollamaBaseUrl);
     _ollamaModelCtrl = TextEditingController(text: settings.ollamaModel);
+    _groqApiKeyCtrl = TextEditingController(text: settings.groqApiKey);
+    _groqModelCtrl = TextEditingController(text: settings.groqModel);
     
     _voiceNarration = settings.voiceNarration;
     ref.read(ttsServiceProvider).setEnabled(_voiceNarration);
@@ -105,6 +109,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _claudeModelCtrl.dispose();
     _ollamaBaseUrlCtrl.dispose();
     _ollamaModelCtrl.dispose();
+    _groqApiKeyCtrl.dispose();
+    _groqModelCtrl.dispose();
     super.dispose();
   }
 
@@ -124,6 +130,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await settings.setClaudeModel(_claudeModelCtrl.text.trim());
       await settings.setOllamaBaseUrl(_ollamaBaseUrlCtrl.text.trim());
       await settings.setOllamaModel(_ollamaModelCtrl.text.trim());
+      await settings.setGroqApiKey(_groqApiKeyCtrl.text.trim());
+      await settings.setGroqModel(_groqModelCtrl.text.trim());
       
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -322,6 +330,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 labelText: 'Ollama Model Name',
                 prefixIcon: Icon(Icons.psychology_alt),
                 hintText: 'e.g. llama3',
+              ),
+            ),
+          ],
+        );
+      case LLMProviderType.groq:
+        return Column(
+          children: [
+            TextField(
+              controller: _groqApiKeyCtrl,
+              obscureText: _obscureApiKey,
+              decoration: InputDecoration(
+                labelText: 'Groq API Key',
+                prefixIcon: const Icon(Icons.vpn_key),
+                suffixIcon: IconButton(
+                  icon: Icon(_obscureApiKey ? Icons.visibility : Icons.visibility_off),
+                  onPressed: () => setState(() => _obscureApiKey = !_obscureApiKey),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _groqModelCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Groq Model Name',
+                prefixIcon: Icon(Icons.psychology_alt),
+                hintText: 'e.g. llama-3.1-8b-instant',
               ),
             ),
           ],
@@ -557,6 +591,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 DropdownMenuItem(value: LLMProviderType.openAI, child: Text('OpenAI')),
                 DropdownMenuItem(value: LLMProviderType.claude, child: Text('Anthropic Claude')),
                 DropdownMenuItem(value: LLMProviderType.ollama, child: Text('Ollama (Local)')),
+                DropdownMenuItem(value: LLMProviderType.groq, child: Text('Groq')),
               ],
               onChanged: (val) {
                 if (val != null) {

@@ -7,6 +7,7 @@ import 'providers/gemini_provider.dart';
 import 'providers/openai_provider.dart';
 import 'providers/claude_provider.dart';
 import 'providers/ollama_provider.dart';
+import 'providers/groq_provider.dart';
 
 abstract class LLMProviderService {
   /// Generates a response from the LLM provider based on the given prompt and conversation history.
@@ -45,6 +46,11 @@ final llmServiceProvider = Provider<LLMProviderService>((ref) {
       return OllamaProvider(
         baseUrl: settings.ollamaBaseUrl,
         modelName: settings.ollamaModel,
+      );
+    case LLMProviderType.groq:
+      return GroqProvider(
+        apiKey: settings.groqApiKey,
+        modelName: settings.groqModel,
       );
   }
 });

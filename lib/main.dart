@@ -32,6 +32,7 @@ void main() async {
   final initialGeminiApiKey = await secureStorage.read(key: 'geminiApiKey') ?? '';
   final initialOpenAIApiKey = await secureStorage.read(key: 'openAIApiKey') ?? '';
   final initialClaudeApiKey = await secureStorage.read(key: 'claudeApiKey') ?? '';
+  final initialGroqApiKey = await secureStorage.read(key: 'groqApiKey') ?? '';
 
   runApp(
     ProviderScope(
@@ -43,6 +44,7 @@ void main() async {
         initialGeminiApiKeyProvider.overrideWithValue(initialGeminiApiKey),
         initialOpenAIApiKeyProvider.overrideWithValue(initialOpenAIApiKey),
         initialClaudeApiKeyProvider.overrideWithValue(initialClaudeApiKey),
+        initialGroqApiKeyProvider.overrideWithValue(initialGroqApiKey),
       ],
       child: LGContentStudioApp(navigatorKey: rootNavigatorKey),
     ),

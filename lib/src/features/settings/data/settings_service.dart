@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 
-enum LLMProviderType { openRouter, gemini, openAI, claude, ollama }
+enum LLMProviderType { openRouter, gemini, openAI, claude, ollama, groq }
 
 /// Manages persistent SSH connection and app settings.
 class SettingsService {
@@ -15,6 +15,7 @@ class SettingsService {
   String _cachedGeminiApiKey;
   String _cachedOpenAIApiKey;
   String _cachedClaudeApiKey;
+  String _cachedGroqApiKey;
 
   SettingsService(
     this._prefs,
@@ -24,6 +25,7 @@ class SettingsService {
     this._cachedGeminiApiKey,
     this._cachedOpenAIApiKey,
     this._cachedClaudeApiKey,
+    this._cachedGroqApiKey,
   );
 
   // ─── Keys ──────────────────────────────────────────────────────────
@@ -48,6 +50,9 @@ class SettingsService {
   
   static const _keyOllamaBaseUrl = 'ollamaBaseUrl';
   static const _keyOllamaModel = 'ollamaModel';
+  
+  static const _keyGroqApiKey = 'groqApiKey';
+  static const _keyGroqModel = 'groqModel';
 
   static const _keyRigs = 'rigs';
   static const _keyThemeMode = 'themeMode';
@@ -55,6 +60,11 @@ class SettingsService {
   static const _keyTtsVoice = 'ttsVoice';
 
   // ─── Getters ───────────────────────────────────────────────────────
+  String _getStringWithDefault(String key, String defaultValue) {
+    final val = _prefs.getString(key);
+    return (val == null || val.isEmpty) ? defaultValue : val;
+  }
+
   String get host => _prefs.getString(_keyHost) ?? AppConstants.defaultSshHost;
   int get port => _prefs.getInt(_keyPort) ?? AppConstants.defaultSshPort;
   String get username => _prefs.getString(_keyUsername) ?? AppConstants.defaultSshUsername;
@@ -70,19 +80,22 @@ class SettingsService {
   }
 
   String get openRouterApiKey => _cachedOpenRouterApiKey;
-  String get openRouterModel => _prefs.getString(_keyOpenRouterModel) ?? 'inclusionai/ling-3.0-flash:free';
+  String get openRouterModel => _getStringWithDefault(_keyOpenRouterModel, 'inclusionai/ling-3.0-flash:free');
   
   String get geminiApiKey => _cachedGeminiApiKey;
-  String get geminiModel => _prefs.getString(_keyGeminiModel) ?? 'gemini-1.5-flash';
+  String get geminiModel => _getStringWithDefault(_keyGeminiModel, 'gemini-3.6-flash');
   
   String get openAIApiKey => _cachedOpenAIApiKey;
-  String get openAIModel => _prefs.getString(_keyOpenAIModel) ?? 'gpt-4o-mini';
+  String get openAIModel => _getStringWithDefault(_keyOpenAIModel, 'gpt-4o-mini');
   
   String get claudeApiKey => _cachedClaudeApiKey;
-  String get claudeModel => _prefs.getString(_keyClaudeModel) ?? 'claude-3-haiku-20240307';
+  String get claudeModel => _getStringWithDefault(_keyClaudeModel, 'claude-3-haiku-20240307');
   
-  String get ollamaBaseUrl => _prefs.getString(_keyOllamaBaseUrl) ?? 'http://10.0.2.2:11434';
-  String get ollamaModel => _prefs.getString(_keyOllamaModel) ?? 'llama3';
+  String get ollamaBaseUrl => _getStringWithDefault(_keyOllamaBaseUrl, 'http://10.0.2.2:11434');
+  String get ollamaModel => _getStringWithDefault(_keyOllamaModel, 'llama3');
+
+  String get groqApiKey => _cachedGroqApiKey;
+  String get groqModel => _getStringWithDefault(_keyGroqModel, 'llama-3.1-8b-instant');
 
   int get rigs => _prefs.getInt(_keyRigs) ?? AppConstants.defaultRigsCount;
   ThemeMode get themeMode => _parseThemeMode(_prefs.getString(_keyThemeMode));
@@ -127,6 +140,12 @@ class SettingsService {
   Future<void> setOllamaBaseUrl(String value) => _prefs.setString(_keyOllamaBaseUrl, value);
   Future<void> setOllamaModel(String value) => _prefs.setString(_keyOllamaModel, value);
 
+  Future<void> setGroqApiKey(String value) async {
+    _cachedGroqApiKey = value;
+    await _secureStorage.write(key: _keyGroqApiKey, value: value);
+  }
+  Future<void> setGroqModel(String value) => _prefs.setString(_keyGroqModel, value);
+
   Future<void> setRigs(int value) => _prefs.setInt(_keyRigs, value);
   Future<void> setThemeMode(ThemeMode value) => _prefs.setString(_keyThemeMode, value.name);
   Future<void> setVoiceNarration(bool value) => _prefs.setBool(_keyVoiceNarration, value);
@@ -151,6 +170,7 @@ final initialOpenRouterApiKeyProvider = Provider<String>((ref) => throw Unimplem
 final initialGeminiApiKeyProvider = Provider<String>((ref) => throw UnimplementedError());
 final initialOpenAIApiKeyProvider = Provider<String>((ref) => throw UnimplementedError());
 final initialClaudeApiKeyProvider = Provider<String>((ref) => throw UnimplementedError());
+final initialGroqApiKeyProvider = Provider<String>((ref) => throw UnimplementedError());
 
 final settingsServiceProvider = Provider<SettingsService>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
@@ -163,6 +183,7 @@ final settingsServiceProvider = Provider<SettingsService>((ref) {
     ref.watch(initialGeminiApiKeyProvider),
     ref.watch(initialOpenAIApiKeyProvider),
     ref.watch(initialClaudeApiKeyProvider),
+    ref.watch(initialGroqApiKeyProvider),
   );
 });
 
