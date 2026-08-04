@@ -7,6 +7,7 @@ import 'package:lg_interactive_onboarding/src/common/tts/tts_service.dart';
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/data/mentor_context_service.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/data/rag_service.dart';
+import 'package:lg_interactive_onboarding/src/features/ai_mentor/data/llm_provider.dart';
 
 const _systemInstruction = '''You are "LG Mentor", a friendly and knowledgeable AI assistant embedded inside the LG Interactive Onboarding app. Your purpose is to help users learn about and operate the Liquid Galaxy system — a multi-screen Google Earth visualization platform.
 
@@ -97,7 +98,7 @@ class MentorService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final responseText = await _callOpenRouter(userPrompt: userText.trim());
+      final responseText = await _callLlmProvider(userPrompt: userText.trim());
       _history.add(MentorMessage(
         role: 'model',
         content: responseText,
@@ -143,7 +144,7 @@ class MentorService extends ChangeNotifier {
         timestamp: DateTime.now(),
       ));
 
-      final responseText = await _callOpenRouter(userPrompt: triggerPrompt);
+      final responseText = await _callLlmProvider(userPrompt: triggerPrompt);
 
       // Remove the invisible system trigger message from visible history.
       if (_history.isNotEmpty && _history.last.role == 'user') {
@@ -224,13 +225,8 @@ class MentorService extends ChangeNotifier {
     return 'Sorry, I ran into an unexpected hiccup trying to reach the AI service. Please try again in a moment.\n\n(Technical detail: $e)';
   }
 
-  /// Makes the API call to OpenRouter (OpenAI-compatible endpoint).
-  Future<String> _callOpenRouter({required String userPrompt}) async {
-    final apiKey = _ref.read(settingsServiceProvider).openRouterApiKey;
-    if (apiKey.isEmpty) {
-      throw Exception('No OpenRouter API key provided');
-    }
-
+  /// Makes the API call via the selected LLM Provider.
+  Future<String> _callLlmProvider({required String userPrompt}) async {
     final contextData = _ref.read(mentorContextServiceProvider).buildContext();
     final ragResults = await _ref.read(ragServiceProvider).search(userPrompt);
     
@@ -250,70 +246,13 @@ class MentorService extends ChangeNotifier {
       promptWithContext += ']';
     }
 
-    final modelName = _ref.read(settingsServiceProvider).openRouterModel;
-
-    // Build history for the OpenAI format.
-    final messages = <Map<String, String>>[];
+    final llmProvider = _ref.read(llmServiceProvider);
     
-    // System Instruction
-    messages.add({
-      'role': 'system',
-      'content': _systemInstruction,
-    });
-
-    for (int i = 0; i < _history.length - 1; i++) {
-      final msg = _history[i];
-      // Map 'model' to 'assistant' for OpenAI compatibility.
-      final apiRole = msg.role == 'model' ? 'assistant' : 'user';
-      messages.add({
-        'role': apiRole,
-        'content': msg.content,
-      });
-    }
-
-    // Add current user prompt
-    messages.add({
-      'role': 'user',
-      'content': promptWithContext,
-    });
-
-    final uri = Uri.parse('https://openrouter.ai/api/v1/chat/completions');
-    final response = await http.post(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $apiKey',
-        'HTTP-Referer': 'https://github.com/LiquidGalaxyLAB',
-        'X-Title': 'LG Interactive Onboarding',
-      },
-      body: jsonEncode({
-        'model': modelName,
-        'messages': messages,
-      }),
+    return await llmProvider.generateResponse(
+      prompt: promptWithContext,
+      history: _history,
+      systemInstruction: _systemInstruction,
     );
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('OpenRouter API error ${response.statusCode}: ${response.body}');
-    }
-
-    if (response.body.isEmpty) {
-      throw Exception('OpenRouter API returned a completely empty response (Status: ${response.statusCode})');
-    }
-
-    Map<String, dynamic> data;
-    try {
-      data = jsonDecode(response.body);
-    } catch (e) {
-      throw Exception('Failed to parse OpenRouter response. Body: "${response.body}"');
-    }
-
-    final text = data['choices']?[0]?['message']?['content'] as String?;
-
-    if (text == null || text.isEmpty) {
-      throw Exception('OpenRouter API returned an empty text message. Full response: ${response.body}');
-    }
-
-    return text;
   }
 }
 
