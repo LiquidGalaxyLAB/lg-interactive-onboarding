@@ -593,6 +593,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 DropdownMenuItem(value: LLMProviderType.ollama, child: Text('Ollama (Local)')),
                 DropdownMenuItem(value: LLMProviderType.groq, child: Text('Groq')),
               ],
+              onTap: () => FocusScope.of(context).unfocus(),
               onChanged: (val) {
                 if (val != null) {
                   setState(() => _selectedProvider = val);
@@ -690,6 +691,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: Text(v['displayName'] ?? v['name'] ?? ''),
                   );
                 }).toList(),
+                onTap: () => FocusScope.of(context).unfocus(),
                 onChanged: _voiceNarration ? (val) async {
                   if (val != null) {
                     setState(() => _selectedVoice = val);
