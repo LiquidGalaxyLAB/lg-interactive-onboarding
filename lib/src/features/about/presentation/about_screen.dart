@@ -90,6 +90,27 @@ class AboutScreen extends StatelessWidget {
                   ),
                   textAlign: TextAlign.left,
                 ),
+                const SizedBox(height: 32),
+                Text(
+                  'Credits:',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Special thanks to Kabir Khanuja(GSoC 2026 fellow contributor for Liquid Galaxy) for suggesting the LLM service provider settings.',
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.5,
+                    color: colorScheme.onSurface.withValues(alpha: 0.8),
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
           ),

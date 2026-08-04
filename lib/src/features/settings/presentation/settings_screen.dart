@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/system_kml_service.dart';
@@ -9,9 +8,6 @@ import 'package:lg_interactive_onboarding/src/features/settings/data/settings_se
 import 'widgets/rig_controls_grid.dart';
 
 /// Settings screen for managing SSH connection and app preferences.
-///
-/// On successful connection, navigates to the Dashboard.
-/// Uses a warm, humanistic design with organic layouts.
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -25,28 +21,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late final TextEditingController _usernameCtrl;
   late final TextEditingController _passwordCtrl;
   late final TextEditingController _rigsCtrl;
+  
+  late LLMProviderType _selectedProvider;
   late final TextEditingController _openRouterApiKeyCtrl;
   late final TextEditingController _openRouterModelCtrl;
+  late final TextEditingController _geminiApiKeyCtrl;
+  late final TextEditingController _geminiModelCtrl;
+  late final TextEditingController _openAIApiKeyCtrl;
+  late final TextEditingController _openAIModelCtrl;
+  late final TextEditingController _claudeApiKeyCtrl;
+  late final TextEditingController _claudeModelCtrl;
+  late final TextEditingController _ollamaBaseUrlCtrl;
+  late final TextEditingController _ollamaModelCtrl;
+  late final TextEditingController _groqApiKeyCtrl;
+  late final TextEditingController _groqModelCtrl;
 
   bool _isConnecting = false;
   bool _obscurePassword = true;
   bool _obscureApiKey = true;
-  bool _isVerifyingAi = false;
+  bool _isSavingAi = false;
   late bool _voiceNarration;
-  
-  String _selectedModelDropdown = 'inclusionai/ling-3.0-flash:free';
-  bool _showCustomModelInput = false;
-
-  static const _curatedModels = {
-    'inclusionai/ling-3.0-flash:free': 'Ling-3.0-flash (free)',
-    'nvidia/nemotron-3-ultra-550b-a55b:free': 'NVIDIA: Nemotron 3 Ultra (free)',
-    'poolside/laguna-s-2.1:free': 'Poolside: Laguna S 2.1 (free)',
-    'poolside/laguna-xs-2.1:free': 'Poolside: Laguna XS 2.1 (free)',
-    'cohere/north-mini-code:free': 'Cohere: North Mini Code (free)',
-    'nvidia/nemotron-3-super-120b-a12b:free': 'NVIDIA: Nemotron 3 Super (free)',
-    'nvidia/nemotron-3-nano-30b-a3b:free': 'NVIDIA: Nemotron 3 Nano 30B A3B (free)',
-    'openai/gpt-oss-20b:free': 'OpenAI: gpt-oss-20b (free)',
-  };
   
   List<Map<String, String>> _availableVoices = [];
   String? _selectedVoice;
@@ -59,22 +53,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _portCtrl = TextEditingController(text: settings.port.toString());
     _usernameCtrl = TextEditingController(text: settings.username);
     _passwordCtrl = TextEditingController(text: settings.password);
-    _openRouterApiKeyCtrl = TextEditingController(text: settings.openRouterApiKey);
-    
-    final savedModel = settings.openRouterModel;
-    if (_curatedModels.containsKey(savedModel)) {
-      _selectedModelDropdown = savedModel;
-      _showCustomModelInput = false;
-      _openRouterModelCtrl = TextEditingController();
-    } else {
-      _selectedModelDropdown = 'other';
-      _showCustomModelInput = true;
-      _openRouterModelCtrl = TextEditingController(text: savedModel);
-    }
-    
     _rigsCtrl = TextEditingController(text: settings.rigs.toString());
+    
+    _selectedProvider = settings.llmProvider;
+    _openRouterApiKeyCtrl = TextEditingController(text: settings.openRouterApiKey);
+    _openRouterModelCtrl = TextEditingController(text: settings.openRouterModel);
+    _geminiApiKeyCtrl = TextEditingController(text: settings.geminiApiKey);
+    _geminiModelCtrl = TextEditingController(text: settings.geminiModel);
+    _openAIApiKeyCtrl = TextEditingController(text: settings.openAIApiKey);
+    _openAIModelCtrl = TextEditingController(text: settings.openAIModel);
+    _claudeApiKeyCtrl = TextEditingController(text: settings.claudeApiKey);
+    _claudeModelCtrl = TextEditingController(text: settings.claudeModel);
+    _ollamaBaseUrlCtrl = TextEditingController(text: settings.ollamaBaseUrl);
+    _ollamaModelCtrl = TextEditingController(text: settings.ollamaModel);
+    _groqApiKeyCtrl = TextEditingController(text: settings.groqApiKey);
+    _groqModelCtrl = TextEditingController(text: settings.groqModel);
+    
     _voiceNarration = settings.voiceNarration;
-    // Sync TTS service with persisted preference on screen load.
     ref.read(ttsServiceProvider).setEnabled(_voiceNarration);
     _loadVoices();
   }
@@ -102,66 +97,60 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _portCtrl.dispose();
     _usernameCtrl.dispose();
     _passwordCtrl.dispose();
+    _rigsCtrl.dispose();
+    
     _openRouterApiKeyCtrl.dispose();
     _openRouterModelCtrl.dispose();
-    _rigsCtrl.dispose();
+    _geminiApiKeyCtrl.dispose();
+    _geminiModelCtrl.dispose();
+    _openAIApiKeyCtrl.dispose();
+    _openAIModelCtrl.dispose();
+    _claudeApiKeyCtrl.dispose();
+    _claudeModelCtrl.dispose();
+    _ollamaBaseUrlCtrl.dispose();
+    _ollamaModelCtrl.dispose();
+    _groqApiKeyCtrl.dispose();
+    _groqModelCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _verifyAndApplyAiSettings() async {
-    final apiKey = _openRouterApiKeyCtrl.text.trim();
-    final model = _showCustomModelInput ? _openRouterModelCtrl.text.trim() : _selectedModelDropdown;
-    
-    if (apiKey.isEmpty || model.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('API Key and Model cannot be empty'),
-          backgroundColor: Color(0xFFB3261E),
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isVerifyingAi = true);
+  Future<void> _saveAiSettings() async {
+    setState(() => _isSavingAi = true);
 
     try {
-      final res = await http.get(
-        Uri.parse('https://openrouter.ai/api/v1/auth/key'),
-        headers: {'Authorization': 'Bearer $apiKey'},
-      );
-
+      final settings = ref.read(settingsServiceProvider);
+      await settings.setLlmProvider(_selectedProvider);
+      await settings.setOpenRouterApiKey(_openRouterApiKeyCtrl.text.trim());
+      await settings.setOpenRouterModel(_openRouterModelCtrl.text.trim());
+      await settings.setGeminiApiKey(_geminiApiKeyCtrl.text.trim());
+      await settings.setGeminiModel(_geminiModelCtrl.text.trim());
+      await settings.setOpenAIApiKey(_openAIApiKeyCtrl.text.trim());
+      await settings.setOpenAIModel(_openAIModelCtrl.text.trim());
+      await settings.setClaudeApiKey(_claudeApiKeyCtrl.text.trim());
+      await settings.setClaudeModel(_claudeModelCtrl.text.trim());
+      await settings.setOllamaBaseUrl(_ollamaBaseUrlCtrl.text.trim());
+      await settings.setOllamaModel(_ollamaModelCtrl.text.trim());
+      await settings.setGroqApiKey(_groqApiKeyCtrl.text.trim());
+      await settings.setGroqModel(_groqModelCtrl.text.trim());
+      
       if (!mounted) return;
-
-      if (res.statusCode == 200) {
-        final settings = ref.read(settingsServiceProvider);
-        await settings.setOpenRouterApiKey(apiKey);
-        await settings.setOpenRouterModel(model);
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('AI Mentor settings verified and saved!'),
-            backgroundColor: Color(0xFF1E8E3E),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invalid API Key (OpenRouter rejected it)'),
-            backgroundColor: Color(0xFFB3261E),
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('AI Mentor settings saved!'),
+          backgroundColor: Color(0xFF1E8E3E),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Validation failed: $e'),
+          content: Text('Save failed: $e'),
           backgroundColor: const Color(0xFFB3261E),
         ),
       );
     } finally {
       if (mounted) {
-        setState(() => _isVerifyingAi = false);
+        setState(() => _isSavingAi = false);
       }
     }
   }
@@ -174,14 +163,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await settings.setPort(int.tryParse(_portCtrl.text) ?? 22);
     await settings.setUsername(_usernameCtrl.text.trim());
     await settings.setPassword(_passwordCtrl.text);
-    await settings.setOpenRouterApiKey(_openRouterApiKeyCtrl.text.trim());
-    await settings.setOpenRouterModel(_openRouterModelCtrl.text.trim());
     await settings.setRigs(int.tryParse(_rigsCtrl.text) ?? 3);
+    
+    await _saveAiSettings();
 
     if (!mounted) return;
     setState(() => _isConnecting = true);
 
-    // Clear logo visually first, then clean up all files, then disconnect.
     if (ssh.isConnected) {
       await ref.read(logoOverlayServiceProvider).clearLogo();
       await ref.read(systemKmlServiceProvider).cleanUp();
@@ -213,8 +201,165 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         );
       case SSHConnecting() || SSHDisconnected():
-        // Stale result from a superseded connection attempt; ignore.
         break;
+    }
+  }
+
+  Widget _buildProviderSettings() {
+    switch (_selectedProvider) {
+      case LLMProviderType.openRouter:
+        return Column(
+          children: [
+            TextField(
+              controller: _openRouterApiKeyCtrl,
+              obscureText: _obscureApiKey,
+              decoration: InputDecoration(
+                labelText: 'OpenRouter API Key',
+                prefixIcon: const Icon(Icons.vpn_key),
+                hintText: 'sk-or-v1-...',
+                suffixIcon: IconButton(
+                  icon: Icon(_obscureApiKey ? Icons.visibility : Icons.visibility_off),
+                  onPressed: () => setState(() => _obscureApiKey = !_obscureApiKey),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _openRouterModelCtrl,
+              decoration: const InputDecoration(
+                labelText: 'OpenRouter Model Name',
+                prefixIcon: Icon(Icons.psychology_alt),
+                hintText: 'e.g. inclusionai/ling-3.0-flash:free',
+              ),
+            ),
+          ],
+        );
+      case LLMProviderType.gemini:
+        return Column(
+          children: [
+            TextField(
+              controller: _geminiApiKeyCtrl,
+              obscureText: _obscureApiKey,
+              decoration: InputDecoration(
+                labelText: 'Gemini API Key',
+                prefixIcon: const Icon(Icons.vpn_key),
+                suffixIcon: IconButton(
+                  icon: Icon(_obscureApiKey ? Icons.visibility : Icons.visibility_off),
+                  onPressed: () => setState(() => _obscureApiKey = !_obscureApiKey),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _geminiModelCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Gemini Model Name',
+                prefixIcon: Icon(Icons.psychology_alt),
+                hintText: 'e.g. gemini-1.5-flash',
+              ),
+            ),
+          ],
+        );
+      case LLMProviderType.openAI:
+        return Column(
+          children: [
+            TextField(
+              controller: _openAIApiKeyCtrl,
+              obscureText: _obscureApiKey,
+              decoration: InputDecoration(
+                labelText: 'OpenAI API Key',
+                prefixIcon: const Icon(Icons.vpn_key),
+                suffixIcon: IconButton(
+                  icon: Icon(_obscureApiKey ? Icons.visibility : Icons.visibility_off),
+                  onPressed: () => setState(() => _obscureApiKey = !_obscureApiKey),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _openAIModelCtrl,
+              decoration: const InputDecoration(
+                labelText: 'OpenAI Model Name',
+                prefixIcon: Icon(Icons.psychology_alt),
+                hintText: 'e.g. gpt-4o-mini',
+              ),
+            ),
+          ],
+        );
+      case LLMProviderType.claude:
+        return Column(
+          children: [
+            TextField(
+              controller: _claudeApiKeyCtrl,
+              obscureText: _obscureApiKey,
+              decoration: InputDecoration(
+                labelText: 'Claude API Key',
+                prefixIcon: const Icon(Icons.vpn_key),
+                suffixIcon: IconButton(
+                  icon: Icon(_obscureApiKey ? Icons.visibility : Icons.visibility_off),
+                  onPressed: () => setState(() => _obscureApiKey = !_obscureApiKey),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _claudeModelCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Claude Model Name',
+                prefixIcon: Icon(Icons.psychology_alt),
+                hintText: 'e.g. claude-3-haiku-20240307',
+              ),
+            ),
+          ],
+        );
+      case LLMProviderType.ollama:
+        return Column(
+          children: [
+            TextField(
+              controller: _ollamaBaseUrlCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Ollama Base URL',
+                prefixIcon: Icon(Icons.link),
+                hintText: 'e.g. http://10.0.2.2:11434',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _ollamaModelCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Ollama Model Name',
+                prefixIcon: Icon(Icons.psychology_alt),
+                hintText: 'e.g. llama3',
+              ),
+            ),
+          ],
+        );
+      case LLMProviderType.groq:
+        return Column(
+          children: [
+            TextField(
+              controller: _groqApiKeyCtrl,
+              obscureText: _obscureApiKey,
+              decoration: InputDecoration(
+                labelText: 'Groq API Key',
+                prefixIcon: const Icon(Icons.vpn_key),
+                suffixIcon: IconButton(
+                  icon: Icon(_obscureApiKey ? Icons.visibility : Icons.visibility_off),
+                  onPressed: () => setState(() => _obscureApiKey = !_obscureApiKey),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _groqModelCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Groq Model Name',
+                prefixIcon: Icon(Icons.psychology_alt),
+                hintText: 'e.g. llama-3.1-8b-instant',
+              ),
+            ),
+          ],
+        );
     }
   }
 
@@ -224,12 +369,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final ssh = ref.watch(sshServiceProvider);
     final isDark = theme.brightness == Brightness.dark;
 
-    // M3 semantic palette
-    const success     = Color(0xFF1E8E3E);  // M3 success green
-    const error       = Color(0xFFB3261E);  // M3 error red
-    const outline     = Color(0xFF747775);  // M3 outline
-    const onSurface   = Color(0xFF1F1F1F);  // M3 on-surface
-    // Dark-mode overrides
+    const success     = Color(0xFF1E8E3E);
+    const error       = Color(0xFFB3261E);
+    const outline     = Color(0xFF747775);
+    const onSurface   = Color(0xFF1F1F1F);
+    
     final successEff  = isDark ? const Color(0xFF72DD87) : success;
     final errorEff    = isDark ? const Color(0xFFF2B8B5) : error;
     final outlineEff  = isDark ? const Color(0xFF9AA0A6) : outline;
@@ -241,8 +385,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           children: [
             const SizedBox(height: 20),
-
-            // ─── Header ─────────────────────────────────────────
             Text(
               'Connect to\nLiquid Galaxy',
               style: TextStyle(
@@ -264,7 +406,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
             const SizedBox(height: 24),
 
-            // ─── Status Indicator ────────────────────────────────
             AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               padding: const EdgeInsets.all(14),
@@ -295,9 +436,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
-                      color: ssh.isConnected
-                          ? successEff
-                          : outlineEff,
+                      color: ssh.isConnected ? successEff : outlineEff,
                     ),
                   ),
                   const Spacer(),
@@ -317,7 +456,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
             const SizedBox(height: 28),
 
-            // ─── SSH Configuration ──────────────────────────────
             _SectionLabel(label: 'SSH CONFIGURATION', isDark: isDark),
             const SizedBox(height: 14),
 
@@ -336,27 +474,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 Expanded(
                   flex: 2,
                   child: TextField(
-                    controller: _portCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Port',
-                      prefixIcon: Icon(Icons.tag),
-                      hintText: '22',
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
+                     controller: _portCtrl,
+                     decoration: const InputDecoration(
+                       labelText: 'Port',
+                       prefixIcon: Icon(Icons.tag),
+                       hintText: '22',
+                     ),
+                     keyboardType: TextInputType.number,
+                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   flex: 2,
                   child: TextField(
-                    controller: _rigsCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Rigs',
-                      prefixIcon: Icon(Icons.devices),
-                      hintText: '3',
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
+                     controller: _rigsCtrl,
+                     decoration: const InputDecoration(
+                       labelText: 'Rigs',
+                       prefixIcon: Icon(Icons.devices),
+                       hintText: '3',
+                     ),
+                     keyboardType: TextInputType.number,
+                   ),
                 ),
               ],
             ),
@@ -383,15 +521,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   icon: Icon(
                     _obscurePassword ? Icons.visibility_off : Icons.visibility,
                   ),
-                  onPressed: () =>
-                      setState(() => _obscurePassword = !_obscurePassword),
+                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                 ),
               ),
             ),
 
             const SizedBox(height: 28),
 
-            // ─── Connect Button ─────────────────────────────────
             SizedBox(
               height: 52,
               child: ElevatedButton.icon(
@@ -416,7 +552,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 height: 52,
                 child: OutlinedButton.icon(
                   onPressed: () async {
-                    // Clear logo visually first, then clean up all files, then disconnect.
                     await ref.read(logoOverlayServiceProvider).clearLogo();
                     await ref.read(systemKmlServiceProvider).cleanUp();
                     await ssh.disconnect();
@@ -434,79 +569,48 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
             const SizedBox(height: 32),
 
-            // ─── Rig Controls ─────────────────────────────────────
             _SectionLabel(label: 'RIG CONTROLS', isDark: isDark),
             const SizedBox(height: 14),
             RigControlsGrid(isDark: isDark),
 
             const SizedBox(height: 32),
 
-            // ─── AI Mentor Configuration ──────────────────────────
             _SectionLabel(label: 'AI MENTOR', isDark: isDark),
             const SizedBox(height: 14),
 
-            TextField(
-              controller: _openRouterApiKeyCtrl,
-              obscureText: _obscureApiKey,
-              decoration: InputDecoration(
-                labelText: 'OpenRouter API Key',
-                prefixIcon: const Icon(Icons.vpn_key),
-                hintText: 'sk-or-v1-...',
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscureApiKey ? Icons.visibility : Icons.visibility_off,
-                  ),
-                  onPressed: () {
-                    setState(() => _obscureApiKey = !_obscureApiKey);
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
+            DropdownButtonFormField<LLMProviderType>(
               isExpanded: true,
-              initialValue: _selectedModelDropdown,
+              value: _selectedProvider,
               decoration: const InputDecoration(
-                labelText: 'OpenRouter Model',
-                prefixIcon: Icon(Icons.psychology_alt),
+                labelText: 'LLM Provider',
+                prefixIcon: Icon(Icons.smart_toy),
               ),
-              items: [
-                ..._curatedModels.entries.map((e) => DropdownMenuItem(
-                      value: e.key,
-                      child: Text(e.value),
-                    )),
-                const DropdownMenuItem(
-                  value: 'other',
-                  child: Text('Other (Custom Model)'),
-                ),
+              items: const [
+                DropdownMenuItem(value: LLMProviderType.openRouter, child: Text('OpenRouter')),
+                DropdownMenuItem(value: LLMProviderType.gemini, child: Text('Google Gemini')),
+                DropdownMenuItem(value: LLMProviderType.openAI, child: Text('OpenAI')),
+                DropdownMenuItem(value: LLMProviderType.claude, child: Text('Anthropic Claude')),
+                DropdownMenuItem(value: LLMProviderType.ollama, child: Text('Ollama (Local)')),
+                DropdownMenuItem(value: LLMProviderType.groq, child: Text('Groq')),
               ],
+              onTap: () => FocusScope.of(context).unfocus(),
               onChanged: (val) {
                 if (val != null) {
-                  setState(() {
-                    _selectedModelDropdown = val;
-                    _showCustomModelInput = val == 'other';
-                  });
+                  setState(() => _selectedProvider = val);
                 }
               },
             ),
-            if (_showCustomModelInput) ...[
-              const SizedBox(height: 12),
-              TextField(
-                controller: _openRouterModelCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Custom Model Name',
-                  prefixIcon: Icon(Icons.edit),
-                  hintText: 'e.g. anthropic/claude-3-haiku',
-                ),
-              ),
-            ],
+            const SizedBox(height: 12),
+            
+            _buildProviderSettings(),
+
             const SizedBox(height: 16),
             SizedBox(
               height: 52,
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: _isVerifyingAi ? null : _verifyAndApplyAiSettings,
-                icon: _isVerifyingAi
+                onPressed: _isSavingAi ? null : _saveAiSettings,
+                icon: _isSavingAi
                     ? const SizedBox(
                         width: 20,
                         height: 20,
@@ -516,13 +620,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       )
                     : const Icon(Icons.check_circle_outline),
-                label: Text(_isVerifyingAi ? 'Verifying...' : 'Verify & Save AI Settings'),
+                label: Text(_isSavingAi ? 'Saving...' : 'Save AI Settings'),
               ),
             ),
 
             const SizedBox(height: 32),
 
-            // ─── Appearance ─────────────────────────────────────
             _SectionLabel(label: 'APPEARANCE', isDark: isDark),
             const SizedBox(height: 14),
 
@@ -552,7 +655,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
             const SizedBox(height: 32),
 
-            // ─── Accessibility ───────────────────────────────────
             _SectionLabel(label: 'ACCESSIBILITY', isDark: isDark),
             const SizedBox(height: 14),
 
@@ -561,9 +663,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               subtitle: const Text('Read aloud guided-mode steps and diagram descriptions'),
               secondary: Icon(
                 _voiceNarration ? Icons.record_voice_over : Icons.voice_over_off,
-                color: _voiceNarration
-                    ? const Color(0xFF1A73E8)
-                    : outlineEff,
+                color: _voiceNarration ? const Color(0xFF1A73E8) : outlineEff,
               ),
               value: _voiceNarration,
               onChanged: (value) async {
@@ -591,6 +691,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: Text(v['displayName'] ?? v['name'] ?? ''),
                   );
                 }).toList(),
+                onTap: () => FocusScope.of(context).unfocus(),
                 onChanged: _voiceNarration ? (val) async {
                   if (val != null) {
                     setState(() => _selectedVoice = val);
@@ -625,9 +726,7 @@ class _SectionLabel extends StatelessWidget {
         fontSize: 11,
         fontWeight: FontWeight.w700,
         letterSpacing: 1.8,
-        color: isDark
-            ? const Color(0xFF9AA0A6)
-            : const Color(0xFF747775),
+        color: isDark ? const Color(0xFF9AA0A6) : const Color(0xFF747775),
       ),
     );
   }

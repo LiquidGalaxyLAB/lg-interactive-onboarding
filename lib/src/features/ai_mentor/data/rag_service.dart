@@ -3,9 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
-import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
-import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
+import 'package:lg_interactive_onboarding/src/features/ai_mentor/data/offline_embedding_service.dart';
 
 class VectorChunk {
   final String text;
@@ -26,6 +24,7 @@ class RagService {
   Future<void> init() async {
     if (_isInitialized) return;
     try {
+      await _ref.read(offlineEmbeddingServiceProvider).init();
       final jsonString = await rootBundle.loadString('assets/knowledge/lg_wiki_embeddings.json');
       final List<dynamic> data = jsonDecode(jsonString);
       
@@ -68,35 +67,8 @@ class RagService {
       return [];
     }
 
-    final apiKey = _ref.read(settingsServiceProvider).openRouterApiKey;
-    if (apiKey.isEmpty) {
-      debugPrint('RagService: No API key available for embeddings.');
-      return [];
-    }
-
-      // Get embedding for prompt
-      final uri = Uri.parse('https://openrouter.ai/api/v1/embeddings');
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: jsonEncode({
-          'model': AppConstants.openRouterEmbeddingModel,
-          'input': [prompt.trim()]
-        }),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('OpenRouter API error ${response.statusCode}: ${response.body}');
-      }
-
-      final resData = jsonDecode(response.body);
-      final List<dynamic>? data = resData['data'];
-      if (data == null || data.isEmpty) return [];
-      
-      final promptEmbedding = (data[0]['embedding'] as List<dynamic>).map((e) => (e as num).toDouble()).toList();
+    final promptEmbedding = await _ref.read(offlineEmbeddingServiceProvider).getEmbedding(prompt.trim());
+    if (promptEmbedding.isEmpty) return [];
 
       // Score all chunks
       final scores = <Map<String, dynamic>>[];
