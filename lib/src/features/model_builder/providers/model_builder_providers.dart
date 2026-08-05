@@ -523,6 +523,8 @@ class PushNotifier extends Notifier<PushState> {
     // no logo action — logo lifecycle is managed by the SSH connection watcher
     if (result.success) {
       ref.read(deployedModelsProvider.notifier).clearAll();
+      ref.read(lgServiceProvider).orbitStop();
+      ref.read(lgServiceProvider).cleanBalloonKML();
     }
 
     state = PushState(
