@@ -439,6 +439,7 @@ class PushNotifier extends Notifier<PushState> {
 
     if (result.success) {
       ref.read(deployedModelsProvider.notifier).removeDeployment(model.id);
+      ref.read(lgServiceProvider).orbitStop();
       ref.read(lgServiceProvider).cleanBalloonKML();
     }
 
