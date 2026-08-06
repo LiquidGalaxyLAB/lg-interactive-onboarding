@@ -104,8 +104,11 @@ ${_generateOrbitTour(project)}
     final lat = project.latitude!;
     final lng = project.longitude!;
     final alt = project.altitude;
-    final range = (alt + (project.scaleX * 150)).clamp(2000.0, 250000.0);
-    final tilt = AppConstants.defaultCameraTilt;
+    // Increase the multiplier to push the camera back for tall models
+    // clamp it higher so that models don't easily clip out of the narrow LG master screen FOV.
+    final range = (alt + (project.scaleX * 250)).clamp(400.0, 300000.0);
+    // Use a slightly lower tilt angle (more top-down) to keep tall models vertically centered in frame
+    final tilt = 50.0;
     final String tourName = 'Orbit_${project.id}';
 
     final buffer = StringBuffer();

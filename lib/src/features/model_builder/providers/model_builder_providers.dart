@@ -377,16 +377,16 @@ class PushNotifier extends Notifier<PushState> {
       // Fly to the newly pushed model's location
       if (project.hasLocation) {
         // The 'range' parameter dictates how far the camera pulls back from the object.
-        // We significantly increase the multiplier here so the camera doesn't end up inside huge models.
-        final range = (project.altitude + (project.scaleX * 150)).clamp(2000.0, 250000.0);
+        // We adjust the multiplier here so the camera doesn't end up inside huge models.
+        final range = (project.altitude + (project.scaleX * 250)).clamp(400.0, 300000.0);
         
         ref.read(lgServiceProvider).flyTo(
           latitude: project.latitude!,
           longitude: project.longitude!,
           altitude: project.altitude,
           heading: project.heading,
-          // We use a fixed camera tilt for a nice bird's-eye 3D perspective.
-          tilt: AppConstants.defaultCameraTilt, 
+          // We use a fixed camera tilt (slightly more top-down) to ensure tall models fit
+          tilt: 50.0, 
           range: range,
         );
 
