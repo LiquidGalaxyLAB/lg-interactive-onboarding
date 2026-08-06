@@ -32,6 +32,9 @@ class PlaygroundState {
   /// Whether a push-to-LG operation is currently in flight.
   final bool isPushing;
 
+  /// Whether a clear-from-LG operation is currently in flight.
+  final bool isClearing;
+
   /// Whether a tour is currently playing on the rig.
   final bool isTourPlaying;
 
@@ -48,6 +51,7 @@ class PlaygroundState {
     this.isKmlValid = true,
     this.validationError,
     this.isPushing = false,
+    this.isClearing = false,
     this.isTourPlaying = false,
     this.isOrbiting = false,
     this.isPushed = false,
@@ -60,6 +64,7 @@ class PlaygroundState {
     bool? isKmlValid,
     String? validationError,
     bool? isPushing,
+    bool? isClearing,
     bool? isTourPlaying,
     bool? isOrbiting,
     bool? isPushed,
@@ -71,6 +76,7 @@ class PlaygroundState {
       isKmlValid: isKmlValid ?? this.isKmlValid,
       validationError: validationError,
       isPushing: isPushing ?? this.isPushing,
+      isClearing: isClearing ?? this.isClearing,
       isTourPlaying: isTourPlaying ?? this.isTourPlaying,
       isOrbiting: isOrbiting ?? this.isOrbiting,
       isPushed: isPushed ?? this.isPushed,
@@ -310,10 +316,14 @@ class PlaygroundController extends Notifier<PlaygroundState> {
 
   /// Clears the KML from the Liquid Galaxy screens.
   Future<bool> clearFromLG() async {
+    if (state.isClearing) return false;
+    
     try {
       final playgroundService = ref.read(kmlPlaygroundServiceProvider);
       final lgService = ref.read(lgServiceProvider);
       final wasPlaying = state.isOrbiting || state.isTourPlaying;
+
+      state = state.copyWith(isClearing: true);
 
       // Stop any running background tours or orbits before clearing
       await stopOrbit();
@@ -330,13 +340,14 @@ class PlaygroundController extends Notifier<PlaygroundState> {
       
       await lgService.cleanBalloonKML();
       final cleared = await playgroundService.clearKml();
-      if (cleared) {
-        _flyToTimer?.cancel();
-        state = state.copyWith(isPushed: false);
-      }
+      
+      _flyToTimer?.cancel();
+      state = state.copyWith(isClearing: false, isPushed: !cleared && state.isPushed);
+      
       return cleared;
     } catch (e) {
       debugPrint('Playground: clearFromLG error: $e');
+      state = state.copyWith(isClearing: false);
       return false;
     }
   }
