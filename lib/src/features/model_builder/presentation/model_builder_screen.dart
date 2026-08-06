@@ -216,10 +216,10 @@ class _DeployedModelsCard extends ConsumerWidget {
                         onPressed: isPushing ? null : () {
                           if (isOrbitingThis) {
                             ref.read(lgServiceProvider).orbitStop();
-                            ref.read(orbitingModelIdProvider.notifier).set(null);
+                            ref.read(orbitingModelIdProvider.notifier).setOrbiting(null);
                           } else {
                             ref.read(lgServiceProvider).playTour('Orbit_${model.id}');
-                            ref.read(orbitingModelIdProvider.notifier).set(model.id);
+                            ref.read(orbitingModelIdProvider.notifier).setOrbiting(model.id);
                           }
                         },
                       ),

@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_project.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_repository.dart';
@@ -392,10 +393,15 @@ class PushNotifier extends Notifier<PushState> {
         // Send Educational Balloon KML if applicable.
         String? key;
         final projectName = (project.fileName ?? project.assetPath ?? '').toLowerCase();
-        if (projectName.contains('tree')) key = 'Tree';
-        else if (projectName.contains('car')) key = 'Car';
-        else if (projectName.contains('pyramid')) key = 'Pyramid';
-        else if (projectName.contains('football') || projectName.contains('ball')) key = 'Football';
+        if (projectName.contains('tree')) {
+          key = 'Tree';
+        } else if (projectName.contains('car')) {
+          key = 'Car';
+        } else if (projectName.contains('pyramid')) {
+          key = 'Pyramid';
+        } else if (projectName.contains('football') || projectName.contains('ball')) {
+          key = 'Football';
+        }
 
         if (key != null) {
           final content = EducationalConstants.modelContent[key];
@@ -446,7 +452,7 @@ class PushNotifier extends Notifier<PushState> {
     if (result.success) {
       ref.read(deployedModelsProvider.notifier).removeDeployment(model.id);
       ref.read(lgServiceProvider).orbitStop();
-      ref.read(orbitingModelIdProvider.notifier).set(null);
+      ref.read(orbitingModelIdProvider.notifier).setOrbiting(null);
       ref.read(lgServiceProvider).cleanBalloonKML();
     }
 
@@ -479,7 +485,7 @@ class PushNotifier extends Notifier<PushState> {
     if (result.success) {
       ref.read(deployedModelsProvider.notifier).clearAll();
       ref.read(lgServiceProvider).orbitStop();
-      ref.read(orbitingModelIdProvider.notifier).set(null);
+      ref.read(orbitingModelIdProvider.notifier).setOrbiting(null);
       ref.read(lgServiceProvider).cleanBalloonKML();
     }
 
@@ -507,7 +513,7 @@ class PushNotifier extends Notifier<PushState> {
     final result = await repo.removeAllFromLG([]);
 
     ref.read(lgServiceProvider).orbitStop();
-    ref.read(orbitingModelIdProvider.notifier).set(null);
+    ref.read(orbitingModelIdProvider.notifier).setOrbiting(null);
 
     if (result.success) {
       ref.read(deployedModelsProvider.notifier).clearAll();
@@ -536,7 +542,7 @@ class PushNotifier extends Notifier<PushState> {
     );
 
     ref.read(lgServiceProvider).orbitStop();
-    ref.read(orbitingModelIdProvider.notifier).set(null);
+    ref.read(orbitingModelIdProvider.notifier).setOrbiting(null);
     ref.read(lgServiceProvider).cleanBalloonKML();
 
     final result = await repo.removeAllFromLG(deployed);
@@ -570,7 +576,7 @@ class PushNotifier extends Notifier<PushState> {
 
     // Disrupt any ongoing tours or orbits (this also calls stopTour internally)
     await ref.read(lgServiceProvider).orbitStop();
-    ref.read(orbitingModelIdProvider.notifier).set(null);
+    ref.read(orbitingModelIdProvider.notifier).setOrbiting(null);
 
     final result = await repo.deepClean();
 
@@ -595,14 +601,30 @@ final pushProvider = NotifierProvider<PushNotifier, PushState>(
 );
 
 /// Tracks the ID of the model currently being orbited, if any.
-class OrbitingModelIdNotifier extends Notifier<String?> {
+class OrbitingModelNotifier extends Notifier<String?> {
+  Timer? _timer;
+  
   @override
   String? build() => null;
-  void set(String? id) => state = id;
+
+  void setOrbiting(String? modelId) {
+    state = modelId;
+    _timer?.cancel();
+    
+    if (modelId != null) {
+      // The tour generates 20 orbits at ~43.2 seconds each (approx 864 seconds total).
+      // We automatically reset the UI state back to "Start Orbit" when the tour naturally finishes.
+      _timer = Timer(const Duration(seconds: 864), () {
+        if (state == modelId) {
+          state = null;
+        }
+      });
+    }
+  }
 }
 
-final orbitingModelIdProvider = NotifierProvider<OrbitingModelIdNotifier, String?>(
-  OrbitingModelIdNotifier.new,
+final orbitingModelIdProvider = NotifierProvider<OrbitingModelNotifier, String?>(
+  OrbitingModelNotifier.new,
 );
 
 // ─── Vertex Count (async) ──────────────────────────────────────────────
