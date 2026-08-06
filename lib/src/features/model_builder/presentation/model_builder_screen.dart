@@ -198,17 +198,20 @@ class _DeployedModelsCard extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      FilledButton.tonalIcon(
+                      TextButton.icon(
                         icon: Icon(
                           isOrbitingThis ? Icons.stop_circle : Icons.play_circle_outline,
-                          size: 18,
-                          color: isOrbitingThis ? theme.colorScheme.error : theme.colorScheme.primary,
+                          size: 16,
                         ),
                         label: Text(
                           isOrbitingThis ? 'Stop Orbit' : 'Start Orbit',
-                          style: TextStyle(
-                            color: isOrbitingThis ? theme.colorScheme.error : theme.colorScheme.primary,
-                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: isOrbitingThis ? theme.colorScheme.error : theme.colorScheme.primary,
+                          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                         onPressed: isPushing ? null : () {
                           if (isOrbitingThis) {
