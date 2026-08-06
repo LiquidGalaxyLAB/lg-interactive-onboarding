@@ -6,6 +6,7 @@ class AppConstants {
   static const int defaultRigsCount = 3;
   static const int lgHttpPort = 81;
   static const Duration sshConnectionTimeout = Duration(seconds: 10);
+  static const Duration sshExecutionTimeout = Duration(seconds: 45);
 
   // ─── LG Paths ────────────────────────────────────────────────────────
   static const String lgModelDir = '/var/www/html/model';

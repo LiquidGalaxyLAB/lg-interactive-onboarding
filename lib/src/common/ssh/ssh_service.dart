@@ -269,7 +269,8 @@ class SSHService extends ChangeNotifier {
     }
 
     try {
-      final result = await stateBeforeQueue._client.run(command);
+      final result = await stateBeforeQueue._client.run(command)
+          .timeout(AppConstants.sshExecutionTimeout);
       final success = SSHExecSuccess(
         stdout: String.fromCharCodes(result),
         stderr: '',
@@ -316,8 +317,8 @@ class SSHService extends ChangeNotifier {
             SftpFileOpenMode.create |
             SftpFileOpenMode.truncate |
             SftpFileOpenMode.write,
-      );
-      await file.write(_chunkedStream(localData));
+      ).timeout(AppConstants.sshExecutionTimeout);
+      await file.write(_chunkedStream(localData)).timeout(AppConstants.sshExecutionTimeout);
       await file.close();
       debugPrint('SSH: Binary file uploaded to $remotePath');
       return const SSHUploadSuccess();
@@ -349,8 +350,8 @@ class SSHService extends ChangeNotifier {
             SftpFileOpenMode.create |
             SftpFileOpenMode.truncate |
             SftpFileOpenMode.write,
-      );
-      await file.write(_chunkedStream(bytes));
+      ).timeout(AppConstants.sshExecutionTimeout);
+      await file.write(_chunkedStream(bytes)).timeout(AppConstants.sshExecutionTimeout);
       await file.close();
       debugPrint('SSH: Bytes uploaded to $remotePath (${bytes.length} bytes)');
       return const SSHUploadSuccess();
