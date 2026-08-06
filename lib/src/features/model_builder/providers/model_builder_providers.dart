@@ -284,6 +284,7 @@ class DeployedModelsNotifier extends Notifier<List<DeployedModel>> {
 
   /// Records a newly pushed model.
   void addDeployment(ModelProject project) {
+    final range = (project.altitude + (project.scaleX * 150)).clamp(2000.0, 250000.0);
     state = [
       ...state,
       DeployedModel(
@@ -293,6 +294,9 @@ class DeployedModelsNotifier extends Notifier<List<DeployedModel>> {
         remoteKmlFileName: project.remoteKmlFileName,
         latitude: project.latitude!,
         longitude: project.longitude!,
+        altitude: project.altitude,
+        range: range,
+        tilt: AppConstants.defaultCameraTilt,
         deployedAt: DateTime.now(),
       ),
     ];
@@ -372,10 +376,10 @@ class PushNotifier extends Notifier<PushState> {
       // Fly to the newly pushed model's location
       if (project.hasLocation) {
         // The 'range' parameter dictates how far the camera pulls back from the object.
-        // We increase the multiplier here so the camera doesn't end up inside very large models.
-        final range = (project.altitude + (project.scaleX * 15)).clamp(1000.0, 100000.0);
+        // We significantly increase the multiplier here so the camera doesn't end up inside huge models.
+        final range = (project.altitude + (project.scaleX * 150)).clamp(2000.0, 250000.0);
         
-        ref.read(lgServiceProvider).flyToAndOrbit(
+        ref.read(lgServiceProvider).flyTo(
           latitude: project.latitude!,
           longitude: project.longitude!,
           altitude: project.altitude,
@@ -442,6 +446,7 @@ class PushNotifier extends Notifier<PushState> {
     if (result.success) {
       ref.read(deployedModelsProvider.notifier).removeDeployment(model.id);
       ref.read(lgServiceProvider).orbitStop();
+      ref.read(orbitingModelIdProvider.notifier).set(null);
       ref.read(lgServiceProvider).cleanBalloonKML();
     }
 
@@ -474,6 +479,7 @@ class PushNotifier extends Notifier<PushState> {
     if (result.success) {
       ref.read(deployedModelsProvider.notifier).clearAll();
       ref.read(lgServiceProvider).orbitStop();
+      ref.read(orbitingModelIdProvider.notifier).set(null);
       ref.read(lgServiceProvider).cleanBalloonKML();
     }
 
@@ -499,6 +505,9 @@ class PushNotifier extends Notifier<PushState> {
     );
 
     final result = await repo.removeAllFromLG([]);
+
+    ref.read(lgServiceProvider).orbitStop();
+    ref.read(orbitingModelIdProvider.notifier).set(null);
 
     if (result.success) {
       ref.read(deployedModelsProvider.notifier).clearAll();
@@ -527,6 +536,7 @@ class PushNotifier extends Notifier<PushState> {
     );
 
     ref.read(lgServiceProvider).orbitStop();
+    ref.read(orbitingModelIdProvider.notifier).set(null);
     ref.read(lgServiceProvider).cleanBalloonKML();
 
     final result = await repo.removeAllFromLG(deployed);
@@ -560,6 +570,7 @@ class PushNotifier extends Notifier<PushState> {
 
     // Disrupt any ongoing tours or orbits (this also calls stopTour internally)
     await ref.read(lgServiceProvider).orbitStop();
+    ref.read(orbitingModelIdProvider.notifier).set(null);
 
     final result = await repo.deepClean();
 
@@ -581,6 +592,17 @@ class PushNotifier extends Notifier<PushState> {
 
 final pushProvider = NotifierProvider<PushNotifier, PushState>(
   PushNotifier.new,
+);
+
+/// Tracks the ID of the model currently being orbited, if any.
+class OrbitingModelIdNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+  void set(String? id) => state = id;
+}
+
+final orbitingModelIdProvider = NotifierProvider<OrbitingModelIdNotifier, String?>(
+  OrbitingModelIdNotifier.new,
 );
 
 // ─── Vertex Count (async) ──────────────────────────────────────────────
