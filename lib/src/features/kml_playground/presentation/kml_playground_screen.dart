@@ -675,7 +675,7 @@ class _PushToLGCard extends ConsumerWidget {
             SizedBox(
               width: double.infinity, height: 52,
               child: FilledButton.icon(
-                onPressed: (isReady && ssh.isConnected && !state.isPushing)
+                onPressed: (isReady && ssh.isConnected && !state.isPushing && !state.isClearing)
                     ? () async {
                         final success = await controller.pushToLG();
                         if (context.mounted) {
@@ -707,7 +707,7 @@ class _PushToLGCard extends ConsumerWidget {
               SizedBox(
                 width: double.infinity, height: 44,
                 child: OutlinedButton.icon(
-                  onPressed: !state.isPushing
+                  onPressed: (!state.isPushing && !state.isClearing)
                       ? () async {
                           final success = await controller.clearFromLG();
                           if (context.mounted) {
@@ -743,7 +743,7 @@ class _PushToLGCard extends ConsumerWidget {
                 children: [
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: state.isTourPlaying ? controller.stopTour : controller.playTour,
+                      onPressed: (!ssh.isConnected || !isReady || !state.isPushed || state.isClearing) ? null : (state.isTourPlaying ? controller.stopTour : controller.playTour),
                       icon: Icon(state.isTourPlaying ? Icons.stop : Icons.play_arrow),
                       label: Text(state.isTourPlaying ? 'Stop Tour' : 'Play Tour'),
                       style: FilledButton.styleFrom(
@@ -755,7 +755,7 @@ class _PushToLGCard extends ConsumerWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: controller.restartTour,
+                      onPressed: (!ssh.isConnected || !isReady || !state.isPushed || state.isClearing) ? null : controller.restartTour,
                       icon: const Icon(Icons.replay),
                       label: const Text('Restart'),
                       style: OutlinedButton.styleFrom(
@@ -764,6 +764,31 @@ class _PushToLGCard extends ConsumerWidget {
                     ),
                   ),
                 ],
+              ),
+            ] else if (state.activeTemplate != null) ...[
+              // Optional Orbit Playback Controls for Shapes
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(Icons.threesixty, color: Colors.blueAccent, size: 20),
+                  const SizedBox(width: 10),
+                  Text('Orbit Playback', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: (!ssh.isConnected || !isReady || !state.isPushed || state.isClearing) ? null : (state.isOrbiting ? controller.stopOrbit : controller.startOrbit),
+                  icon: Icon(state.isOrbiting ? Icons.stop : Icons.play_arrow),
+                  label: Text(state.isOrbiting ? 'Stop Orbit' : 'Start Orbit'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: state.isOrbiting ? theme.colorScheme.error : const Color(0xFF00B894),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
               ),
             ],
           ],

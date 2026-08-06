@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_project.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_repository.dart';
@@ -284,6 +285,7 @@ class DeployedModelsNotifier extends Notifier<List<DeployedModel>> {
 
   /// Records a newly pushed model.
   void addDeployment(ModelProject project) {
+    final range = (project.altitude + (project.scaleX * 150)).clamp(2000.0, 250000.0);
     state = [
       ...state,
       DeployedModel(
@@ -293,6 +295,9 @@ class DeployedModelsNotifier extends Notifier<List<DeployedModel>> {
         remoteKmlFileName: project.remoteKmlFileName,
         latitude: project.latitude!,
         longitude: project.longitude!,
+        altitude: project.altitude,
+        range: range,
+        tilt: AppConstants.defaultCameraTilt,
         deployedAt: DateTime.now(),
       ),
     ];
@@ -372,26 +377,31 @@ class PushNotifier extends Notifier<PushState> {
       // Fly to the newly pushed model's location
       if (project.hasLocation) {
         // The 'range' parameter dictates how far the camera pulls back from the object.
-        // We increase the multiplier here so the camera doesn't end up inside very large models.
-        final range = (project.altitude + (project.scaleX * 15)).clamp(1000.0, 100000.0);
+        // We adjust the multiplier here so the camera doesn't end up inside huge models.
+        final range = (project.altitude + (project.scaleX * 250)).clamp(400.0, 300000.0);
         
-        ref.read(lgServiceProvider).flyToAndOrbit(
+        ref.read(lgServiceProvider).flyTo(
           latitude: project.latitude!,
           longitude: project.longitude!,
           altitude: project.altitude,
           heading: project.heading,
-          // We use a fixed camera tilt for a nice bird's-eye 3D perspective.
-          tilt: AppConstants.defaultCameraTilt, 
+          // We use a fixed camera tilt (slightly more top-down) to ensure tall models fit
+          tilt: 50.0, 
           range: range,
         );
 
         // Send Educational Balloon KML if applicable.
         String? key;
         final projectName = (project.fileName ?? project.assetPath ?? '').toLowerCase();
-        if (projectName.contains('tree')) key = 'Tree';
-        else if (projectName.contains('car')) key = 'Car';
-        else if (projectName.contains('pyramid')) key = 'Pyramid';
-        else if (projectName.contains('football') || projectName.contains('ball')) key = 'Football';
+        if (projectName.contains('tree')) {
+          key = 'Tree';
+        } else if (projectName.contains('car')) {
+          key = 'Car';
+        } else if (projectName.contains('pyramid')) {
+          key = 'Pyramid';
+        } else if (projectName.contains('football') || projectName.contains('ball')) {
+          key = 'Football';
+        }
 
         if (key != null) {
           final content = EducationalConstants.modelContent[key];
@@ -408,6 +418,12 @@ class PushNotifier extends Notifier<PushState> {
           }
         }
       }
+    }
+
+    // Delay success status if pushing was successful to let Google Earth finish the physical 
+    // flyTo animation. Otherwise, clicking "Start Orbit" instantly will abort the camera flight.
+    if (result.success) {
+      await Future.delayed(AppConstants.lgFlyToDuration);
     }
 
     state = PushState(
@@ -442,6 +458,7 @@ class PushNotifier extends Notifier<PushState> {
     if (result.success) {
       ref.read(deployedModelsProvider.notifier).removeDeployment(model.id);
       ref.read(lgServiceProvider).orbitStop();
+      ref.read(orbitingModelIdProvider.notifier).setOrbiting(null);
       ref.read(lgServiceProvider).cleanBalloonKML();
     }
 
@@ -474,6 +491,7 @@ class PushNotifier extends Notifier<PushState> {
     if (result.success) {
       ref.read(deployedModelsProvider.notifier).clearAll();
       ref.read(lgServiceProvider).orbitStop();
+      ref.read(orbitingModelIdProvider.notifier).setOrbiting(null);
       ref.read(lgServiceProvider).cleanBalloonKML();
     }
 
@@ -499,6 +517,9 @@ class PushNotifier extends Notifier<PushState> {
     );
 
     final result = await repo.removeAllFromLG([]);
+
+    ref.read(lgServiceProvider).orbitStop();
+    ref.read(orbitingModelIdProvider.notifier).setOrbiting(null);
 
     if (result.success) {
       ref.read(deployedModelsProvider.notifier).clearAll();
@@ -527,6 +548,7 @@ class PushNotifier extends Notifier<PushState> {
     );
 
     ref.read(lgServiceProvider).orbitStop();
+    ref.read(orbitingModelIdProvider.notifier).setOrbiting(null);
     ref.read(lgServiceProvider).cleanBalloonKML();
 
     final result = await repo.removeAllFromLG(deployed);
@@ -560,6 +582,7 @@ class PushNotifier extends Notifier<PushState> {
 
     // Disrupt any ongoing tours or orbits (this also calls stopTour internally)
     await ref.read(lgServiceProvider).orbitStop();
+    ref.read(orbitingModelIdProvider.notifier).setOrbiting(null);
 
     final result = await repo.deepClean();
 
@@ -581,6 +604,38 @@ class PushNotifier extends Notifier<PushState> {
 
 final pushProvider = NotifierProvider<PushNotifier, PushState>(
   PushNotifier.new,
+);
+
+/// Tracks the ID of the model currently being orbited, if any.
+class OrbitingModelNotifier extends Notifier<String?> {
+  Timer? _timer;
+  
+  @override
+  String? build() {
+    ref.onDispose(() {
+      _timer?.cancel();
+    });
+    return null;
+  }
+
+  void setOrbiting(String? modelId) {
+    state = modelId;
+    _timer?.cancel();
+    
+    if (modelId != null) {
+      // The tour generates 20 orbits at ~43.2 seconds each (approx 864 seconds total).
+      // We automatically reset the UI state back to "Start Orbit" when the tour naturally finishes.
+      _timer = Timer(const Duration(seconds: 864), () {
+        if (state == modelId) {
+          state = null;
+        }
+      });
+    }
+  }
+}
+
+final orbitingModelIdProvider = NotifierProvider<OrbitingModelNotifier, String?>(
+  OrbitingModelNotifier.new,
 );
 
 // ─── Vertex Count (async) ──────────────────────────────────────────────

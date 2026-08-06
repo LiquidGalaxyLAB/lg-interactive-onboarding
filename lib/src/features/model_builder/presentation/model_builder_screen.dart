@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lg_interactive_onboarding/src/common/lg/lg_service.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_project.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
@@ -165,45 +166,76 @@ class _DeployedModelsCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 12),
-            ...deployed.map((model) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.04),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.1)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.view_in_ar, size: 18, color: Color(0xFF6C5CE7)),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(model.displayName,
-                            style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-                            overflow: TextOverflow.ellipsis),
-                          Text(
-                            '${model.latitude.toStringAsFixed(4)}, ${model.longitude.toStringAsFixed(4)}',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 10, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
-                          ),
-                        ],
+            ...deployed.map((model) {
+              final orbitingModelId = ref.watch(orbitingModelIdProvider);
+              final isOrbitingThis = orbitingModelId == model.id;
+              
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.1)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.view_in_ar, size: 18, color: Color(0xFF6C5CE7)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(model.displayName,
+                              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                              overflow: TextOverflow.ellipsis),
+                            Text(
+                              '${model.latitude.toStringAsFixed(4)}, ${model.longitude.toStringAsFixed(4)}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 10, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.close, size: 18, color: theme.colorScheme.error),
-                      tooltip: 'Remove from LG',
-                      onPressed: isPushing ? null : () {
-                        ref.read(pushProvider.notifier).removeModel(model);
-                      },
-                    ),
-                  ],
+                      TextButton.icon(
+                        icon: Icon(
+                          isOrbitingThis ? Icons.stop_circle : Icons.play_circle_outline,
+                          size: 16,
+                        ),
+                        label: Text(
+                          isOrbitingThis ? 'Stop Orbit' : 'Start Orbit',
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: isOrbitingThis ? theme.colorScheme.error : theme.colorScheme.primary,
+                          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: isPushing ? null : () {
+                          if (isOrbitingThis) {
+                            ref.read(lgServiceProvider).orbitStop();
+                            ref.read(orbitingModelIdProvider.notifier).setOrbiting(null);
+                          } else {
+                            ref.read(lgServiceProvider).playTour('Orbit_${model.id}');
+                            ref.read(orbitingModelIdProvider.notifier).setOrbiting(model.id);
+                          }
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: Icon(Icons.close, size: 18, color: theme.colorScheme.error),
+                        tooltip: 'Remove from LG',
+                        onPressed: isPushing ? null : () {
+                          ref.read(pushProvider.notifier).removeModel(model);
+                        },
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            )),
+              );
+            }),
           ],
         ),
       ),

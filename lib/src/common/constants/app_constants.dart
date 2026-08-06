@@ -20,6 +20,8 @@ class AppConstants {
   static const Duration kmlClearDelay = Duration(milliseconds: 300);
   static const Duration kmlRefreshDelay = Duration(seconds: 1);
   static const Duration pushStateResetDelay = Duration(seconds: 3);
+  static const Duration lgFlyToDuration = Duration(milliseconds: 6000);
+  static const Duration lgTourExitDelay = Duration(milliseconds: 1500);
 
   // ─── Model Builder Defaults ──────────────────────────────────────────
   static const double defaultScale = 1.0;

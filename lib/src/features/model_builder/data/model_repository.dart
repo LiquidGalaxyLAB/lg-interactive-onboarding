@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lg_interactive_onboarding/src/common/kml/orbit_generator.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/data/model_project.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
@@ -92,8 +93,33 @@ class ModelRepository {
         </Scale>
       </Model>
     </Placemark>
+${_generateOrbitTour(project)}
   </Document>
 </kml>''';
+  }
+
+  /// Generates a perfectly smooth KML Tour for orbiting this specific model.
+  String _generateOrbitTour(ModelProject project) {
+    if (!project.hasLocation) return '';
+
+    final lat = project.latitude!;
+    final lng = project.longitude!;
+    final alt = project.altitude;
+    // Increase the multiplier to push the camera back for tall models
+    // clamp it higher so that models don't easily clip out of the narrow LG master screen FOV.
+    final range = (alt + (project.scaleX * 250)).clamp(400.0, 300000.0);
+    // Use a slightly lower tilt angle (more top-down) to keep tall models vertically centered in frame
+    final tilt = 50.0;
+    final String tourName = 'Orbit_${project.id}';
+
+    return OrbitGenerator.generateOrbitTour(
+      tourName: tourName,
+      lat: lat,
+      lng: lng,
+      alt: alt,
+      range: range,
+      tilt: tilt,
+    );
   }
 
   /// Generates just the Model block (for KML preview).

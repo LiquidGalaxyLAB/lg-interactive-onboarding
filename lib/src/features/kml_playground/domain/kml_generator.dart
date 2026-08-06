@@ -1,4 +1,6 @@
 import 'package:lg_interactive_onboarding/src/features/kml_playground/domain/kml_template.dart';
+import 'package:lg_interactive_onboarding/src/common/utils/geo_math.dart';
+import 'package:lg_interactive_onboarding/src/common/kml/orbit_generator.dart';
 
 /// Generates valid KML XML strings from template parameters.
 ///
@@ -62,9 +64,20 @@ class KmlGenerator {
     final scale = _d(params, 'scale', fallback: 1.0);
     final rawColor = _s(params, 'color', fallback: 'Red');
     final color = _mapColorToAbgr(rawColor);
+    final range = _d(params, 'range', fallback: 1000.0);
+    final adjustedRange = range.clamp(400.0, 300000.0);
+    final orbitBody = OrbitGenerator.generateOrbitTour(
+      tourName: 'Orbit_Playground',
+      lat: lat,
+      lng: lng,
+      alt: 0.0,
+      range: adjustedRange,
+      tilt: 50.0,
+    );
 
     return _wrapDocument(
       name: name,
+      orbitTourBody: orbitBody,
       body: '''
     <Style id="playgroundStyle">
       <IconStyle>
@@ -130,8 +143,30 @@ class KmlGenerator {
               77.2080,28.6149,$altitude''';
     }
 
+    // Calculate centroid for the polygon's orbit center
+    double lat = 28.6139; // Default to New Delhi area if no vertices
+    double lng = 77.2090;
+    if (vertices is List && vertices.isNotEmpty) {
+      final centroid = GeoMath.calculateCentroid(vertices);
+      if (centroid.$1 != 0.0 || centroid.$2 != 0.0) {
+        lat = centroid.$1;
+        lng = centroid.$2;
+      }
+    }
+    final range = _d(params, 'range', fallback: 1000.0);
+    final adjustedRange = range.clamp(400.0, 300000.0);
+    final orbitBody = OrbitGenerator.generateOrbitTour(
+      tourName: 'Orbit_Playground',
+      lat: lat,
+      lng: lng,
+      alt: altitude,
+      range: adjustedRange,
+      tilt: 50.0,
+    );
+
     return _wrapDocument(
       name: name,
+      orbitTourBody: orbitBody,
       body: '''
     <Style id="polyStyle">
       <LineStyle>
@@ -172,8 +207,22 @@ $coordString
     final lineWidth = _d(params, 'lineWidth', fallback: 3.0);
     final altitudeMode = _s(params, 'altitudeMode', fallback: 'clampToGround');
 
+    final midLat = (startLat + endLat) / 2;
+    final midLng = (startLng + endLng) / 2;
+    final range = _d(params, 'range', fallback: 1000.0);
+    final adjustedRange = range.clamp(400.0, 300000.0);
+    final orbitBody = OrbitGenerator.generateOrbitTour(
+      tourName: 'Orbit_Playground',
+      lat: midLat,
+      lng: midLng,
+      alt: 0.0,
+      range: adjustedRange,
+      tilt: 50.0,
+    );
+
     return _wrapDocument(
       name: name,
+      orbitTourBody: orbitBody,
       body: '''
     <Style id="lineStyle">
       <LineStyle>
@@ -214,8 +263,20 @@ $coordString
     final east = lng + size;
     final west = lng - size;
 
+    final range = _d(params, 'range', fallback: 1000.0);
+    final adjustedRange = range.clamp(400.0, 300000.0);
+    final orbitBody = OrbitGenerator.generateOrbitTour(
+      tourName: 'Orbit_Playground',
+      lat: lat,
+      lng: lng,
+      alt: 0.0,
+      range: adjustedRange,
+      tilt: 50.0,
+    );
+
     return _wrapDocument(
       name: name,
+      orbitTourBody: orbitBody,
       body: '''
     <GroundOverlay>
       <name>$name</name>
@@ -319,13 +380,14 @@ ${playlistBuffer.toString()}      </gx:Playlist>
   // ─── Helpers ─────────────────────────────────────────────────────
 
   /// Wraps the inner body with the standard KML document boilerplate.
-  String _wrapDocument({required String name, required String body}) {
+  String _wrapDocument({required String name, required String body, String orbitTourBody = ''}) {
     return '''<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"
      xmlns:gx="http://www.google.com/kml/ext/2.2">
   <Document>
     <name>$name</name>
     <open>1</open>$body
+$orbitTourBody
   </Document>
 </kml>''';
   }

@@ -205,6 +205,15 @@ class DeployedModel {
   /// Timestamp when the model was deployed.
   final DateTime deployedAt;
 
+  /// Model's altitude for accurate camera framing during orbit.
+  final double altitude;
+
+  /// Camera range for orbit.
+  final double range;
+
+  /// Camera tilt for orbit.
+  final double tilt;
+
   const DeployedModel({
     required this.id,
     required this.displayName,
@@ -212,6 +221,9 @@ class DeployedModel {
     required this.remoteKmlFileName,
     required this.latitude,
     required this.longitude,
+    required this.altitude,
+    required this.range,
+    required this.tilt,
     required this.deployedAt,
   });
 }
