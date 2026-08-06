@@ -230,6 +230,17 @@ class LGService {
     try {
       final command = 'echo "playtour=$tourName" > /tmp/query.txt';
       await _sshService.execute(command);
+      
+      // Fire it again after a short delay!
+      // This fixes a common LG bug where if the user clicks "Start Tour" immediately
+      // after pushing a model, Google Earth might still be processing the KML NetworkLink.
+      // The second ping guarantees the tour starts without requiring the user to double tap.
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        if (_sshService.isConnected) {
+          _sshService.execute(command);
+        }
+      });
+      
       debugPrint('LGService: Playing tour "$tourName"');
       return true;
     } catch (e) {
