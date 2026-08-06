@@ -215,6 +215,7 @@ class LGService {
         orbitPlay(
           latitude: latitude,
           longitude: longitude,
+          altitude: altitude,
           range: range,
           tilt: tilt,
         );
@@ -257,6 +258,7 @@ class LGService {
   Future<void> _flyToOrbit(
     double latitude,
     double longitude,
+    double altitude,
     double range,
     double tilt,
     double heading,
@@ -265,6 +267,7 @@ class LGService {
       final String lookAt = '<LookAt>'
           '<longitude>$longitude</longitude>'
           '<latitude>$latitude</latitude>'
+          '<altitude>$altitude</altitude>'
           '<heading>$heading</heading>'
           '<tilt>$tilt</tilt>'
           '<range>$range</range>'
@@ -280,6 +283,7 @@ class LGService {
   Future<bool> orbitPlay({
     required double latitude,
     required double longitude,
+    required double altitude,
     required double range,
     required double tilt,
   }) async {
@@ -296,15 +300,13 @@ class LGService {
     _orbitPlaying = true;
 
     try {
-      const int steps = 60;
       const int stepDuration = 400; // milliseconds
       int currentStep = 0;
       bool isMoving = false;
 
       _orbitTimer = Timer.periodic(const Duration(milliseconds: stepDuration), (timer) async {
-        if (!_orbitPlaying || currentStep >= steps) {
+        if (!_orbitPlaying) {
           timer.cancel();
-          _orbitPlaying = false;
           try {
             await stopTour(); // Sends exittour=true to stabilize
           } catch (e) {
@@ -317,9 +319,10 @@ class LGService {
 
         try {
           isMoving = true;
-          // Calculate heading
-          double heading = (currentStep * (360.0 / steps)) % 360.0;
-          await _flyToOrbit(latitude, longitude, range, tilt, heading);
+          // Calculate heading (continuously increasing, no modulo 360 to prevent backward spinning)
+          // 6 degrees per step = 360 degrees in 60 steps (24 seconds per orbit)
+          double heading = currentStep * 6.0;
+          await _flyToOrbit(latitude, longitude, altitude, range, tilt, heading);
           currentStep++;
           isMoving = false;
         } catch (e) {
