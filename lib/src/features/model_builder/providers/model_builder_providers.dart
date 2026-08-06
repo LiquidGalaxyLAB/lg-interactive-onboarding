@@ -509,22 +509,24 @@ class PushNotifier extends Notifier<PushState> {
     }
   }
 
-  /// Clears only the active master KML display without deleting the files from directory.
+  /// Clears the active master KML display and removes files from the directory.
   Future<void> clearMasterKml() async {
     final repo = ref.read(modelRepositoryProvider);
+    final deployed = ref.read(deployedModelsProvider);
 
     state = const PushState(
       status: PushStatus.pushing,
       message: 'Clearing master KML...',
     );
 
-    final result = await repo.writeEmptyMasterKml();
+    ref.read(lgServiceProvider).orbitStop();
+    ref.read(lgServiceProvider).cleanBalloonKML();
+
+    final result = await repo.removeAllFromLG(deployed);
 
     // no logo action — logo lifecycle is managed by the SSH connection watcher
     if (result.success) {
       ref.read(deployedModelsProvider.notifier).clearAll();
-      ref.read(lgServiceProvider).orbitStop();
-      ref.read(lgServiceProvider).cleanBalloonKML();
     }
 
     state = PushState(
