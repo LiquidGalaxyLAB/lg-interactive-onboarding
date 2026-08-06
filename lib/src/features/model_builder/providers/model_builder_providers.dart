@@ -347,6 +347,7 @@ class PushNotifier extends Notifier<PushState> {
   PushState build() => const PushState();
 
   Future<void> push({bool relaunch = true}) async {
+    if (state.status == PushStatus.pushing) return;
     final project = ref.read(modelBuilderProvider);
     final repo = ref.read(modelRepositoryProvider);
     final deployed = ref.read(deployedModelsProvider);
@@ -423,6 +424,7 @@ class PushNotifier extends Notifier<PushState> {
 
   /// Removes a single deployed model from the LG rig.
   Future<void> removeModel(DeployedModel model) async {
+    if (state.status == PushStatus.pushing) return;
     final repo = ref.read(modelRepositoryProvider);
     final deployed = ref.read(deployedModelsProvider);
     final remaining = deployed.where((d) => d.id != model.id).toList();
@@ -456,6 +458,7 @@ class PushNotifier extends Notifier<PushState> {
 
   /// Removes all deployed models from the LG rig.
   Future<void> removeAll() async {
+    if (state.status == PushStatus.pushing) return;
     final repo = ref.read(modelRepositoryProvider);
     final deployed = ref.read(deployedModelsProvider);
 
@@ -487,6 +490,7 @@ class PushNotifier extends Notifier<PushState> {
 
   /// Wipes all remote model and KML files from the LG rig and clears the local registry.
   Future<void> wipeLgRig() async {
+    if (state.status == PushStatus.pushing) return;
     final repo = ref.read(modelRepositoryProvider);
 
     state = const PushState(
@@ -513,6 +517,7 @@ class PushNotifier extends Notifier<PushState> {
 
   /// Clears the active master KML display and removes files from the directory.
   Future<void> clearMasterKml() async {
+    if (state.status == PushStatus.pushing) return;
     final repo = ref.read(modelRepositoryProvider);
     final deployed = ref.read(deployedModelsProvider);
 
@@ -545,6 +550,7 @@ class PushNotifier extends Notifier<PushState> {
   /// Deep cleans all 3D model content from the LG rig.
   /// Removes everything from /model and /3d_model_wrapper, clears master KML.
   Future<void> deepClean() async {
+    if (state.status == PushStatus.pushing) return;
     final repo = ref.read(modelRepositoryProvider);
 
     state = const PushState(
