@@ -1,5 +1,6 @@
 import 'package:lg_interactive_onboarding/src/features/kml_playground/domain/kml_template.dart';
 import 'package:lg_interactive_onboarding/src/common/utils/geo_math.dart';
+import 'package:lg_interactive_onboarding/src/common/kml/orbit_generator.dart';
 
 /// Generates valid KML XML strings from template parameters.
 ///
@@ -64,7 +65,15 @@ class KmlGenerator {
     final rawColor = _s(params, 'color', fallback: 'Red');
     final color = _mapColorToAbgr(rawColor);
     final range = _d(params, 'range', fallback: 1000.0);
-    final orbitBody = _generateOrbitTour(lat, lng, 0.0, range);
+    final adjustedRange = range.clamp(400.0, 300000.0);
+    final orbitBody = OrbitGenerator.generateOrbitTour(
+      tourName: 'Orbit_Playground',
+      lat: lat,
+      lng: lng,
+      alt: 0.0,
+      range: adjustedRange,
+      tilt: 50.0,
+    );
 
     return _wrapDocument(
       name: name,
@@ -145,7 +154,15 @@ class KmlGenerator {
       }
     }
     final range = _d(params, 'range', fallback: 1000.0);
-    final orbitBody = _generateOrbitTour(lat, lng, altitude, range);
+    final adjustedRange = range.clamp(400.0, 300000.0);
+    final orbitBody = OrbitGenerator.generateOrbitTour(
+      tourName: 'Orbit_Playground',
+      lat: lat,
+      lng: lng,
+      alt: altitude,
+      range: adjustedRange,
+      tilt: 50.0,
+    );
 
     return _wrapDocument(
       name: name,
@@ -193,7 +210,15 @@ $coordString
     final midLat = (startLat + endLat) / 2;
     final midLng = (startLng + endLng) / 2;
     final range = _d(params, 'range', fallback: 1000.0);
-    final orbitBody = _generateOrbitTour(midLat, midLng, 0.0, range);
+    final adjustedRange = range.clamp(400.0, 300000.0);
+    final orbitBody = OrbitGenerator.generateOrbitTour(
+      tourName: 'Orbit_Playground',
+      lat: midLat,
+      lng: midLng,
+      alt: 0.0,
+      range: adjustedRange,
+      tilt: 50.0,
+    );
 
     return _wrapDocument(
       name: name,
@@ -239,7 +264,15 @@ $coordString
     final west = lng - size;
 
     final range = _d(params, 'range', fallback: 1000.0);
-    final orbitBody = _generateOrbitTour(lat, lng, 0.0, range);
+    final adjustedRange = range.clamp(400.0, 300000.0);
+    final orbitBody = OrbitGenerator.generateOrbitTour(
+      tourName: 'Orbit_Playground',
+      lat: lat,
+      lng: lng,
+      alt: 0.0,
+      range: adjustedRange,
+      tilt: 50.0,
+    );
 
     return _wrapDocument(
       name: name,
@@ -405,58 +438,5 @@ $orbitTourBody
       case 'cyan': return '7fffff00';
       default: return colorName;
     }
-  }
-
-  /// Generates a perfectly smooth KML Tour for orbiting the shape.
-  String _generateOrbitTour(double lat, double lng, double alt, double range) {
-    // We adjust the multiplier here so the camera doesn't end up inside huge models, similar to model builder
-    // But since this is playground, we'll just clamp the range and use tilt 50.0
-    final adjustedRange = range.clamp(400.0, 300000.0);
-    final tilt = 50.0;
-    final String tourName = 'Orbit_Playground';
-
-    final buffer = StringBuffer();
-    buffer.writeln('    <gx:Tour>');
-    buffer.writeln('      <name>$tourName</name>');
-    buffer.writeln('      <gx:Playlist>');
-
-    // Generate 20 orbits (about 15 minutes of continuous smooth orbiting)
-    for (int orbit = 0; orbit < 20; orbit++) {
-      for (int i = 0; i <= 360; i += 10) {
-        if (i == 0 && orbit > 0) {
-          // Reset heading to 0 instantly
-          buffer.writeln('        <gx:FlyTo>');
-          buffer.writeln('          <gx:duration>0.0</gx:duration>');
-          buffer.writeln('          <gx:flyToMode>bounce</gx:flyToMode>');
-          buffer.writeln('          <LookAt>');
-          buffer.writeln('            <longitude>$lng</longitude>');
-          buffer.writeln('            <latitude>$lat</latitude>');
-          buffer.writeln('            <altitude>$alt</altitude>');
-          buffer.writeln('            <heading>0</heading>');
-          buffer.writeln('            <tilt>$tilt</tilt>');
-          buffer.writeln('            <range>$adjustedRange</range>');
-          buffer.writeln('            <gx:altitudeMode>relativeToGround</gx:altitudeMode>');
-          buffer.writeln('          </LookAt>');
-          buffer.writeln('        </gx:FlyTo>');
-        } else {
-          buffer.writeln('        <gx:FlyTo>');
-          buffer.writeln('          <gx:duration>1.2</gx:duration>');
-          buffer.writeln('          <gx:flyToMode>smooth</gx:flyToMode>');
-          buffer.writeln('          <LookAt>');
-          buffer.writeln('            <longitude>$lng</longitude>');
-          buffer.writeln('            <latitude>$lat</latitude>');
-          buffer.writeln('            <altitude>$alt</altitude>');
-          buffer.writeln('            <heading>$i</heading>');
-          buffer.writeln('            <tilt>$tilt</tilt>');
-          buffer.writeln('            <range>$adjustedRange</range>');
-          buffer.writeln('            <gx:altitudeMode>relativeToGround</gx:altitudeMode>');
-          buffer.writeln('          </LookAt>');
-          buffer.writeln('        </gx:FlyTo>');
-        }
-      }
-    }
-    buffer.writeln('      </gx:Playlist>');
-    buffer.writeln('    </gx:Tour>');
-    return buffer.toString();
   }
 }

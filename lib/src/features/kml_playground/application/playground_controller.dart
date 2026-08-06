@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 
 import 'package:lg_interactive_onboarding/src/common/lg/lg_service.dart';
 import 'package:lg_interactive_onboarding/src/features/kml_playground/data/kml_playground_service.dart';
@@ -97,6 +98,10 @@ class PlaygroundController extends Notifier<PlaygroundState> {
 
   @override
   PlaygroundState build() {
+    ref.onDispose(() {
+      _orbitTimer?.cancel();
+      _flyToTimer?.cancel();
+    });
     return PlaygroundState();
   }
 
@@ -302,7 +307,7 @@ class PlaygroundController extends Notifier<PlaygroundState> {
       // before enabling the Orbit/Tour buttons. Otherwise, starting an orbit instantly
       // will abruptly cancel the camera flight.
       _flyToTimer?.cancel();
-      _flyToTimer = Timer(const Duration(milliseconds: 6000), () {
+      _flyToTimer = Timer(AppConstants.lgFlyToDuration, () {
         state = state.copyWith(isPushed: true);
       });
 
@@ -333,7 +338,7 @@ class PlaygroundController extends Notifier<PlaygroundState> {
         // Give Google Earth ample time to fully exit the tour mode and 
         // stabilize its UI. Otherwise, it might ignore the subsequent 
         // network link refresh signal.
-        await Future.delayed(const Duration(milliseconds: 1500));
+        await Future.delayed(AppConstants.lgTourExitDelay);
       } else {
         await Future.delayed(const Duration(milliseconds: 200));
       }

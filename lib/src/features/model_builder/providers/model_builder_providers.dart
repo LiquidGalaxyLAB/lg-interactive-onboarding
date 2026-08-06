@@ -423,7 +423,7 @@ class PushNotifier extends Notifier<PushState> {
     // Delay success status if pushing was successful to let Google Earth finish the physical 
     // flyTo animation. Otherwise, clicking "Start Orbit" instantly will abort the camera flight.
     if (result.success) {
-      await Future.delayed(const Duration(milliseconds: 6000));
+      await Future.delayed(AppConstants.lgFlyToDuration);
     }
 
     state = PushState(
@@ -611,7 +611,12 @@ class OrbitingModelNotifier extends Notifier<String?> {
   Timer? _timer;
   
   @override
-  String? build() => null;
+  String? build() {
+    ref.onDispose(() {
+      _timer?.cancel();
+    });
+    return null;
+  }
 
   void setOrbiting(String? modelId) {
     state = modelId;
