@@ -420,6 +420,12 @@ class PushNotifier extends Notifier<PushState> {
       }
     }
 
+    // Delay success status if pushing was successful to let Google Earth finish the physical 
+    // flyTo animation. Otherwise, clicking "Start Orbit" instantly will abort the camera flight.
+    if (result.success) {
+      await Future.delayed(const Duration(milliseconds: 6000));
+    }
+
     state = PushState(
       status: result.success ? PushStatus.success : PushStatus.error,
       message: result.message,

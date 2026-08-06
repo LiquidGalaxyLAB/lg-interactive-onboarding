@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -34,6 +35,12 @@ class PlaygroundState {
   /// Whether a tour is currently playing on the rig.
   final bool isTourPlaying;
 
+  /// Whether a native orbit tour is currently playing.
+  final bool isOrbiting;
+
+  /// Whether the current KML configuration has been successfully pushed.
+  final bool isPushed;
+
   PlaygroundState({
     this.activeTemplate,
     this.activeParameters = const {},
@@ -42,6 +49,8 @@ class PlaygroundState {
     this.validationError,
     this.isPushing = false,
     this.isTourPlaying = false,
+    this.isOrbiting = false,
+    this.isPushed = false,
   });
 
   PlaygroundState copyWith({
@@ -52,6 +61,8 @@ class PlaygroundState {
     String? validationError,
     bool? isPushing,
     bool? isTourPlaying,
+    bool? isOrbiting,
+    bool? isPushed,
   }) {
     return PlaygroundState(
       activeTemplate: activeTemplate ?? this.activeTemplate,
@@ -61,6 +72,8 @@ class PlaygroundState {
       validationError: validationError,
       isPushing: isPushing ?? this.isPushing,
       isTourPlaying: isTourPlaying ?? this.isTourPlaying,
+      isOrbiting: isOrbiting ?? this.isOrbiting,
+      isPushed: isPushed ?? this.isPushed,
     );
   }
 }
@@ -72,6 +85,9 @@ class PlaygroundState {
 class PlaygroundController extends Notifier<PlaygroundState> {
   static const _generator = KmlGenerator();
   static const _validator = KmlValidator();
+  
+  Timer? _orbitTimer;
+  Timer? _flyToTimer;
 
   @override
   PlaygroundState build() {
@@ -90,6 +106,7 @@ class PlaygroundController extends Notifier<PlaygroundState> {
     state = state.copyWith(
       activeTemplate: template,
       activeParameters: defaultParams,
+      isPushed: false,
     );
     _regenerateKml();
   }
@@ -103,7 +120,7 @@ class PlaygroundController extends Notifier<PlaygroundState> {
     final newParams = Map<String, dynamic>.from(state.activeParameters);
     newParams[id] = value;
 
-    state = state.copyWith(activeParameters: newParams);
+    state = state.copyWith(activeParameters: newParams, isPushed: false);
     _regenerateKml();
   }
 
@@ -116,7 +133,7 @@ class PlaygroundController extends Notifier<PlaygroundState> {
     if (newParams.containsKey('latitude')) newParams['latitude'] = lat;
     if (newParams.containsKey('longitude')) newParams['longitude'] = lng;
 
-    state = state.copyWith(activeParameters: newParams);
+    state = state.copyWith(activeParameters: newParams, isPushed: false);
     _regenerateKml();
   }
 
@@ -131,7 +148,7 @@ class PlaygroundController extends Notifier<PlaygroundState> {
     existing.add({'lat': lat, 'lng': lng});
     newParams['vertices'] = existing;
 
-    state = state.copyWith(activeParameters: newParams);
+    state = state.copyWith(activeParameters: newParams, isPushed: false);
     _regenerateKml();
   }
 
@@ -148,7 +165,7 @@ class PlaygroundController extends Notifier<PlaygroundState> {
     }
     newParams['vertices'] = existing;
 
-    state = state.copyWith(activeParameters: newParams);
+    state = state.copyWith(activeParameters: newParams, isPushed: false);
     _regenerateKml();
   }
 
@@ -159,7 +176,7 @@ class PlaygroundController extends Notifier<PlaygroundState> {
     final newParams = Map<String, dynamic>.from(state.activeParameters);
     newParams['vertices'] = <Map<String, double>>[];
 
-    state = state.copyWith(activeParameters: newParams);
+    state = state.copyWith(activeParameters: newParams, isPushed: false);
     _regenerateKml();
   }
 
@@ -176,7 +193,7 @@ class PlaygroundController extends Notifier<PlaygroundState> {
       defaultParams[param.id] = param.defaultValue;
     }
 
-    state = state.copyWith(activeParameters: defaultParams);
+    state = state.copyWith(activeParameters: defaultParams, isPushed: false);
     _regenerateKml();
   }
 
@@ -204,7 +221,7 @@ class PlaygroundController extends Notifier<PlaygroundState> {
       final lgService = ref.read(lgServiceProvider);
 
       // Stop any running background tours or orbits before pushing new KML
-      await lgService.orbitStop();
+      await stopOrbit();
       await lgService.stopTour();
       await Future.delayed(const Duration(milliseconds: 100)); // Brief pause for GE to stabilize
 
@@ -232,9 +249,13 @@ class PlaygroundController extends Notifier<PlaygroundState> {
       final templateName = state.activeTemplate?.name;
       if (templateName != null) {
         String key = templateName;
-        if (templateName.contains('Placemark')) key = 'Placemark';
-        else if (templateName.contains('Polygon')) key = 'Polygon';
-        else if (templateName.contains('Path') || templateName.contains('LineString')) key = 'LineString';
+        if (templateName.contains('Placemark')) {
+          key = 'Placemark';
+        } else if (templateName.contains('Polygon')) {
+          key = 'Polygon';
+        } else if (templateName.contains('Path') || templateName.contains('LineString')) {
+          key = 'LineString';
+        }
 
         final content = EducationalConstants.kmlContent[key];
         if (content != null) {
@@ -258,8 +279,8 @@ class PlaygroundController extends Notifier<PlaygroundState> {
         return false;
       }
 
-      // 4. Fly the camera to the relevant location.
-      await lgService.flyToAndOrbit(
+      // 4. Fly the camera to the relevant location without starting an automatic stream orbit.
+      await lgService.flyTo(
         latitude: lat,
         longitude: lng,
         altitude: GeoMath.extractDouble(params, 'altitude') ?? 0.0,
@@ -270,6 +291,15 @@ class PlaygroundController extends Notifier<PlaygroundState> {
 
       debugPrint('Playground: KML pushed and camera moved.');
       state = state.copyWith(isPushing: false);
+
+      // We add a delay to allow Google Earth to finish the physical flyTo animation
+      // before enabling the Orbit/Tour buttons. Otherwise, starting an orbit instantly
+      // will abruptly cancel the camera flight.
+      _flyToTimer?.cancel();
+      _flyToTimer = Timer(const Duration(milliseconds: 6000), () {
+        state = state.copyWith(isPushed: true);
+      });
+
       return true;
     } catch (e) {
       debugPrint('Playground: pushToLG error: $e');
@@ -283,14 +313,28 @@ class PlaygroundController extends Notifier<PlaygroundState> {
     try {
       final playgroundService = ref.read(kmlPlaygroundServiceProvider);
       final lgService = ref.read(lgServiceProvider);
-      
+      final wasPlaying = state.isOrbiting || state.isTourPlaying;
+
       // Stop any running background tours or orbits before clearing
-      await lgService.orbitStop();
+      await stopOrbit();
       await lgService.stopTour();
-      await Future.delayed(const Duration(milliseconds: 100));
+      
+      if (wasPlaying) {
+        // Give Google Earth ample time to fully exit the tour mode and 
+        // stabilize its UI. Otherwise, it might ignore the subsequent 
+        // network link refresh signal.
+        await Future.delayed(const Duration(milliseconds: 1500));
+      } else {
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
       
       await lgService.cleanBalloonKML();
-      return await playgroundService.clearKml();
+      final cleared = await playgroundService.clearKml();
+      if (cleared) {
+        _flyToTimer?.cancel();
+        state = state.copyWith(isPushed: false);
+      }
+      return cleared;
     } catch (e) {
       debugPrint('Playground: clearFromLG error: $e');
       return false;
@@ -334,11 +378,47 @@ class PlaygroundController extends Notifier<PlaygroundState> {
     await playTour();
   }
 
+  // ─── Native Orbit Playback ──────────────────────────────────────────
+
+  /// Starts the native gx:Tour orbit for Playground shapes.
+  Future<void> startOrbit() async {
+    final lgService = ref.read(lgServiceProvider);
+    state = state.copyWith(isOrbiting: true);
+
+    // Cancel any existing timer
+    _orbitTimer?.cancel();
+    
+    // Tell GE to play the embedded tour
+    await lgService.playTour('Orbit_Playground');
+
+    // The _generateOrbitTour creates exactly 20 revolutions, taking 14.4 minutes (864 seconds).
+    // When it finishes, GE stops moving, but our UI would be permanently stuck on "Stop Orbit"
+    // because GE cannot send a "Tour Finished" callback over SSH.
+    // So, we set a precise timer to auto-reset the UI back to "Start Orbit" exactly
+    // when the native tour naturally completes!
+    _orbitTimer = Timer(const Duration(seconds: 864), () {
+      state = state.copyWith(isOrbiting: false);
+    });
+  }
+
+  /// Stops the native orbit tour and resets the UI state immediately.
+  Future<void> stopOrbit() async {
+    final lgService = ref.read(lgServiceProvider);
+    
+    // Stop any active tours/orbits in Google Earth
+    await lgService.orbitStop();
+    
+    // Immediately cancel the auto-reset timer and revert UI state
+    _orbitTimer?.cancel();
+    state = state.copyWith(isOrbiting: false);
+  }
+
   // ─── Internal Helpers ──────────────────────────────────────────────
 
   /// Regenerates the KML string from the current template + parameters,
   /// validates it, and updates the state.
   void _regenerateKml() {
+    _flyToTimer?.cancel();
     final template = state.activeTemplate;
     if (template == null) return;
 
