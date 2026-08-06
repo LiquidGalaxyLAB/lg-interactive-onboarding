@@ -198,9 +198,18 @@ class _DeployedModelsCard extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      IconButton(
-                        icon: Icon(isOrbitingThis ? Icons.stop_circle : Icons.play_circle_outline, size: 18, color: isOrbitingThis ? theme.colorScheme.error : theme.colorScheme.primary),
-                        tooltip: isOrbitingThis ? 'Stop Orbit' : 'Start Orbit',
+                      FilledButton.tonalIcon(
+                        icon: Icon(
+                          isOrbitingThis ? Icons.stop_circle : Icons.play_circle_outline,
+                          size: 18,
+                          color: isOrbitingThis ? theme.colorScheme.error : theme.colorScheme.primary,
+                        ),
+                        label: Text(
+                          isOrbitingThis ? 'Stop Orbit' : 'Start Orbit',
+                          style: TextStyle(
+                            color: isOrbitingThis ? theme.colorScheme.error : theme.colorScheme.primary,
+                          ),
+                        ),
                         onPressed: isPushing ? null : () {
                           if (isOrbitingThis) {
                             ref.read(lgServiceProvider).orbitStop();
@@ -211,6 +220,7 @@ class _DeployedModelsCard extends ConsumerWidget {
                           }
                         },
                       ),
+                      const SizedBox(width: 8),
                       IconButton(
                         icon: Icon(Icons.close, size: 18, color: theme.colorScheme.error),
                         tooltip: 'Remove from LG',
