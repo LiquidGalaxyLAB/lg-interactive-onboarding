@@ -92,8 +92,53 @@ class ModelRepository {
         </Scale>
       </Model>
     </Placemark>
+${_generateOrbitTour(project)}
   </Document>
 </kml>''';
+  }
+
+  /// Generates a perfectly smooth KML Tour for orbiting this specific model.
+  String _generateOrbitTour(ModelProject project) {
+    if (!project.hasLocation) return '';
+
+    final lat = project.latitude!;
+    final lng = project.longitude!;
+    final alt = project.altitude;
+    final range = (alt + (project.scaleX * 150)).clamp(2000.0, 250000.0);
+    final tilt = AppConstants.defaultCameraTilt;
+    final String tourName = 'Orbit_${project.id}';
+
+    final buffer = StringBuffer();
+    buffer.writeln('    <gx:Tour>');
+    buffer.writeln('      <name>$tourName</name>');
+    buffer.writeln('      <gx:Playlist>');
+
+    // Generate 20 orbits (about 15 minutes of continuous smooth orbiting)
+    for (int orbit = 0; orbit < 20; orbit++) {
+      for (int i = 0; i <= 360; i += 10) {
+        // Continuously increase heading (e.g. 360, 370, 380...) 
+        // to prevent Google Earth from spinning backwards at the 360->0 boundary
+        final heading = (orbit * 360) + i;
+        
+        buffer.writeln('        <gx:FlyTo>');
+        buffer.writeln('          <gx:duration>1.2</gx:duration>');
+        buffer.writeln('          <gx:flyToMode>smooth</gx:flyToMode>');
+        buffer.writeln('          <LookAt>');
+        buffer.writeln('            <longitude>$lng</longitude>');
+        buffer.writeln('            <latitude>$lat</latitude>');
+        buffer.writeln('            <altitude>$alt</altitude>');
+        buffer.writeln('            <heading>$heading</heading>');
+        buffer.writeln('            <tilt>$tilt</tilt>');
+        buffer.writeln('            <range>$range</range>');
+        buffer.writeln('            <gx:altitudeMode>relativeToGround</gx:altitudeMode>');
+        buffer.writeln('          </LookAt>');
+        buffer.writeln('        </gx:FlyTo>');
+      }
+    }
+
+    buffer.writeln('      </gx:Playlist>');
+    buffer.writeln('    </gx:Tour>');
+    return buffer.toString();
   }
 
   /// Generates just the Model block (for KML preview).
