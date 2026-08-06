@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,12 +26,11 @@ class RagService {
     try {
       await _ref.read(offlineEmbeddingServiceProvider).init();
       
-      // Load the string on the main thread (rootBundle is tied to the main isolate)
-      final jsonString = await rootBundle.loadString('assets/knowledge/lg_wiki_embeddings.json');
-      
-      // Offload heavy JSON parsing and List allocation to a background isolate
-      // to avoid OOM crashes and UI thread jank (skipped frames).
-      final parsedChunks = await compute(_parseEmbeddings, jsonString);
+      // Offload BOTH the file loading and JSON parsing to a background isolate.
+      // Passing a huge string across isolate boundaries doubles its memory footprint.
+      // Using RootIsolateToken allows the background isolate to read assets directly!
+      final rootToken = RootIsolateToken.instance!;
+      final parsedChunks = await compute(_loadAndParseEmbeddings, rootToken);
       
       _chunks.clear();
       _chunks.addAll(parsedChunks);
@@ -45,7 +43,9 @@ class RagService {
   }
 
   // Top-level function for isolate spawning.
-  static List<VectorChunk> _parseEmbeddings(String jsonString) {
+  static Future<List<VectorChunk>> _loadAndParseEmbeddings(RootIsolateToken token) async {
+    BackgroundIsolateBinaryMessenger.ensureInitialized(token);
+    final jsonString = await rootBundle.loadString('assets/knowledge/lg_wiki_embeddings.json');
     final List<dynamic> data = jsonDecode(jsonString);
     final List<VectorChunk> result = [];
     
