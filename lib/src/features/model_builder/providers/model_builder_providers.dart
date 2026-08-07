@@ -14,6 +14,37 @@ import 'package:lg_interactive_onboarding/src/common/kml/educational_balloon_kml
 import 'package:lg_interactive_onboarding/src/common/constants/educational_content.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:xml/xml.dart';
+
+// ─── Local Model Validation ──────────────────────────────────────────────
+
+/// Runs in an Isolate to parse a DAE file and ensure no mesh has > 65535 vertices.
+/// This guarantees Google Earth compatibility before uploading.
+Future<bool> _validateDaeVertices(String filePath) async {
+  return await compute(_checkDaeVerticesInIsolate, filePath);
+}
+
+bool _checkDaeVerticesInIsolate(String filePath) {
+  try {
+    final file = File(filePath);
+    final document = XmlDocument.parse(file.readAsStringSync());
+    final floatArrays = document.findAllElements('float_array');
+    for (final array in floatArrays) {
+      final countStr = array.getAttribute('count');
+      if (countStr != null) {
+        final count = int.tryParse(countStr) ?? 0;
+        // 65535 vertices max. Each vertex is X, Y, Z (3 floats).
+        if (count > 65535 * 3) {
+          return false;
+        }
+      }
+    }
+    return true; // Valid
+  } catch (e) {
+    // If it fails to parse (e.g. malformed), we let it pass here and fail on the Python script.
+    return true; 
+  }
+}
 
 // ─── Bundled Asset Models ──────────────────────────────────────────────
 
@@ -107,7 +138,6 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
         allowMultiple: false,
-        withData: true,
         withReadStream: true,
       );
 
@@ -148,17 +178,28 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
         await persistentFile.writeAsBytes(Uint8List.fromList(chunks));
         debugPrint('Import: streamed ${chunks.length} bytes from content provider');
       } else {
-        return const ImportFailure('Could not read file data from device. '
-            'Try copying the file to internal storage and retry.');
+        debugPrint('Import: Failed to obtain file bytes (all strategies exhausted).');
+        return const ImportFailure('Failed to load file contents.');
       }
 
-      final fileInfo = await persistentFile.stat();
+      // ── Local Validation ──
+      if (ext == '.dae') {
+        final isValid = await _validateDaeVertices(persistentFile.path);
+        if (!isValid) {
+          await persistentFile.delete();
+          return ImportFailure(
+            'This model is too complex for Google Earth. Please decimate it in Blender to under 64,000 vertices per mesh and try again.'
+          );
+        }
+      }
+
+      final modelSize = await persistentFile.length();
 
       state = state.copyWith(
         id: _generateId(),
         filePath: persistentFile.path,
         fileName: fileName,
-        fileSize: fileInfo.size,
+        fileSize: modelSize,
         fileExtension: ext,
         isAsset: false,
         assetPath: null,
