@@ -40,6 +40,8 @@ from lxml import etree
 TAG_TRIANGLES = "triangles"
 TAG_POLYLIST  = "polylist"
 TAG_POLYGONS  = "polygons"
+TAG_TRISTRIPS = "tristrips"
+TAG_TRIFANS   = "trifans"
 TAG_P         = "p"
 TAG_PH        = "ph"
 TAG_VCOUNT    = "vcount"
@@ -48,6 +50,8 @@ ATTR_COUNT    = "count"
 PRIMITIVE_TAGS = {
     TAG_POLYLIST,
     TAG_POLYGONS,
+    TAG_TRISTRIPS,
+    TAG_TRIFANS,
 }
 
 # ---------------------------------------------------------------------------
@@ -211,6 +215,67 @@ def _convert_polygons(primitive_element):
     primitive_element.set(ATTR_COUNT, str(new_tri_count))
     return (old_count, new_tri_count)
 
+def _convert_tristrips(primitive_element):
+    """Convert <tristrips> to <triangles> in-place."""
+    sub_indices_list = primitive_element.findall(TAG_P)
+    vertex_index_stride = _get_vertex_index_stride(primitive_element)
+    if not vertex_index_stride: return None
+    
+    triangulated_flat_indices = []
+    new_tri_count = 0
+    old_count = len(sub_indices_list)
+    
+    for sub_indices in sub_indices_list:
+        row_data = list(map(int, sub_indices.text.split())) if (sub_indices.text or "").strip() else []
+        n_verts  = len(row_data) // vertex_index_stride
+        rows     = [row_data[i * vertex_index_stride : (i + 1) * vertex_index_stride] for i in range(n_verts)]
+        
+        for i in range(n_verts - 2):
+            if i % 2 == 0:
+                triangulated_flat_indices.extend(rows[i])
+                triangulated_flat_indices.extend(rows[i+1])
+                triangulated_flat_indices.extend(rows[i+2])
+            else:
+                triangulated_flat_indices.extend(rows[i+1])
+                triangulated_flat_indices.extend(rows[i])
+                triangulated_flat_indices.extend(rows[i+2])
+            new_tri_count += 1
+        primitive_element.remove(sub_indices)
+        
+    new_indices_element = etree.SubElement(primitive_element, TAG_P)
+    new_indices_element.text = " ".join(map(str, triangulated_flat_indices))
+    primitive_element.tag = TAG_TRIANGLES
+    primitive_element.set(ATTR_COUNT, str(new_tri_count))
+    return (old_count, new_tri_count)
+
+def _convert_trifans(primitive_element):
+    """Convert <trifans> to <triangles> in-place."""
+    sub_indices_list = primitive_element.findall(TAG_P)
+    vertex_index_stride = _get_vertex_index_stride(primitive_element)
+    if not vertex_index_stride: return None
+    
+    triangulated_flat_indices = []
+    new_tri_count = 0
+    old_count = len(sub_indices_list)
+    
+    for sub_indices in sub_indices_list:
+        row_data = list(map(int, sub_indices.text.split())) if (sub_indices.text or "").strip() else []
+        n_verts  = len(row_data) // vertex_index_stride
+        rows     = [row_data[i * vertex_index_stride : (i + 1) * vertex_index_stride] for i in range(n_verts)]
+        
+        for i in range(n_verts - 2):
+            triangulated_flat_indices.extend(rows[0])
+            triangulated_flat_indices.extend(rows[i+1])
+            triangulated_flat_indices.extend(rows[i+2])
+            new_tri_count += 1
+        primitive_element.remove(sub_indices)
+        
+    new_indices_element = etree.SubElement(primitive_element, TAG_P)
+    new_indices_element.text = " ".join(map(str, triangulated_flat_indices))
+    primitive_element.tag = TAG_TRIANGLES
+    primitive_element.set(ATTR_COUNT, str(new_tri_count))
+    return (old_count, new_tri_count)
+
 def _normalize_scale_unit(root):
     """
     Force normalize scale unit to 1.0 (Meters).
@@ -253,6 +318,25 @@ def _strip_transparency(root):
                 count += 1
     if count > 0:
         print("NOTE  : Removed %d transparency-related tags to prevent Google Earth invisibility bug." % count)
+
+def _strip_useless_libraries(root):
+    """Remove extraneous library tags that GE ignores to save file size and parsing time."""
+    useless_tags = [
+        "library_cameras",
+        "library_lights",
+        "library_animations",
+        "library_controllers",
+        "library_force_fields"
+    ]
+    count = 0
+    for tag in useless_tags:
+        for elem in root.iter(tag):
+            parent = elem.getparent()
+            if parent is not None:
+                parent.remove(elem)
+                count += 1
+    if count > 0:
+        print("NOTE  : Removed %d extraneous libraries (cameras, lights, animations) to reduce file bloat." % count)
 
 def _normalize_shaders(root):
     """
@@ -343,6 +427,80 @@ def _apply_vertex_scale_and_offset(root, sx, sy, sz):
     if count > 0:
         print("NOTE  : Applied vertex transformations to %d position arrays." % count)
 
+def _inject_missing_materials(root):
+    """Inject a default white lambert material for any geometry lacking a material binding."""
+    fallback_mat_id = "LG_Fallback_Material"
+    fallback_eff_id = "LG_Fallback_Effect"
+    needs_fallback = False
+    
+    for geom in root.iter("geometry"):
+        mesh = geom.find("mesh")
+        if mesh is None: continue
+        for prim_tag in ["triangles", "polylist", "polygons", "tristrips", "trifans"]:
+            for prim in mesh.iter(prim_tag):
+                if not prim.get("material"):
+                    prim.set("material", fallback_mat_id)
+                    needs_fallback = True
+    
+    for instance_geom in root.iter("instance_geometry"):
+        url = instance_geom.get("url", "")
+        if not url.startswith("#"): continue
+        
+        geom_id = url[1:]
+        geom = root.find(".//geometry[@id='%s']" % geom_id)
+        if geom is None: continue
+        
+        symbols_needed = set()
+        for prim_tag in ["triangles", "polylist", "polygons", "tristrips", "trifans"]:
+            for prim in geom.iter(prim_tag):
+                sym = prim.get("material")
+                if sym: symbols_needed.add(sym)
+                
+        if not symbols_needed: continue
+        
+        bind_material = instance_geom.find("bind_material")
+        if bind_material is None:
+            bind_material = etree.SubElement(instance_geom, "bind_material")
+            technique_common = etree.SubElement(bind_material, "technique_common")
+        else:
+            technique_common = bind_material.find("technique_common")
+            if technique_common is None:
+                technique_common = etree.SubElement(bind_material, "technique_common")
+        
+        bound_symbols = set()
+        for inst_mat in technique_common.findall("instance_material"):
+            bound_symbols.add(inst_mat.get("symbol"))
+            
+        for sym in symbols_needed:
+            if sym not in bound_symbols:
+                etree.SubElement(technique_common, "instance_material", symbol=sym, target="#" + fallback_mat_id)
+                needs_fallback = True
+                
+    if needs_fallback:
+        _add_fallback_material(root, fallback_mat_id, fallback_eff_id)
+        print("NOTE  : Injected fallback white material for un-textured/un-materialized geometry.")
+
+def _add_fallback_material(root, mat_id, eff_id):
+    lib_eff = root.find("library_effects")
+    if lib_eff is None:
+        lib_eff = etree.Element("library_effects")
+        root.insert(0, lib_eff)
+    effect = etree.SubElement(lib_eff, "effect", id=eff_id)
+    profile = etree.SubElement(effect, "profile_COMMON")
+    technique = etree.SubElement(profile, "technique", sid="common")
+    lambert = etree.SubElement(technique, "lambert")
+    emission = etree.SubElement(lambert, "emission")
+    etree.SubElement(emission, "color").text = "0 0 0 1"
+    diffuse = etree.SubElement(lambert, "diffuse")
+    etree.SubElement(diffuse, "color").text = "0.8 0.8 0.8 1"
+    
+    lib_mat = root.find("library_materials")
+    if lib_mat is None:
+        lib_mat = etree.Element("library_materials")
+        root.insert(1, lib_mat)
+    mat = etree.SubElement(lib_mat, "material", id=mat_id)
+    etree.SubElement(mat, "instance_effect", url="#" + eff_id)
+
 def _normalize_up_axis(root):
     """
     If up_axis is Y_UP, convert it to Z_UP and wrap the root visual_scene nodes
@@ -399,7 +557,9 @@ def convert_dae_file(input_path, output_path, sx=1.0, sy=1.0, sz=1.0):
     sz *= unit_multiplier
 
     _strip_transparency(root)
+    _strip_useless_libraries(root)
     _normalize_shaders(root)
+    _inject_missing_materials(root)
     _apply_vertex_scale_and_offset(root, sx, sy, sz)
     _normalize_up_axis(root)
 
@@ -427,8 +587,14 @@ def convert_dae_file(input_path, output_path, sx=1.0, sy=1.0, sz=1.0):
 
         if short_tag == TAG_POLYLIST:
             result = _convert_polylist(primitive_element)
-        else:
+        elif short_tag == TAG_POLYGONS:
             result = _convert_polygons(primitive_element)
+        elif short_tag == TAG_TRISTRIPS:
+            result = _convert_tristrips(primitive_element)
+        elif short_tag == TAG_TRIFANS:
+            result = _convert_trifans(primitive_element)
+        else:
+            result = None
 
         if result is None:
             print("    [WARN] Skipped -- could not determine face topology (malformed element).")
