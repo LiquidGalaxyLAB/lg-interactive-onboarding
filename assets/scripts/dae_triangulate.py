@@ -664,12 +664,48 @@ def build_parser():
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    p.add_argument("input",  help="Path to the source .dae file")
-    p.add_argument("output", help="Path for the triangulated output .dae file")
+    p.add_argument("input",  help="Path to the source .dae or .zip file")
+    p.add_argument("output", help="Path for the output file or directory")
     p.add_argument("--scale-x", type=float, default=1.0, help="Scale factor for X axis")
     p.add_argument("--scale-y", type=float, default=1.0, help="Scale factor for Y axis")
     p.add_argument("--scale-z", type=float, default=1.0, help="Scale factor for Z axis")
+    p.add_argument("--is-zip", action="store_true", help="Input is a zip file, output is a directory to extract to.")
     return p
+
+
+def process_zip_to_dir(input_zip, output_dir, sx=1.0, sy=1.0, sz=1.0):
+    print("Extracting ZIP: %s to %s" % (input_zip, output_dir))
+    os.makedirs(output_dir, exist_ok=True)
+    with zipfile.ZipFile(input_zip, 'r') as zf:
+        zf.extractall(output_dir)
+        
+    dae_files = glob.glob(os.path.join(output_dir, "**/*.dae"), recursive=True)
+    if not dae_files:
+        print("ERROR: No .dae file found inside ZIP")
+        sys.exit(1)
+        
+    # Pick the largest DAE file as the main model
+    main_dae = max(dae_files, key=os.path.getsize)
+    
+    # Clean up file bloat (other DAEs, OBJs, FBXs, etc.)
+    unwanted_exts = {'.obj', '.fbx', '.blend', '.3ds', '.c4d', '.stl', '.gltf', '.glb'}
+    for root, dirs, files in os.walk(output_dir):
+        for f in files:
+            file_path = os.path.join(root, f)
+            ext = os.path.splitext(f)[1].lower()
+            if file_path != main_dae and (ext == '.dae' or ext in unwanted_exts):
+                try:
+                    os.remove(file_path)
+                except Exception:
+                    pass
+                    
+    # Triangulate and sanitize the main DAE in-place
+    convert_dae_file(main_dae, main_dae, sx, sy, sz)
+    
+    # Print the relative path so Dart can capture it
+    rel_path = os.path.relpath(main_dae, output_dir)
+    rel_path = rel_path.replace("\\", "/") # Ensure forward slashes for KML Link
+    print("LG_DAE_PATH=%s" % rel_path)
 
 
 def process_kmz(input_path, output_path, sx=1.0, sy=1.0, sz=1.0):
@@ -710,11 +746,14 @@ def main():
               "(use a different filename or directory).")
         sys.exit(1)
 
-    out_dir = os.path.dirname(output_path)
-    if out_dir:
-        os.makedirs(out_dir, exist_ok=True)
+    if not args.is_zip:
+        out_dir = os.path.dirname(output_path)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
 
-    if input_path.lower().endswith('.kmz'):
+    if args.is_zip:
+        process_zip_to_dir(input_path, output_path, args.scale_x, args.scale_y, args.scale_z)
+    elif input_path.lower().endswith('.kmz'):
         process_kmz(input_path, output_path, args.scale_x, args.scale_y, args.scale_z)
     else:
         convert_dae_file(input_path, output_path, args.scale_x, args.scale_y, args.scale_z)
