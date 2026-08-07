@@ -297,7 +297,7 @@ class _ImportModelCard extends ConsumerWidget {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('Import 3D Model', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-                    Text('Supports .dae, .obj, .fbx, .blend, .gltf, .glb, .stl & more',
+                    Text('Only .dae models (max 64k vertices)',
                       style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.5))),
                   ]),
                 ),
@@ -474,7 +474,7 @@ class _ImportButton extends ConsumerWidget {
           Text('Tap to import from device', style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.primary, fontWeight: FontWeight.w500)),
           const SizedBox(height: 2),
-          Text('.dae · .obj · .fbx · .blend · .gltf · .glb · .stl & more', style: theme.textTheme.bodySmall?.copyWith(
+          Text('Only .dae models', style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurface.withValues(alpha: 0.4))),
         ]),
       ),

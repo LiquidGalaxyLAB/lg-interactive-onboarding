@@ -8,17 +8,9 @@ class ModelProject {
   // ─── Supported 3D Formats ──────────────────────────────────────
 
   /// All file extensions the model builder can accept.
-  /// Non-DAE formats are converted to DAE via assimp on the LG master.
+  /// We strictly limit this to DAE (native).
   static const supportedExtensions = [
-    // Common / Native formats
-    '.dae', '.obj', '.fbx', '.blend', '.gltf', '.glb', '.kmz', '.stl', '.ply', '.3ds',
-    // Extended Assimp formats
-    '.3d', '.ac', '.ac3d', '.acc', '.ase', '.ask', '.assbin', '.b3d', '.bvh',
-    '.cob', '.csm', '.dxf', '.enff', '.hmp', '.ifc', '.ifczip', '.irr', '.irrmesh',
-    '.lwo', '.lws', '.lxo', '.md2', '.md3', '.md5anim', '.md5camera', '.md5mesh',
-    '.mdc', '.mdl', '.mesh', '.mesh.xml', '.mot', '.ms3d', '.ndo', '.nff', '.off',
-    '.ogex', '.pk3', '.prj', '.q3o', '.q3s', '.raw', '.scn', '.smd', '.ter',
-    '.uc', '.vta', '.x', '.xgl', '.xml', '.zgl'
+    '.dae'
   ];
 
   /// The native format used by Google Earth / Liquid Galaxy.
@@ -102,26 +94,10 @@ class ModelProject {
   /// Whether the project is ready to generate KML and push.
   bool get isReady => hasModel && hasLocation;
 
-
-
-  /// Whether this file needs assimp conversion to DAE before deployment.
-  /// KMZ files have their own handling path and are excluded.
-  bool get requiresConversion {
-    final ext = fileExtension?.toLowerCase();
-    return ext != null && ext != '.kmz';
-  }
-
   /// The remote filename used on the LG server.
   /// Prefixed with the project ID to keep deployments isolated.
-  /// Non-KMZ files always get a .dae suffix since they are converted/triangulated.
   String get remoteModelFileName {
     final baseName = fileName ?? '';
-    if (requiresConversion) {
-      // Replace original extension with .dae (e.g., model.obj → {id}_model.dae)
-      final withoutExt = baseName.replaceAll(RegExp(r'\.[^.]+$'), '');
-      final safeName = withoutExt.replaceAll(' ', '_');
-      return '${id}_$safeName.dae';
-    }
     return '${id}_${baseName.replaceAll(' ', '_')}';
   }
 
