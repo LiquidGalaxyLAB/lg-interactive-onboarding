@@ -26,9 +26,8 @@ class ModelRepository {
 
   ModelRepository(this._sshService, this._settingsService, this._systemKmlService);
 
-  /// Session-level cache: avoids re-checking assimp installation on every push.
-  /// Also caches lxml (Python dependency for triangulation script).
-  bool _assimpVerified = false;
+  /// Session-level cache: avoids re-checking lxml on every push.
+  /// (Python dependency for triangulation script).
   bool _lxmlVerified = false;
 
   // ─── Constants ───────────────────────────────────────────────────
@@ -150,97 +149,6 @@ ${_generateOrbitTour(project)}
 </Model>''';
   }
 
-  // ─── Assimp Prerequisite Check ─────────────────────────────────
-
-  /// Ensures `assimp` (assimp-utils) is installed on the LG master node.
-  ///
-  /// Checks once per session; subsequent calls return immediately.
-  /// If missing, installs via `apt` using the stored SSH password.
-  ///
-  /// Uses the `(echo password; sleep 1) | sudo -S` pattern established
-  /// across the codebase — the sleep keeps the pipe open long enough for
-  /// sudo to read the password from stdin.
-  Future<void> _ensureAssimpInstalled() async {
-    if (_assimpVerified) return;
-    if (!_sshService.isConnected) throw Exception('SSH not connected.');
-
-    try {
-      // Check if assimp is already available
-      final whichOutput = await _execute('which assimp');
-
-      if (whichOutput.isNotEmpty && !whichOutput.contains('not found')) {
-        debugPrint('Assimp: Already installed at $whichOutput');
-        _assimpVerified = true;
-        return;
-      }
-
-      // ── Step 1: apt update ──
-      debugPrint('Assimp: Not found — installing assimp-utils...');
-      final updateOutput = await _execute('apt update -qq 2>&1', sudo: true);
-      debugPrint('Assimp: apt update output: $updateOutput');
-
-      // ── Step 2: apt install ──
-      final installOutput = await _execute('apt install assimp-utils -y -qq 2>&1', sudo: true);
-      debugPrint('Assimp: apt install output: $installOutput');
-
-      // ── Step 3: Verify installation succeeded ──
-      final verifyOutput = await _execute('which assimp');
-
-      if (verifyOutput.isNotEmpty && !verifyOutput.contains('not found')) {
-        debugPrint('Assimp: Installed successfully at $verifyOutput');
-        _assimpVerified = true;
-        return;
-      }
-
-      throw Exception('Installation failed — assimp not found after apt install.');
-    } catch (e) {
-      throw Exception('Prerequisite check failed: $e');
-    }
-  }
-
-  // ─── Assimp Format Conversion ──────────────────────────────────
-
-  /// Converts a non-DAE model file to COLLADA (.dae) using assimp on the
-  /// LG master node.
-  ///
-  /// [uploadedFilePath] — the full remote path of the uploaded raw file
-  ///   (e.g., `/var/www/html/model/123_car.obj`).
-  /// [targetDaePath] — the desired output .dae path
-  ///   (e.g., `/var/www/html/model/123_car.dae`).
-  ///
-  /// On success: the raw file is deleted, only the .dae remains.
-  /// On failure: throws an [Exception] with a descriptive message.
-  Future<void> _convertToCollada({
-    required String uploadedFilePath,
-    required String targetDaePath,
-  }) async {
-
-    try {
-      debugPrint('Assimp: Converting $uploadedFilePath → $targetDaePath');
-
-      final conversionOutput = await _execute('assimp export "$uploadedFilePath" "$targetDaePath" -tri 2>&1');
-
-      // Verify the .dae was actually created
-      final verifyOutput = await _execute('test -f "$targetDaePath" && echo EXISTS');
-
-      if (!verifyOutput.contains('EXISTS')) {
-        throw Exception(
-          'Conversion failed: unsupported format or corrupt file. '
-          'assimp output: $conversionOutput',
-        );
-      }
-
-      // Cleanup: delete the original raw file to avoid clutter
-      await _execute('rm -f "$uploadedFilePath"');
-
-      debugPrint('Assimp: Conversion successful, raw file cleaned up');
-    } catch (e) {
-      // Cleanup on failure too — remove any partial output
-      await _execute('rm -f "$targetDaePath"').catchError((_) => '');
-      rethrow;
-    }
-  }
-
   // ─── Python-Based DAE Triangulation ─────────────────────────────
 
   /// Ensures `lxml` (Python XML library) is installed on the LG master node.
@@ -350,8 +258,6 @@ ${_generateOrbitTour(project)}
     if (!project.isReady) {
       return PushResult(success: false, message: 'Model or location not set.');
     }
-    final ext = project.fileExtension?.toLowerCase() ?? '';
-
     try {
       // 1. Ensure directories exist (single command)
       await _execute('mkdir -p $_modelDir && mkdir -p $_wrapperDir && mkdir -p /var/www/html/kml');
@@ -362,43 +268,9 @@ ${_generateOrbitTour(project)}
       // The final path on the server (what KML will reference)
       final remoteModelPath = '$_modelDir/${project.remoteModelFileName}';
 
-      // Upload with a "raw_" prefix, then let Assimp process/triangulate it
-      final safeRawName = project.fileName?.replaceAll(' ', '_') ?? 'unnamed';
-      final rawUploadPath = '$_modelDir/raw_${project.id}_$safeRawName';
-
-      await _sshService.uploadBytes(bytes: fileBytes, remotePath: rawUploadPath);
+      // Upload directly to the final path (bypassing the old Assimp temp file workflow)
+      await _sshService.uploadBytes(bytes: fileBytes, remotePath: remoteModelPath);
       await _channelDelay();
-
-      if (ext == '.dae' || ext == '.kmz') {
-        // Bypass Assimp conversion since the file is already a DAE or KMZ.
-        // The Python script will handle triangulation next.
-        await _execute('mv -f "$rawUploadPath" "$remoteModelPath"');
-      } else {
-        // Ensure assimp is available
-        try {
-          await _ensureAssimpInstalled();
-        } catch (e) {
-          await _execute('rm -f "$rawUploadPath"');
-          return PushResult(
-            success: false,
-            message: 'Failed to install assimp: $e',
-          );
-        }
-
-        // Convert/Triangulate to .dae (deletes the raw file on success)
-        try {
-          await _convertToCollada(
-            uploadedFilePath: rawUploadPath,
-            targetDaePath: remoteModelPath,
-          );
-        } catch (e) {
-          return PushResult(
-            success: false,
-            message: 'Model conversion failed: $e',
-          );
-        }
-        await _channelDelay();
-      }
 
       // 3. Triangulate the model in-place using Python script
       //    (converts <polylist>/<polygons> → <triangles> for Google Earth)
@@ -423,12 +295,6 @@ ${_generateOrbitTour(project)}
       // Set proper permissions for the web server to read the model and KML
       await _execute('chmod 644 "$_wrapperDir/${project.remoteKmlFileName}"');
       await _execute('chmod 644 "$_modelDir/${project.remoteModelFileName}"');
-
-      // Set proper permissions for the web server to read the model and KML
-      await _execute('chmod 644 "$_wrapperDir/${project.remoteKmlFileName}"');
-      if (ext != '.kmz') {
-        await _execute('chmod 644 "$_modelDir/${project.remoteModelFileName}"');
-      }
 
       // 6. Build wrapper master.kml with NetworkLinks for ALL deployed models
       final allKmlFiles = <String>[
