@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lg_interactive_onboarding/src/common/curriculum/guided_mode_controller.dart';
-import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
-import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
-import 'package:lg_interactive_onboarding/src/common/ssh/system_kml_service.dart';
 import 'package:lg_interactive_onboarding/src/common/theme/app_palette.dart';
 import 'package:lg_interactive_onboarding/src/common/tts/tts_service.dart';
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/data/mentor_service.dart';
@@ -32,7 +29,7 @@ class AppShell extends ConsumerStatefulWidget {
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver {
+class _AppShellState extends ConsumerState<AppShell> {
   int _selectedIndex = 0;
 
   /// Per-tab accent color from the LG brand palette.
@@ -42,35 +39,7 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
     AppPalette.lgRed,    // AI Mentor
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
 
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  /// Clears the logo and disconnects SSH when the app is gracefully exited.
-  /// [AppLifecycleState.detached] fires when the Flutter engine is about to
-  /// be torn down (back-button exit on Android, swipe-close on iOS, etc.).
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.detached) {
-      final ssh = ref.read(sshServiceProvider);
-      if (ssh.isConnected) {
-        final kmlService = ref.read(systemKmlServiceProvider);
-        final logo = ref.read(logoOverlayServiceProvider);
-        // Fire-and-forget — best-effort before process is killed.
-        logo.clearLogo().then((_) {
-          kmlService.cleanUp().then((_) => ssh.disconnect());
-        });
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
