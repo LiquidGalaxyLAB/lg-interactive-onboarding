@@ -15,6 +15,7 @@ import 'package:lg_interactive_onboarding/src/common/constants/educational_conte
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:xml/xml.dart';
+import 'package:archive/archive.dart';
 
 // ─── Local Model Validation ──────────────────────────────────────────────
 
@@ -27,15 +28,34 @@ Future<bool> _validateDaeVertices(String filePath) async {
 bool _checkDaeVerticesInIsolate(String filePath) {
   try {
     final file = File(filePath);
-    final document = XmlDocument.parse(file.readAsStringSync());
-    final floatArrays = document.findAllElements('float_array');
-    for (final array in floatArrays) {
-      final countStr = array.getAttribute('count');
-      if (countStr != null) {
-        final count = int.tryParse(countStr) ?? 0;
-        // 65535 vertices max. Each vertex is X, Y, Z (3 floats).
-        if (count > 65535 * 3) {
-          return false;
+    final ext = p.extension(filePath).toLowerCase();
+
+    List<String> xmlContents = [];
+
+    if (ext == '.zip') {
+      final bytes = file.readAsBytesSync();
+      final archive = ZipDecoder().decodeBytes(bytes);
+      for (final archiveFile in archive) {
+        if (archiveFile.isFile && archiveFile.name.toLowerCase().endsWith('.dae')) {
+          final data = archiveFile.content as List<int>;
+          xmlContents.add(String.fromCharCodes(data));
+        }
+      }
+    } else {
+      xmlContents.add(file.readAsStringSync());
+    }
+
+    for (final content in xmlContents) {
+      final document = XmlDocument.parse(content);
+      final floatArrays = document.findAllElements('float_array');
+      for (final array in floatArrays) {
+        final countStr = array.getAttribute('count');
+        if (countStr != null) {
+          final count = int.tryParse(countStr) ?? 0;
+          // 65535 vertices max. Each vertex is X, Y, Z (3 floats).
+          if (count > 65535 * 3) {
+            return false;
+          }
         }
       }
     }
@@ -183,7 +203,7 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
       }
 
       // ── Local Validation ──
-      if (ext == '.dae') {
+      if (ext == '.dae' || ext == '.zip') {
         final isValid = await _validateDaeVertices(persistentFile.path);
         if (!isValid) {
           await persistentFile.delete();

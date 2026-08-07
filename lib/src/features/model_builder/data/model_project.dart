@@ -8,9 +8,10 @@ class ModelProject {
   // ─── Supported 3D Formats ──────────────────────────────────────
 
   /// All file extensions the model builder can accept.
-  /// We strictly limit this to DAE (native).
+  /// We strictly limit this to DAE (native) and ZIP (packaged DAE).
   static const supportedExtensions = [
-    '.dae'
+    '.dae',
+    '.zip'
   ];
 
   /// The native format used by Google Earth / Liquid Galaxy.
@@ -22,6 +23,10 @@ class ModelProject {
   /// Path to the selected model file on device storage.
   /// For bundled assets, this will be the temp path after extraction.
   final String? filePath;
+  
+  /// The relative internal path to the .dae file if extracted from a .zip.
+  /// (e.g., 'model_v2/source/main.dae'). Null if the source was a raw .dae.
+  final String? internalDaePath;
 
   /// Original filename of the model.
   final String? fileName;
@@ -69,6 +74,7 @@ class ModelProject {
   const ModelProject({
     this.id = '',
     this.filePath,
+    this.internalDaePath,
     this.fileName,
     this.fileSize,
     this.fileExtension,
@@ -109,6 +115,7 @@ class ModelProject {
   ModelProject copyWith({
     String? id,
     String? filePath,
+    String? internalDaePath,
     String? fileName,
     int? fileSize,
     String? fileExtension,
@@ -127,6 +134,7 @@ class ModelProject {
     return ModelProject(
       id: id ?? this.id,
       filePath: filePath ?? this.filePath,
+      internalDaePath: internalDaePath ?? this.internalDaePath,
       fileName: fileName ?? this.fileName,
       fileSize: fileSize ?? this.fileSize,
       fileExtension: fileExtension ?? this.fileExtension,
