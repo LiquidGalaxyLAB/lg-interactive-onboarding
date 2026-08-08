@@ -478,15 +478,17 @@ class PushNotifier extends Notifier<PushState> {
 
         // Send Educational Balloon KML if applicable.
         String? key;
-        final projectName = (project.fileName ?? project.assetPath ?? '').toLowerCase();
-        if (projectName.contains('tree')) {
-          key = 'Tree';
-        } else if (projectName.contains('car')) {
-          key = 'Car';
-        } else if (projectName.contains('pyramid')) {
-          key = 'Pyramid';
-        } else if (projectName.contains('football') || projectName.contains('ball')) {
-          key = 'Football';
+        if (project.isAsset) {
+          final fileName = project.fileName;
+          if (fileName == '3dmodel_tri.dae') {
+            key = 'Tree';
+          } else if (fileName == 'Car.dae') {
+            key = 'Car';
+          } else if (fileName == 'model_pyramid.dae') {
+            key = 'Pyramid';
+          } else if (fileName == 'Ball DAE.dae') {
+            key = 'Football';
+          }
         }
 
         if (key != null) {
