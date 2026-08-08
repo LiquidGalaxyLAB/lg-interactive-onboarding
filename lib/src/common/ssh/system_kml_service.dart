@@ -139,7 +139,8 @@ class SystemKmlService {
     const icons = [
       'tree.png', 'car.png', 'pyramid.png', 'football.png',
       'placemark.png', 'polygon.png', 'linestring.png',
-      'ground_overlay.png', 'screen_overlay.png', 'tour.png'
+      'ground_overlay.png', 'screen_overlay.png', 'tour.png',
+      'custom_model.png'
     ];
     
     try {
