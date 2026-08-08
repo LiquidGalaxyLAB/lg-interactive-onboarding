@@ -1,11 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
 
 import 'package:lg_interactive_onboarding/src/common/tts/tts_service.dart';
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/data/mentor_context_service.dart';
-import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/data/rag_service.dart';
 import 'package:lg_interactive_onboarding/src/features/ai_mentor/data/llm_provider.dart';
 

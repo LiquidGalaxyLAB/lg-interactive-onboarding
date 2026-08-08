@@ -112,9 +112,9 @@ ${_generateOrbitTour(project)}
     final alt = project.altitude;
     // Increase the multiplier to push the camera back for tall models
     // clamp it higher so that models don't easily clip out of the narrow LG master screen FOV.
-    final range = (alt + (project.scaleX * 250)).clamp(400.0, 300000.0);
+    final range = (alt + (project.scaleX * AppConstants.orbitScaleMultiplier)).clamp(AppConstants.orbitMinRange, AppConstants.orbitMaxRange);
     // Use a slightly lower tilt angle (more top-down) to keep tall models vertically centered in frame
-    final tilt = 50.0;
+    final tilt = AppConstants.orbitCameraTilt;
     final String tourName = 'Orbit_${project.id}';
 
     return OrbitGenerator.generateOrbitTour(
@@ -293,7 +293,7 @@ ${_generateOrbitTour(project)}
     }
     try {
       // 1. Ensure directories exist (single command)
-      await _execute('mkdir -p $_modelDir && mkdir -p $_wrapperDir && mkdir -p /var/www/html/kml');
+      await _execute('mkdir -p $_modelDir && mkdir -p $_wrapperDir && mkdir -p ${AppConstants.lgSlaveKmlDir}');
 
       // 2. Upload and process model file
       final fileBytes = await File(project.filePath!).readAsBytes();
@@ -536,12 +536,12 @@ $networkLinks
     await _channelDelay();
     await _sshService.uploadFile(
       localData: emptyKml,
-      remotePath: '/var/www/html/kml/playground.kml',
+      remotePath: AppConstants.lgPlaygroundKml,
     );
     await _channelDelay();
     await _sshService.uploadFile(
       localData: emptyKml,
-      remotePath: '/var/www/html/kml/balloon.kml',
+      remotePath: AppConstants.lgBalloonKml,
     );
   }
 

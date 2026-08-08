@@ -492,7 +492,7 @@ class _ParametersCard extends ConsumerWidget {
           value: boolValue,
           contentPadding: EdgeInsets.zero,
           visualDensity: VisualDensity.compact,
-          activeColor: const Color(0xFF00B894),
+          activeThumbColor: const Color(0xFF00B894),
           onChanged: (v) => controller.updateParameter(param.id, v),
         );
 

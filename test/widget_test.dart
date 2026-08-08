@@ -25,15 +25,24 @@ void main() {
           sharedPreferencesProvider.overrideWithValue(prefs),
           secureStorageProvider.overrideWithValue(secureStorage),
           initialPasswordProvider.overrideWithValue(initialPassword),
+          initialOpenRouterApiKeyProvider.overrideWithValue(''),
+          initialGeminiApiKeyProvider.overrideWithValue(''),
+          initialOpenAIApiKeyProvider.overrideWithValue(''),
+          initialClaudeApiKeyProvider.overrideWithValue(''),
+          initialGroqApiKeyProvider.overrideWithValue(''),
         ],
-        child: LGContentStudioApp(navigatorKey: GlobalKey<NavigatorState>()),
+        child: LGInteractiveOnboardingApp(navigatorKey: GlobalKey<NavigatorState>()),
       ),
     );
 
-    await tester.pumpAndSettle();
+    // The splash screen takes 4 seconds, so we pump enough time to skip it.
+    await tester.pump(const Duration(seconds: 4));
+    // Pump again to let the Navigator transition complete.
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
 
     // Verify that the app launches and the AppShell is shown (dashboard)
     expect(find.byType(AppShell), findsOneWidget);
-    expect(find.text('LG Content Studio'), findsOneWidget);
+    expect(find.text('LG Interactive Onboarding'), findsOneWidget);
   });
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
 
@@ -111,7 +112,7 @@ class LGService {
     try {
       final result = await _sshService.uploadFile(
         localData: kmlContent,
-        remotePath: '/var/www/html/kml/balloon.kml',
+        remotePath: AppConstants.lgBalloonKml,
       );
       
       if (result is SSHUploadFailure) {
@@ -139,7 +140,7 @@ class LGService {
 </kml>''';
       final result = await _sshService.uploadFile(
         localData: emptyKml,
-        remotePath: '/var/www/html/kml/balloon.kml',
+        remotePath: AppConstants.lgBalloonKml,
       );
       
       if (result is SSHUploadFailure) {
@@ -180,7 +181,7 @@ class LGService {
           '<gx:altitudeMode>relativeToGround</gx:altitudeMode>'
           '</LookAt>';
           
-      final command = 'echo "flytoview=$lookAt" > /tmp/query.txt';
+      final command = 'echo "flytoview=$lookAt" > ${AppConstants.lgQueryTxtPath}';
       await _sshService.execute(command);
       
       debugPrint('LGService: Flew to $latitude, $longitude');
@@ -228,7 +229,7 @@ class LGService {
   Future<bool> playTour(String tourName) async {
     if (!_isReady) return false;
     try {
-      final command = 'echo "playtour=$tourName" > /tmp/query.txt';
+      final command = 'echo "playtour=$tourName" > ${AppConstants.lgQueryTxtPath}';
       await _sshService.execute(command);
       
       // Fire it again after a short delay!
@@ -253,7 +254,7 @@ class LGService {
   Future<bool> stopTour() async {
     if (!_isReady) return false;
     try {
-      final command = 'echo "exittour=true" > /tmp/query.txt';
+      final command = 'echo "exittour=true" > ${AppConstants.lgQueryTxtPath}';
       await _sshService.execute(command);
       debugPrint('LGService: Stopped tour');
       return true;
@@ -284,7 +285,7 @@ class LGService {
           '<range>$range</range>'
           '<gx:altitudeMode>relativeToGround</gx:altitudeMode>'
           '</LookAt>';
-      await _sshService.execute('echo "flytoview=$lookAt" > /tmp/query.txt');
+      await _sshService.execute('echo "flytoview=$lookAt" > ${AppConstants.lgQueryTxtPath}');
     } catch (error) {
       debugPrint('LGService: Error in _flyToOrbit: $error');
     }

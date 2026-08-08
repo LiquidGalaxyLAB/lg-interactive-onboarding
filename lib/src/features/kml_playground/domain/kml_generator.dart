@@ -1,5 +1,6 @@
 import 'package:lg_interactive_onboarding/src/features/kml_playground/domain/kml_template.dart';
 import 'package:lg_interactive_onboarding/src/common/utils/geo_math.dart';
+import 'package:lg_interactive_onboarding/src/common/constants/app_constants.dart';
 import 'package:lg_interactive_onboarding/src/common/kml/orbit_generator.dart';
 
 /// Generates valid KML XML strings from template parameters.
@@ -65,14 +66,14 @@ class KmlGenerator {
     final rawColor = _s(params, 'color', fallback: 'Red');
     final color = _mapColorToAbgr(rawColor);
     final range = _d(params, 'range', fallback: 1000.0);
-    final adjustedRange = range.clamp(400.0, 300000.0);
+    final adjustedRange = range.clamp(AppConstants.orbitMinRange, AppConstants.orbitMaxRange);
     final orbitBody = OrbitGenerator.generateOrbitTour(
       tourName: 'Orbit_Playground',
       lat: lat,
       lng: lng,
       alt: 0.0,
       range: adjustedRange,
-      tilt: 50.0,
+      tilt: AppConstants.orbitCameraTilt,
     );
 
     return _wrapDocument(
@@ -154,14 +155,14 @@ class KmlGenerator {
       }
     }
     final range = _d(params, 'range', fallback: 1000.0);
-    final adjustedRange = range.clamp(400.0, 300000.0);
+    final adjustedRange = range.clamp(AppConstants.orbitMinRange, AppConstants.orbitMaxRange);
     final orbitBody = OrbitGenerator.generateOrbitTour(
       tourName: 'Orbit_Playground',
       lat: lat,
       lng: lng,
       alt: altitude,
       range: adjustedRange,
-      tilt: 50.0,
+      tilt: AppConstants.orbitCameraTilt,
     );
 
     return _wrapDocument(
@@ -210,14 +211,14 @@ $coordString
     final midLat = (startLat + endLat) / 2;
     final midLng = (startLng + endLng) / 2;
     final range = _d(params, 'range', fallback: 1000.0);
-    final adjustedRange = range.clamp(400.0, 300000.0);
+    final adjustedRange = range.clamp(AppConstants.orbitMinRange, AppConstants.orbitMaxRange);
     final orbitBody = OrbitGenerator.generateOrbitTour(
       tourName: 'Orbit_Playground',
       lat: midLat,
       lng: midLng,
       alt: 0.0,
       range: adjustedRange,
-      tilt: 50.0,
+      tilt: AppConstants.orbitCameraTilt,
     );
 
     return _wrapDocument(
@@ -264,14 +265,14 @@ $coordString
     final west = lng - size;
 
     final range = _d(params, 'range', fallback: 1000.0);
-    final adjustedRange = range.clamp(400.0, 300000.0);
+    final adjustedRange = range.clamp(AppConstants.orbitMinRange, AppConstants.orbitMaxRange);
     final orbitBody = OrbitGenerator.generateOrbitTour(
       tourName: 'Orbit_Playground',
       lat: lat,
       lng: lng,
       alt: 0.0,
       range: adjustedRange,
-      tilt: 50.0,
+      tilt: AppConstants.orbitCameraTilt,
     );
 
     return _wrapDocument(

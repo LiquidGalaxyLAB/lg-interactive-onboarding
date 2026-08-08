@@ -20,7 +20,7 @@ class KmlPlaygroundService {
     try {
       final result = await _sshService.uploadFile(
         localData: kmlString,
-        remotePath: '/var/www/html/kml/playground.kml',
+        remotePath: AppConstants.lgPlaygroundKml,
       );
 
       if (result is SSHUploadFailure) {
@@ -60,7 +60,7 @@ class KmlPlaygroundService {
 
       await _sshService.uploadFile(
         localData: blankKml,
-        remotePath: '/var/www/html/kml/playground.kml',
+        remotePath: AppConstants.lgPlaygroundKml,
       );
 
       // Delay before refresh to avoid SSH channel exhaustion

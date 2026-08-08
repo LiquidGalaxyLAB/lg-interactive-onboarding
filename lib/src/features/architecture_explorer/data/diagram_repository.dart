@@ -136,7 +136,7 @@ class DiagramRepository {
         label: 'Tablet App',
         tapArea: Rect.fromLTWH(0.05, 0.20, 0.28, 0.35),
         icon: Icons.tablet_android_rounded,
-        detailTitle: 'LG Content Studio (Tablet)',
+        detailTitle: 'LG Interactive Onboarding (Tablet)',
         detailBody:
             'The tablet app uses the `dartssh2` Dart package to establish '
             'an SSH session with the master node over port 22.\n\n'

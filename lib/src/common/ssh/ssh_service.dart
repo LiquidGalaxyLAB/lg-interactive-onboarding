@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
@@ -221,6 +220,19 @@ class SSHService extends ChangeNotifier {
   Future<void> disconnect() async {
     final state = _connectionState;
     if (state is SSHConnected) {
+      try {
+        debugPrint('SSH: Performing garbage collection before disconnect...');
+        // Deep clean all app-generated files before leaving
+        await execute(
+          'rm -rf ${AppConstants.lgModelDir} ${AppConstants.lgWrapperDir} '
+          '${AppConstants.lgIconsDir} ${AppConstants.lgBalloonKml} '
+          '${AppConstants.lgLogoKml} ${AppConstants.lgPlaygroundKml} '
+          '${AppConstants.lgRemoteScriptPath}'
+        );
+      } catch (e) {
+        debugPrint('SSH: Garbage collection failed: $e');
+      }
+
       try {
         final sftpClient = await state.sftp;
         sftpClient?.close();
