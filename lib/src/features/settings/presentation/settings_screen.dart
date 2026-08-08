@@ -580,7 +580,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
             DropdownButtonFormField<LLMProviderType>(
               isExpanded: true,
-              value: _selectedProvider,
+              initialValue: _selectedProvider,
               decoration: const InputDecoration(
                 labelText: 'LLM Provider',
                 prefixIcon: Icon(Icons.smart_toy),

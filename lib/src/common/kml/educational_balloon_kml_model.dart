@@ -17,7 +17,7 @@ class EducationalBalloonKmlModel {
 <kml xmlns="http://www.opengis.net/kml/2.2"
      xmlns:gx="http://www.google.com/kml/ext/2.2">
   <Document>
-    <name>${title} Information</name>
+    <name>$title Information</name>
     <Style id="educational_balloon_style_$cleanId">
       <IconStyle>
         <scale>0</scale>
