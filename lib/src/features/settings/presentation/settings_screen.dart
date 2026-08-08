@@ -37,6 +37,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late final TextEditingController _groqModelCtrl;
 
   bool _isConnecting = false;
+  bool _isDisconnecting = false;
   bool _obscurePassword = true;
   bool _obscureApiKey = true;
   bool _isSavingAi = false;
@@ -114,7 +115,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     super.dispose();
   }
 
-  Future<void> _saveAiSettings() async {
+  Future<void> _saveAiSettings({bool showSnackbar = true}) async {
     setState(() => _isSavingAi = true);
 
     try {
@@ -134,12 +135,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await settings.setGroqModel(_groqModelCtrl.text.trim());
       
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('AI Mentor settings saved!'),
-          backgroundColor: Color(0xFF1E8E3E),
-        ),
-      );
+      if (showSnackbar) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('AI Mentor settings saved!'),
+            backgroundColor: Color(0xFF1E8E3E),
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -165,7 +169,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await settings.setPassword(_passwordCtrl.text);
     await settings.setRigs(int.tryParse(_rigsCtrl.text) ?? 3);
     
-    await _saveAiSettings();
+    await _saveAiSettings(showSnackbar: false);
 
     if (!mounted) return;
     setState(() => _isConnecting = true);
@@ -187,6 +191,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     switch (result) {
       case SSHConnected():
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Connected to Liquid Galaxy successfully!'),
@@ -194,6 +199,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         );
       case SSHConnectionError(:final message):
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Connection failed: $message'),
@@ -530,42 +536,62 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
             SizedBox(
               height: 52,
-              child: ElevatedButton.icon(
-                onPressed: _isConnecting ? null : _saveAndConnect,
-                icon: _isConnecting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.power_settings_new),
-                label: Text(_isConnecting ? 'Connecting...' : 'Save & Connect'),
-              ),
+              child: ssh.isConnected
+                  ? OutlinedButton.icon(
+                      onPressed: _isDisconnecting
+                          ? null
+                          : () async {
+                              setState(() => _isDisconnecting = true);
+                              try {
+                                await ref.read(logoOverlayServiceProvider).clearLogo();
+                                await ref.read(systemKmlServiceProvider).cleanUp();
+                                await ssh.disconnect();
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).clearSnackBars();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Disconnected successfully'),
+                                      backgroundColor: Color(0xFF1E8E3E),
+                                    ),
+                                  );
+                                }
+                              } finally {
+                                if (mounted) {
+                                  setState(() => _isDisconnecting = false);
+                                }
+                              }
+                            },
+                      icon: _isDisconnecting
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                            )
+                          : const Icon(Icons.link_off),
+                      label: Text(_isDisconnecting ? 'Disconnecting...' : 'Disconnect'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: errorEff,
+                        side: BorderSide(color: errorEff.withValues(alpha: 0.5)),
+                      ),
+                    )
+                  : ElevatedButton.icon(
+                      onPressed: _isConnecting ? null : _saveAndConnect,
+                      icon: _isConnecting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.power_settings_new),
+                      label: Text(_isConnecting ? 'Connecting...' : 'Save & Connect'),
+                    ),
             ),
-
-            if (ssh.isConnected) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 52,
-                child: OutlinedButton.icon(
-                  onPressed: () async {
-                    await ref.read(logoOverlayServiceProvider).clearLogo();
-                    await ref.read(systemKmlServiceProvider).cleanUp();
-                    await ssh.disconnect();
-                    setState(() {});
-                  },
-                  icon: const Icon(Icons.link_off),
-                  label: const Text('Disconnect'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: errorEff,
-                    side: BorderSide(color: errorEff.withValues(alpha: 0.5)),
-                  ),
-                ),
-              ),
-            ],
 
             const SizedBox(height: 32),
 
