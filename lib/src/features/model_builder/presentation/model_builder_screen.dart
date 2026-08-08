@@ -411,9 +411,10 @@ class _FileInfoTile extends StatelessWidget {
           Consumer(builder: (context, ref, _) => IconButton(
             icon: const Icon(Icons.swap_horiz, size: 20), tooltip: 'Replace model',
             onPressed: () async {
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
               final result = await ref.read(modelBuilderProvider.notifier).importModel();
-              if (result is ImportFailure && context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
+              if (result is ImportFailure) {
+                scaffoldMessenger.showSnackBar(
                   SnackBar(content: Text(result.message), backgroundColor: Colors.orangeAccent));
               }
             },
@@ -470,9 +471,10 @@ class _ImportButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return InkWell(
       onTap: () async {
+        final scaffoldMessenger = ScaffoldMessenger.of(context);
         final result = await ref.read(modelBuilderProvider.notifier).importModel();
-        if (result is ImportFailure && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+        if (result is ImportFailure) {
+          scaffoldMessenger.showSnackBar(
             SnackBar(content: Text(result.message), backgroundColor: Colors.orangeAccent));
         }
       },
