@@ -75,17 +75,17 @@ class RigControlsGrid extends ConsumerWidget {
                     accentColor: AppPalette.sage,
                     isDark: isDark,
                     enabled: isConnected,
-                    onTap: () async {
-                      await ref.read(lgServiceProvider).relaunch();
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Relaunching LG...'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      }
-                    },
+                    onTap: () => _confirmDangerous(
+                      context,
+                      ref,
+                      title: 'Relaunch LG',
+                      message: 'This will relaunch the Liquid Galaxy software on all rigs. Continue?',
+                      action: () async {
+                        await ref.read(lgServiceProvider).relaunch();
+                        return true;
+                      },
+                      actionLabel: 'Relaunch',
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -97,18 +97,16 @@ class RigControlsGrid extends ConsumerWidget {
                     accentColor: AppPalette.dustyBlue,
                     isDark: isDark,
                     enabled: isConnected,
-                    onTap: () async {
-                      final ok = await ref.read(systemKmlServiceProvider).forceRefreshAll();
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(ok ? 'Master KML refreshed' : 'Refresh failed'),
-                            backgroundColor: ok ? AppPalette.sage : AppPalette.terracotta,
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      }
-                    },
+                    onTap: () => _confirmDangerous(
+                      context,
+                      ref,
+                      title: 'Refresh Master KML',
+                      message: 'This will force a refresh of the Master KML on the rig. Continue?',
+                      action: () async {
+                        return await ref.read(systemKmlServiceProvider).forceRefreshAll();
+                      },
+                      actionLabel: 'Refresh KML',
+                    ),
                   ),
                 ),
               ],
@@ -126,18 +124,16 @@ class RigControlsGrid extends ConsumerWidget {
                     accentColor: AppPalette.lgYellow,
                     isDark: isDark,
                     enabled: isConnected,
-                    onTap: () async {
-                      final ok = await ref.read(kmlPlaygroundServiceProvider).clearKml();
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(ok ? 'KML cleared' : 'Failed to clear KML'),
-                            backgroundColor: ok ? AppPalette.sage : AppPalette.terracotta,
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      }
-                    },
+                    onTap: () => _confirmDangerous(
+                      context,
+                      ref,
+                      title: 'Clear KML',
+                      message: 'This will clear all running KMLs from the rig. Continue?',
+                      action: () async {
+                        return await ref.read(kmlPlaygroundServiceProvider).clearKml();
+                      },
+                      actionLabel: 'Clear KML',
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
