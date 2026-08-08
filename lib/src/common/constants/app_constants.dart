@@ -14,6 +14,12 @@ class AppConstants {
   static const String lgSystemMasterKml = '/var/www/html/kml/master.kml';
   static const String lgWrapperMasterKml = '/var/www/html/3d_model_wrapper/master.kml';
   static const String lgRemoteScriptPath = '/tmp/dae_triangulate.py';
+  static const String lgQueryTxtPath = '/tmp/query.txt';
+  static const String lgPlaygroundKml = '/var/www/html/kml/playground.kml';
+  static const String lgBalloonKml = '/var/www/html/kml/balloon.kml';
+  static const String lgLogoKml = '/var/www/html/kml/logo.kml';
+  static const String lgIconsDir = '/var/www/html/kml_icons';
+  static const String lgSlaveKmlDir = '/var/www/html/kml';
 
   // ─── Timeouts & Delays ───────────────────────────────────────────────
   static const Duration sshChannelDelay = Duration(milliseconds: 500);
@@ -35,7 +41,6 @@ class AppConstants {
   static const String lgLogoAssetPath = 'assets/logos/logo_banner.png';
   static const int logoOverlayWidth = 720;
   static const int logoOverlayHeight = 650;
-  static const String lgSlaveKmlDir = '/var/www/html/kml';
   // ─── AI Mentor Settings ──────────────────────────────────────────────
   static const String openRouterEmbeddingModel = 'nvidia/nemotron-3-embed-1b:free';
 

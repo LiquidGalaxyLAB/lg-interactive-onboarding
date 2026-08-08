@@ -47,7 +47,7 @@ class SystemKmlService {
 <kml xmlns="http://www.opengis.net/kml/2.2"
      xmlns:gx="http://www.google.com/kml/ext/2.2">
   <Document>
-    <name>LG Content Studio</name>
+    <name>LG Interactive Onboarding</name>
     <NetworkLink>
       <name>3D Model Wrapper</name>
       <Link>
@@ -144,7 +144,7 @@ class SystemKmlService {
     ];
     
     try {
-      await _execute('mkdir -p /var/www/html/kml_icons');
+      await _execute('mkdir -p ${AppConstants.lgIconsDir}');
       await _channelDelay();
       
       for (final icon in icons) {
@@ -152,7 +152,7 @@ class SystemKmlService {
         final bytes = byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes);
         await _sshService.uploadBinaryFile(
           localData: bytes,
-          remotePath: '/var/www/html/kml_icons/$icon',
+          remotePath: '${AppConstants.lgIconsDir}/$icon',
         );
         await _channelDelay();
       }
@@ -166,10 +166,10 @@ class SystemKmlService {
   Future<void> cleanUp() async {
     if (!_sshService.isConnected) return;
     try {
-      await _execute('rm -rf /var/www/html/kml_icons');
+      await _execute('rm -rf ${AppConstants.lgIconsDir}');
       await _execute('rm -rf ${AppConstants.lgModelDir}');
       await _execute('rm -rf ${AppConstants.lgWrapperDir}');
-      await _execute('rm -f /var/www/html/kml/balloon.kml /var/www/html/kml/logo.kml /var/www/html/kml/playground.kml');
+      await _execute('rm -f ${AppConstants.lgBalloonKml} ${AppConstants.lgLogoKml} ${AppConstants.lgPlaygroundKml}');
       debugPrint('SystemKmlService: Cleaned up KML icons, models, wrappers, and dynamic KMLs.');
     } catch (e) {
       debugPrint('SystemKmlService: Failed to clean up: $e');

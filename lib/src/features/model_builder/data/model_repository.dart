@@ -293,7 +293,7 @@ ${_generateOrbitTour(project)}
     }
     try {
       // 1. Ensure directories exist (single command)
-      await _execute('mkdir -p $_modelDir && mkdir -p $_wrapperDir && mkdir -p /var/www/html/kml');
+      await _execute('mkdir -p $_modelDir && mkdir -p $_wrapperDir && mkdir -p ${AppConstants.lgSlaveKmlDir}');
 
       // 2. Upload and process model file
       final fileBytes = await File(project.filePath!).readAsBytes();
@@ -536,12 +536,12 @@ $networkLinks
     await _channelDelay();
     await _sshService.uploadFile(
       localData: emptyKml,
-      remotePath: '/var/www/html/kml/playground.kml',
+      remotePath: AppConstants.lgPlaygroundKml,
     );
     await _channelDelay();
     await _sshService.uploadFile(
       localData: emptyKml,
-      remotePath: '/var/www/html/kml/balloon.kml',
+      remotePath: AppConstants.lgBalloonKml,
     );
   }
 
