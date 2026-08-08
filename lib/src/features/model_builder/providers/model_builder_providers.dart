@@ -14,7 +14,6 @@ import 'package:lg_interactive_onboarding/src/common/kml/educational_balloon_kml
 import 'package:lg_interactive_onboarding/src/common/constants/educational_content.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:xml/xml.dart';
 import 'package:archive/archive.dart';
 
 // ─── Local Model Validation ──────────────────────────────────────────────
@@ -23,6 +22,13 @@ import 'package:archive/archive.dart';
 /// This guarantees Google Earth compatibility before uploading.
 Future<bool> _validateDaeVertices(String filePath) async {
   return await compute(_checkDaeVerticesInIsolate, filePath);
+}
+
+class MissingDaeException implements Exception {
+  final String message;
+  const MissingDaeException(this.message);
+  @override
+  String toString() => message;
 }
 
 bool _checkDaeVerticesInIsolate(String filePath) {
@@ -41,15 +47,20 @@ bool _checkDaeVerticesInIsolate(String filePath) {
           xmlContents.add(String.fromCharCodes(data));
         }
       }
+      
+      // If no DAE was found in the zip, fail early
+      if (xmlContents.isEmpty) {
+        throw const MissingDaeException('No .dae file found inside the ZIP archive.');
+      }
     } else {
       xmlContents.add(file.readAsStringSync());
     }
 
+    final regex = RegExp(r'<float_array[^>]*count="([0-9]+)"');
     for (final content in xmlContents) {
-      final document = XmlDocument.parse(content);
-      final floatArrays = document.findAllElements('float_array');
-      for (final array in floatArrays) {
-        final countStr = array.getAttribute('count');
+      final matches = regex.allMatches(content);
+      for (final match in matches) {
+        final countStr = match.group(1);
         if (countStr != null) {
           final count = int.tryParse(countStr) ?? 0;
           // 65535 vertices max. Each vertex is X, Y, Z (3 floats).
@@ -60,6 +71,8 @@ bool _checkDaeVerticesInIsolate(String filePath) {
       }
     }
     return true; // Valid
+  } on MissingDaeException {
+    rethrow; // Pass this specific error up to show the user
   } catch (e) {
     // If it fails to parse (e.g. malformed), we let it pass here and fail on the Python script.
     return true; 
