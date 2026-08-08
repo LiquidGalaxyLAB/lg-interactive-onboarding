@@ -163,12 +163,15 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
 
       if (result == null || result.files.isEmpty) return const ImportCanceled();
 
+      state = state.copyWith(isImporting: true);
+
       final file = result.files.first;
       final fileName = file.name;
       final ext = p.extension(fileName).toLowerCase();
 
       // Validate extension in Dart (the OS picker is unfiltered)
       if (!ModelProject.supportedExtensions.contains(ext)) {
+        state = state.copyWith(isImporting: false);
         return ImportFailure('Unsupported format "$ext". '
             'Accepted: ${ModelProject.supportedExtensions.join(', ')}');
       }
@@ -193,12 +196,14 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
           chunks.addAll(chunk);
         }
         if (chunks.isEmpty) {
+          state = state.copyWith(isImporting: false);
           return const ImportFailure('File appears to be empty (0 bytes read from stream).');
         }
         await persistentFile.writeAsBytes(Uint8List.fromList(chunks));
         debugPrint('Import: streamed ${chunks.length} bytes from content provider');
       } else {
         debugPrint('Import: Failed to obtain file bytes (all strategies exhausted).');
+        state = state.copyWith(isImporting: false);
         return const ImportFailure('Failed to load file contents.');
       }
 
@@ -207,6 +212,7 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
         final isValid = await _validateDaeVertices(persistentFile.path);
         if (!isValid) {
           await persistentFile.delete();
+          state = state.copyWith(isImporting: false);
           return ImportFailure(
             'This model is too complex for Google Earth. Please decimate it in Blender to under 64,000 vertices per mesh and try again.'
           );
@@ -223,6 +229,7 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
         fileExtension: ext,
         isAsset: false,
         assetPath: null,
+        isImporting: false,
       );
 
       debugPrint(
@@ -230,6 +237,7 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
       return const ImportSuccess(); // success
     } catch (e) {
       debugPrint('File import failed: $e');
+      state = state.copyWith(isImporting: false);
       return ImportFailure('File import failed: $e');
     }
   }
@@ -237,6 +245,8 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
   /// Loads a bundled asset model for testing. Returns null if successful, or error message.
   Future<ImportResult> loadBundledModel(BundledModel bundled) async {
     try {
+      state = state.copyWith(isImporting: true);
+
       // Copy asset to app documents directory so it can be read as a File and doesn't get pruned
       final byteData = await rootBundle.load(bundled.assetPath);
       final appDir = await getApplicationDocumentsDirectory();
@@ -260,13 +270,15 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
         fileExtension: ext,
         isAsset: true,
         assetPath: bundled.assetPath,
+        isImporting: false,
       );
 
       debugPrint('Bundled model loaded: ${bundled.displayName}');
       return const ImportSuccess();
     } catch (e) {
-      debugPrint('Bundled import failed: $e');
-      return ImportFailure('Failed to load bundled model: $e');
+      debugPrint('Load bundled asset failed: $e');
+      state = state.copyWith(isImporting: false);
+      return ImportFailure('Failed to load bundled asset: $e');
     }
   }
 

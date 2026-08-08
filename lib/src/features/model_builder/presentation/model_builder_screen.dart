@@ -322,12 +322,27 @@ class _ImportModelCard extends ConsumerWidget {
               const Divider(),
               const SizedBox(height: 12),
             ],
-            _ImportButton(theme: theme),
-            const SizedBox(height: 12),
-            // Bundled assets section
-            Text('Or use a bundled model:', style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.5))),
-            const SizedBox(height: 8),
+            if (project.isImporting)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: Column(
+                    children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 16),
+                      Text('Importing & Validating...', style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.primary, fontWeight: FontWeight.w500)),
+                    ],
+                  ),
+                ),
+              )
+            else ...[
+              _ImportButton(theme: theme),
+              const SizedBox(height: 12),
+              // Bundled assets section
+              Text('Or use a bundled model:', style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5))),
+              const SizedBox(height: 8),
             Wrap(spacing: 8, runSpacing: 8, children: bundledModels.map((b) =>
               ActionChip(
                 avatar: const Icon(Icons.architecture, size: 16),
@@ -350,6 +365,7 @@ class _ImportModelCard extends ConsumerWidget {
                 },
               ),
             ).toList()),
+            ],
           ],
         ),
       ),

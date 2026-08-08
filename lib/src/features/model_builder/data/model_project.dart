@@ -71,6 +71,9 @@ class ModelProject {
   /// Scale factor on the Z-axis.
   final double scaleZ;
 
+  /// Whether a model is currently being imported and validated.
+  final bool isImporting;
+
   const ModelProject({
     this.id = '',
     this.filePath,
@@ -89,6 +92,7 @@ class ModelProject {
     this.scaleX = AppConstants.defaultScale,
     this.scaleY = AppConstants.defaultScale,
     this.scaleZ = AppConstants.defaultScale,
+    this.isImporting = false,
   });
 
   /// Whether a model file has been imported.
@@ -130,6 +134,7 @@ class ModelProject {
     double? scaleX,
     double? scaleY,
     double? scaleZ,
+    bool? isImporting,
   }) {
     return ModelProject(
       id: id ?? this.id,
@@ -149,6 +154,7 @@ class ModelProject {
       scaleX: scaleX ?? this.scaleX,
       scaleY: scaleY ?? this.scaleY,
       scaleZ: scaleZ ?? this.scaleZ,
+      isImporting: isImporting ?? this.isImporting,
     );
   }
 
