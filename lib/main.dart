@@ -46,16 +46,16 @@ void main() async {
         initialClaudeApiKeyProvider.overrideWithValue(initialClaudeApiKey),
         initialGroqApiKeyProvider.overrideWithValue(initialGroqApiKey),
       ],
-      child: LGContentStudioApp(navigatorKey: rootNavigatorKey),
+      child: LGInteractiveOnboardingApp(navigatorKey: rootNavigatorKey),
     ),
   );
 }
 
 /// Root application widget.
-class LGContentStudioApp extends ConsumerWidget {
+class LGInteractiveOnboardingApp extends ConsumerWidget {
   final GlobalKey<NavigatorState> navigatorKey;
 
-  const LGContentStudioApp({super.key, required this.navigatorKey});
+  const LGInteractiveOnboardingApp({super.key, required this.navigatorKey});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -76,7 +76,7 @@ class LGContentStudioApp extends ConsumerWidget {
 
     return MaterialApp(
       navigatorKey: navigatorKey,
-      title: 'LG Content Studio',
+      title: 'LG Interactive Onboarding',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
