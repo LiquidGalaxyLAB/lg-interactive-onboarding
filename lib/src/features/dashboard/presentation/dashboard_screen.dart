@@ -6,6 +6,7 @@ import 'package:lg_interactive_onboarding/src/features/about/presentation/about_
 import 'package:lg_interactive_onboarding/src/features/model_builder/presentation/model_builder_screen.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/data/settings_service.dart';
+import 'package:lg_interactive_onboarding/src/features/help/presentation/help_screen.dart';
 import 'package:lg_interactive_onboarding/src/features/settings/presentation/settings_screen.dart';
 import 'package:lg_interactive_onboarding/src/features/kml_playground/presentation/kml_playground_screen.dart';
 
@@ -68,16 +69,29 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                 ),
               ),
-              // About / Help shortcut
+              // About shortcut
               IconButton(
                 icon: Icon(
                   Icons.info_outline_rounded,
                   color: isDark ? Colors.white60 : DashboardPalette.warmGrey,
                 ),
-                tooltip: 'About / Help',
+                tooltip: 'About',
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => const AboutScreen(),
+                  ),
+                ),
+              ),
+              // Help / FAQ shortcut
+              IconButton(
+                icon: Icon(
+                  Icons.help_outline_rounded,
+                  color: isDark ? Colors.white70 : DashboardPalette.warmGrey,
+                ),
+                tooltip: 'Help & FAQ',
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const HelpScreen(),
                   ),
                 ),
               ),
