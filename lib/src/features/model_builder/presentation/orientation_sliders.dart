@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
 
 const double _scaleMin = 0.1;
-const double _scaleMax = 100.0;
+const double _scaleMax = 200.0;
 
 /// Widget with sliders/inputs for adjusting heading, tilt, roll, and scale X/Y/Z.
 class OrientationSlidersWidget extends ConsumerWidget {
