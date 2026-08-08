@@ -489,6 +489,17 @@ class PushNotifier extends Notifier<PushState> {
             );
             ref.read(lgServiceProvider).sendBalloonKml(balloonKml);
           }
+        } else if (!project.isAsset) {
+          // Provide a custom educational balloon for user-imported models.
+          final balloonKml = EducationalBalloonKmlModel.generateBalloonKml(
+            id: 'custom_dae',
+            title: '3D COLLADA DAE Model',
+            description: 'COLLADA (COLLAborative Design Activity) is an XML-based file format (.dae) used to exchange digital assets among various graphics software. Liquid Galaxy uses the DAE format natively within Google Earth. This custom imported model was dynamically converted, optimized, and pushed to the rig in real-time, allowing users to visualize personalized 3D architectures and objects across the immersive panoramic screens.',
+            iconUrl: 'http://lg1:81/kml_icons/custom_model.png',
+            latitude: project.latitude!,
+            longitude: project.longitude!,
+          );
+          ref.read(lgServiceProvider).sendBalloonKml(balloonKml);
         }
       }
     }
