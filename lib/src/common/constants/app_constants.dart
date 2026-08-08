@@ -44,4 +44,9 @@ class AppConstants {
   // ─── AI Mentor Settings ──────────────────────────────────────────────
   static const String openRouterEmbeddingModel = 'nvidia/nemotron-3-embed-1b:free';
 
+  // ─── Orbit Settings ────────────────────────────────────────────────────
+  static const double orbitCameraTilt = 50.0;
+  static const double orbitMinRange = 400.0;
+  static const double orbitMaxRange = 300000.0;
+  static const double orbitScaleMultiplier = 250.0;
 }
