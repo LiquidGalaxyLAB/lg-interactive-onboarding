@@ -8,17 +8,10 @@ class ModelProject {
   // ─── Supported 3D Formats ──────────────────────────────────────
 
   /// All file extensions the model builder can accept.
-  /// Non-DAE formats are converted to DAE via assimp on the LG master.
+  /// We strictly limit this to DAE (native) and ZIP (packaged DAE).
   static const supportedExtensions = [
-    // Common / Native formats
-    '.dae', '.obj', '.fbx', '.blend', '.gltf', '.glb', '.kmz', '.stl', '.ply', '.3ds',
-    // Extended Assimp formats
-    '.3d', '.ac', '.ac3d', '.acc', '.ase', '.ask', '.assbin', '.b3d', '.bvh',
-    '.cob', '.csm', '.dxf', '.enff', '.hmp', '.ifc', '.ifczip', '.irr', '.irrmesh',
-    '.lwo', '.lws', '.lxo', '.md2', '.md3', '.md5anim', '.md5camera', '.md5mesh',
-    '.mdc', '.mdl', '.mesh', '.mesh.xml', '.mot', '.ms3d', '.ndo', '.nff', '.off',
-    '.ogex', '.pk3', '.prj', '.q3o', '.q3s', '.raw', '.scn', '.smd', '.ter',
-    '.uc', '.vta', '.x', '.xgl', '.xml', '.zgl'
+    '.dae',
+    '.zip'
   ];
 
   /// The native format used by Google Earth / Liquid Galaxy.
@@ -30,6 +23,10 @@ class ModelProject {
   /// Path to the selected model file on device storage.
   /// For bundled assets, this will be the temp path after extraction.
   final String? filePath;
+  
+  /// The relative internal path to the .dae file if extracted from a .zip.
+  /// (e.g., 'model_v2/source/main.dae'). Null if the source was a raw .dae.
+  final String? internalDaePath;
 
   /// Original filename of the model.
   final String? fileName;
@@ -74,9 +71,13 @@ class ModelProject {
   /// Scale factor on the Z-axis.
   final double scaleZ;
 
+  /// Whether a model is currently being imported and validated.
+  final bool isImporting;
+
   const ModelProject({
     this.id = '',
     this.filePath,
+    this.internalDaePath,
     this.fileName,
     this.fileSize,
     this.fileExtension,
@@ -91,6 +92,7 @@ class ModelProject {
     this.scaleX = AppConstants.defaultScale,
     this.scaleY = AppConstants.defaultScale,
     this.scaleZ = AppConstants.defaultScale,
+    this.isImporting = false,
   });
 
   /// Whether a model file has been imported.
@@ -102,26 +104,10 @@ class ModelProject {
   /// Whether the project is ready to generate KML and push.
   bool get isReady => hasModel && hasLocation;
 
-
-
-  /// Whether this file needs assimp conversion to DAE before deployment.
-  /// KMZ files have their own handling path and are excluded.
-  bool get requiresConversion {
-    final ext = fileExtension?.toLowerCase();
-    return ext != null && ext != '.kmz';
-  }
-
   /// The remote filename used on the LG server.
   /// Prefixed with the project ID to keep deployments isolated.
-  /// Non-KMZ files always get a .dae suffix since they are converted/triangulated.
   String get remoteModelFileName {
     final baseName = fileName ?? '';
-    if (requiresConversion) {
-      // Replace original extension with .dae (e.g., model.obj → {id}_model.dae)
-      final withoutExt = baseName.replaceAll(RegExp(r'\.[^.]+$'), '');
-      final safeName = withoutExt.replaceAll(' ', '_');
-      return '${id}_$safeName.dae';
-    }
     return '${id}_${baseName.replaceAll(' ', '_')}';
   }
 
@@ -133,6 +119,7 @@ class ModelProject {
   ModelProject copyWith({
     String? id,
     String? filePath,
+    String? internalDaePath,
     String? fileName,
     int? fileSize,
     String? fileExtension,
@@ -147,10 +134,12 @@ class ModelProject {
     double? scaleX,
     double? scaleY,
     double? scaleZ,
+    bool? isImporting,
   }) {
     return ModelProject(
       id: id ?? this.id,
       filePath: filePath ?? this.filePath,
+      internalDaePath: internalDaePath ?? this.internalDaePath,
       fileName: fileName ?? this.fileName,
       fileSize: fileSize ?? this.fileSize,
       fileExtension: fileExtension ?? this.fileExtension,
@@ -165,6 +154,7 @@ class ModelProject {
       scaleX: scaleX ?? this.scaleX,
       scaleY: scaleY ?? this.scaleY,
       scaleZ: scaleZ ?? this.scaleZ,
+      isImporting: isImporting ?? this.isImporting,
     );
   }
 

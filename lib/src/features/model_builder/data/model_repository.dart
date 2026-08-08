@@ -26,9 +26,8 @@ class ModelRepository {
 
   ModelRepository(this._sshService, this._settingsService, this._systemKmlService);
 
-  /// Session-level cache: avoids re-checking assimp installation on every push.
-  /// Also caches lxml (Python dependency for triangulation script).
-  bool _assimpVerified = false;
+  /// Session-level cache: avoids re-checking lxml on every push.
+  /// (Python dependency for triangulation script).
   bool _lxmlVerified = false;
 
   // ─── Constants ───────────────────────────────────────────────────
@@ -62,6 +61,12 @@ class ModelRepository {
   /// Generates a complete KML document for the given model project.
   String generateKml(ModelProject project) {
     final remoteModelFile = project.remoteModelFileName;
+    
+    // For zip files, the path is the extracted folder (which is remoteModelFileName without .zip)
+    // plus the internal DAE path returned by the python script.
+    final hrefPath = project.fileExtension == '.zip' && project.internalDaePath != null
+        ? '${remoteModelFile.replaceAll('.zip', '')}/${project.internalDaePath}'
+        : remoteModelFile;
 
     return '''<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"
@@ -72,8 +77,8 @@ class ModelRepository {
       <name>${project.fileName}</name>
       <Model>
         <Link>
-          <href>http://lg1:${AppConstants.lgHttpPort}/model/$remoteModelFile</href>
-          <href>http://lg1:${AppConstants.lgHttpPort}/model/$remoteModelFile</href>
+          <href>${Uri.encodeFull('http://lg1:${AppConstants.lgHttpPort}/model/$hrefPath')}</href>
+          <href>${Uri.encodeFull('http://lg1:${AppConstants.lgHttpPort}/model/$hrefPath')}</href>
         </Link>
         <Location>
           <latitude>${project.latitude ?? 0.0}</latitude>
@@ -150,97 +155,6 @@ ${_generateOrbitTour(project)}
 </Model>''';
   }
 
-  // ─── Assimp Prerequisite Check ─────────────────────────────────
-
-  /// Ensures `assimp` (assimp-utils) is installed on the LG master node.
-  ///
-  /// Checks once per session; subsequent calls return immediately.
-  /// If missing, installs via `apt` using the stored SSH password.
-  ///
-  /// Uses the `(echo password; sleep 1) | sudo -S` pattern established
-  /// across the codebase — the sleep keeps the pipe open long enough for
-  /// sudo to read the password from stdin.
-  Future<void> _ensureAssimpInstalled() async {
-    if (_assimpVerified) return;
-    if (!_sshService.isConnected) throw Exception('SSH not connected.');
-
-    try {
-      // Check if assimp is already available
-      final whichOutput = await _execute('which assimp');
-
-      if (whichOutput.isNotEmpty && !whichOutput.contains('not found')) {
-        debugPrint('Assimp: Already installed at $whichOutput');
-        _assimpVerified = true;
-        return;
-      }
-
-      // ── Step 1: apt update ──
-      debugPrint('Assimp: Not found — installing assimp-utils...');
-      final updateOutput = await _execute('apt update -qq 2>&1', sudo: true);
-      debugPrint('Assimp: apt update output: $updateOutput');
-
-      // ── Step 2: apt install ──
-      final installOutput = await _execute('apt install assimp-utils -y -qq 2>&1', sudo: true);
-      debugPrint('Assimp: apt install output: $installOutput');
-
-      // ── Step 3: Verify installation succeeded ──
-      final verifyOutput = await _execute('which assimp');
-
-      if (verifyOutput.isNotEmpty && !verifyOutput.contains('not found')) {
-        debugPrint('Assimp: Installed successfully at $verifyOutput');
-        _assimpVerified = true;
-        return;
-      }
-
-      throw Exception('Installation failed — assimp not found after apt install.');
-    } catch (e) {
-      throw Exception('Prerequisite check failed: $e');
-    }
-  }
-
-  // ─── Assimp Format Conversion ──────────────────────────────────
-
-  /// Converts a non-DAE model file to COLLADA (.dae) using assimp on the
-  /// LG master node.
-  ///
-  /// [uploadedFilePath] — the full remote path of the uploaded raw file
-  ///   (e.g., `/var/www/html/model/123_car.obj`).
-  /// [targetDaePath] — the desired output .dae path
-  ///   (e.g., `/var/www/html/model/123_car.dae`).
-  ///
-  /// On success: the raw file is deleted, only the .dae remains.
-  /// On failure: throws an [Exception] with a descriptive message.
-  Future<void> _convertToCollada({
-    required String uploadedFilePath,
-    required String targetDaePath,
-  }) async {
-
-    try {
-      debugPrint('Assimp: Converting $uploadedFilePath → $targetDaePath');
-
-      final conversionOutput = await _execute('assimp export "$uploadedFilePath" "$targetDaePath" -tri 2>&1');
-
-      // Verify the .dae was actually created
-      final verifyOutput = await _execute('test -f "$targetDaePath" && echo EXISTS');
-
-      if (!verifyOutput.contains('EXISTS')) {
-        throw Exception(
-          'Conversion failed: unsupported format or corrupt file. '
-          'assimp output: $conversionOutput',
-        );
-      }
-
-      // Cleanup: delete the original raw file to avoid clutter
-      await _execute('rm -f "$uploadedFilePath"');
-
-      debugPrint('Assimp: Conversion successful, raw file cleaned up');
-    } catch (e) {
-      // Cleanup on failure too — remove any partial output
-      await _execute('rm -f "$targetDaePath"').catchError((_) => '');
-      rethrow;
-    }
-  }
-
   // ─── Python-Based DAE Triangulation ─────────────────────────────
 
   /// Ensures `lxml` (Python XML library) is installed on the LG master node.
@@ -294,13 +208,16 @@ ${_generateOrbitTour(project)}
   ///   2. Ensure `lxml` (Python dependency) is installed.
   ///   3. Run the script: input → temp output.
   ///   4. Overwrite the original with the triangulated result.
-  Future<void> _triangulateDaeWithScript(String remoteDaePath, double sx, double sy, double sz) async {
+  Future<String?> _triangulateDaeWithScript(String remoteModelPath, double sx, double sy, double sz, {bool isZip = false}) async {
     if (!_sshService.isConnected) throw Exception('SSH not connected.');
-    final triangulatedTempPath = '${remoteDaePath}_tri_tmp.dae';
+    final triangulatedTempPath = '${remoteModelPath}_tri_tmp.dae';
+    final extractDir = remoteModelPath.replaceAll('.zip', '');
     const remoteScriptPath = AppConstants.lgRemoteScriptPath;
 
+    String? internalDaePath;
+
     try {
-      debugPrint('Triangulate: Processing $remoteDaePath...');
+      debugPrint('Triangulate: Processing $remoteModelPath... (isZip: $isZip)');
 
       // 1. Upload the Python script from bundled assets
       final scriptContent = await rootBundle.loadString(
@@ -316,23 +233,47 @@ ${_generateOrbitTour(project)}
       await _ensureLxmlInstalled();
 
       // 3. Run the triangulation script with scaling
-      final triOutput = await _execute('python3 $remoteScriptPath "$remoteDaePath" "$triangulatedTempPath" --scale-x $sx --scale-y $sy --scale-z $sz 2>&1');
+      final cmd = isZip 
+          ? 'python3 $remoteScriptPath "$remoteModelPath" "$extractDir" --is-zip --scale-x $sx --scale-y $sy --scale-z $sz 2>&1'
+          : 'python3 $remoteScriptPath "$remoteModelPath" "$triangulatedTempPath" --scale-x $sx --scale-y $sy --scale-z $sz 2>&1';
+          
+      final triOutput = await _execute(cmd);
       debugPrint('Triangulate: script output: $triOutput');
 
-      // 4. Verify the triangulated file was created
-      final verifyOutput = await _execute('test -f "$triangulatedTempPath" && echo EXISTS');
+      if (isZip) {
+          final lines = triOutput.split('\n');
+          for (final line in lines) {
+              if (line.startsWith('LG_DAE_PATH=')) {
+                  internalDaePath = line.substring('LG_DAE_PATH='.length).trim();
+              }
+          }
+          if (internalDaePath == null) {
+              throw Exception('Could not extract LG_DAE_PATH from zip script output: $triOutput');
+          }
+          // Remove the original raw zip now that it's extracted
+          await _execute('rm -f "$remoteModelPath"');
+          // Update permissions for the extracted directory
+          await _execute('chmod -R 755 "$extractDir"');
+      } else {
+          // 4. Verify the triangulated file was created
+          final verifyOutput = await _execute('test -f "$triangulatedTempPath" && echo EXISTS');
 
-      if (!verifyOutput.contains('EXISTS')) {
-        throw Exception('Output file not created. Script output: $triOutput');
+          if (!verifyOutput.contains('EXISTS')) {
+            throw Exception('Output file not created. Script output: $triOutput');
+          }
+
+          // 5. Overwrite the original .dae with the triangulated version
+          await _execute('mv -f "$triangulatedTempPath" "$remoteModelPath"');
+          debugPrint('Triangulate: Success — $remoteModelPath overwritten with triangulated version');
       }
-
-      // 5. Overwrite the original .dae with the triangulated version
-      await _execute('mv -f "$triangulatedTempPath" "$remoteDaePath"');
-
-      debugPrint('Triangulate: Success — $remoteDaePath overwritten with triangulated version');
+      return internalDaePath;
     } catch (e) {
       // Cleanup temp file on failure
-      await _execute('rm -f "$triangulatedTempPath"').catchError((_) => '');
+      if (isZip) {
+         await _execute('rm -rf "$extractDir"').catchError((_) => '');
+      } else {
+         await _execute('rm -f "$triangulatedTempPath"').catchError((_) => '');
+      }
       throw Exception('Triangulate failed: $e');
     }
   }
@@ -350,8 +291,6 @@ ${_generateOrbitTour(project)}
     if (!project.isReady) {
       return PushResult(success: false, message: 'Model or location not set.');
     }
-    final ext = project.fileExtension?.toLowerCase() ?? '';
-
     try {
       // 1. Ensure directories exist (single command)
       await _execute('mkdir -p $_modelDir && mkdir -p $_wrapperDir && mkdir -p /var/www/html/kml');
@@ -362,48 +301,15 @@ ${_generateOrbitTour(project)}
       // The final path on the server (what KML will reference)
       final remoteModelPath = '$_modelDir/${project.remoteModelFileName}';
 
-      // Upload with a "raw_" prefix, then let Assimp process/triangulate it
-      final safeRawName = project.fileName?.replaceAll(' ', '_') ?? 'unnamed';
-      final rawUploadPath = '$_modelDir/raw_${project.id}_$safeRawName';
-
-      await _sshService.uploadBytes(bytes: fileBytes, remotePath: rawUploadPath);
+      // Upload directly to the final path
+      await _sshService.uploadBytes(bytes: fileBytes, remotePath: remoteModelPath);
       await _channelDelay();
 
-      if (ext == '.dae' || ext == '.kmz') {
-        // Bypass Assimp conversion since the file is already a DAE or KMZ.
-        // The Python script will handle triangulation next.
-        await _execute('mv -f "$rawUploadPath" "$remoteModelPath"');
-      } else {
-        // Ensure assimp is available
-        try {
-          await _ensureAssimpInstalled();
-        } catch (e) {
-          await _execute('rm -f "$rawUploadPath"');
-          return PushResult(
-            success: false,
-            message: 'Failed to install assimp: $e',
-          );
-        }
-
-        // Convert/Triangulate to .dae (deletes the raw file on success)
-        try {
-          await _convertToCollada(
-            uploadedFilePath: rawUploadPath,
-            targetDaePath: remoteModelPath,
-          );
-        } catch (e) {
-          return PushResult(
-            success: false,
-            message: 'Model conversion failed: $e',
-          );
-        }
-        await _channelDelay();
-      }
-
       // 3. Triangulate the model in-place using Python script
-      //    (converts <polylist>/<polygons> → <triangles> for Google Earth)
+      String? internalDaePath;
       try {
-        await _triangulateDaeWithScript(remoteModelPath, project.scaleX, project.scaleY, project.scaleZ);
+        final isZip = project.fileExtension == '.zip';
+        internalDaePath = await _triangulateDaeWithScript(remoteModelPath, project.scaleX, project.scaleY, project.scaleZ, isZip: isZip);
       } catch (e) {
         return PushResult(
           success: false,
@@ -411,9 +317,12 @@ ${_generateOrbitTour(project)}
         );
       }
       await _channelDelay();
+      
+      // Update the model project with the internal dae path so the KML points to it
+      final projectForKml = project.copyWith(internalDaePath: internalDaePath);
 
       // 5. Generate and upload this model's KML to wrapper directory
-      final kml = generateKml(project);
+      final kml = generateKml(projectForKml);
       await _sshService.uploadFile(
         localData: kml,
         remotePath: '$_wrapperDir/${project.remoteKmlFileName}',
@@ -422,11 +331,7 @@ ${_generateOrbitTour(project)}
 
       // Set proper permissions for the web server to read the model and KML
       await _execute('chmod 644 "$_wrapperDir/${project.remoteKmlFileName}"');
-      await _execute('chmod 644 "$_modelDir/${project.remoteModelFileName}"');
-
-      // Set proper permissions for the web server to read the model and KML
-      await _execute('chmod 644 "$_wrapperDir/${project.remoteKmlFileName}"');
-      if (ext != '.kmz') {
+      if (project.fileExtension != '.zip') {
         await _execute('chmod 644 "$_modelDir/${project.remoteModelFileName}"');
       }
 
@@ -490,18 +395,10 @@ ${_generateOrbitTour(project)}
       // Wait a moment for Google Earth to process the refresh before deleting files
       await Future.delayed(const Duration(seconds: 2));
 
-      // 5. Now it is safe to remove the model file AND its KML file
+      // 5. Now it is safe to remove the model file, its extracted folder (if zip), AND its KML file
       await _execute(
         'rm -f $_modelDir/${model.remoteModelFileName} && '
-        'rm -f $_wrapperDir/${model.remoteKmlFileName}',
-      );
-      
-      // Wait a moment for Google Earth to process the refresh before deleting files
-      await Future.delayed(const Duration(seconds: 2));
-
-      // 5. Now it is safe to remove the model file AND its KML file
-      await _execute(
-        'rm -f $_modelDir/${model.remoteModelFileName} && '
+        'rm -rf $_modelDir/${model.remoteModelFileName.replaceAll(".zip", "")} && '
         'rm -f $_wrapperDir/${model.remoteKmlFileName}',
       );
 
@@ -526,10 +423,10 @@ ${_generateOrbitTour(project)}
       await _forceRefresh();
       
       await Future.delayed(const Duration(seconds: 2));
-      await _execute('rm -f $_modelDir/* && rm -f $_wrapperDir/*');
+      await _execute('rm -rf $_modelDir/* && rm -rf $_wrapperDir/*');
       
       await Future.delayed(const Duration(seconds: 2));
-      await _execute('rm -f $_modelDir/* && rm -f $_wrapperDir/*');
+      await _execute('rm -rf $_modelDir/* && rm -rf $_wrapperDir/*');
 
       return PushResult(success: true, message: 'All models removed from LG.');
     } catch (e) {

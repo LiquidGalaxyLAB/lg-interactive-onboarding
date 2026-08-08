@@ -5,8 +5,8 @@
       <author>Blender User</author>
       <authoring_tool>Blender 4.5.11 LTS commit date:2026-06-22, commit time:11:08, hash:4db51e9d1e1e</authoring_tool>
     </contributor>
-    <created>2026-07-29T12:04:59</created>
-    <modified>2026-07-29T12:04:59</modified>
+    <created>2026-08-07T00:16:41</created>
+    <modified>2026-08-07T00:16:41</modified>
     <unit name="meter" meter="1"/>
     <up_axis>Z_UP</up_axis>
   </asset>
@@ -97,7 +97,7 @@
   <library_visual_scenes>
     <visual_scene id="Scene" name="Scene">
       <node id="Solid_001" name="Solid_001" type="NODE">
-        <matrix sid="transform">4.986665 0 0 0 0 4.986665 0 0 0 0 4.986665 0 0 0 0 1</matrix>
+        <matrix sid="transform">4.986665 0 0 -5.81432e-4 0 4.986665 0 -9.22372e-6 0 0 4.986665 0.03376358 0 0 0 1</matrix>
         <instance_geometry url="#Solid_001-mesh" name="Solid_001">
           <bind_material>
             <technique_common>

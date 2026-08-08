@@ -14,6 +14,70 @@ import 'package:lg_interactive_onboarding/src/common/kml/educational_balloon_kml
 import 'package:lg_interactive_onboarding/src/common/constants/educational_content.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:archive/archive.dart';
+
+// ─── Local Model Validation ──────────────────────────────────────────────
+
+/// Runs in an Isolate to parse a DAE file and ensure no mesh has > 65535 vertices.
+/// This guarantees Google Earth compatibility before uploading.
+Future<bool> _validateDaeVertices(String filePath) async {
+  return await compute(_checkDaeVerticesInIsolate, filePath);
+}
+
+class MissingDaeException implements Exception {
+  final String message;
+  const MissingDaeException(this.message);
+  @override
+  String toString() => message;
+}
+
+bool _checkDaeVerticesInIsolate(String filePath) {
+  try {
+    final file = File(filePath);
+    final ext = p.extension(filePath).toLowerCase();
+
+    List<String> xmlContents = [];
+
+    if (ext == '.zip') {
+      final bytes = file.readAsBytesSync();
+      final archive = ZipDecoder().decodeBytes(bytes);
+      for (final archiveFile in archive) {
+        if (archiveFile.isFile && archiveFile.name.toLowerCase().endsWith('.dae')) {
+          final data = archiveFile.content as List<int>;
+          xmlContents.add(String.fromCharCodes(data));
+        }
+      }
+      
+      // If no DAE was found in the zip, fail early
+      if (xmlContents.isEmpty) {
+        throw const MissingDaeException('No .dae file found inside the ZIP archive.');
+      }
+    } else {
+      xmlContents.add(file.readAsStringSync());
+    }
+
+    final regex = RegExp(r'<float_array[^>]*count="([0-9]+)"');
+    for (final content in xmlContents) {
+      final matches = regex.allMatches(content);
+      for (final match in matches) {
+        final countStr = match.group(1);
+        if (countStr != null) {
+          final count = int.tryParse(countStr) ?? 0;
+          // 65535 vertices max. Each vertex is X, Y, Z (3 floats).
+          if (count > 65535 * 3) {
+            return false;
+          }
+        }
+      }
+    }
+    return true; // Valid
+  } on MissingDaeException {
+    rethrow; // Pass this specific error up to show the user
+  } catch (e) {
+    // If it fails to parse (e.g. malformed), we let it pass here and fail on the Python script.
+    return true; 
+  }
+}
 
 // ─── Bundled Asset Models ──────────────────────────────────────────────
 
@@ -107,11 +171,12 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
         allowMultiple: false,
-        withData: true,
         withReadStream: true,
       );
 
       if (result == null || result.files.isEmpty) return const ImportCanceled();
+
+      state = state.copyWith(isImporting: true);
 
       final file = result.files.first;
       final fileName = file.name;
@@ -119,6 +184,7 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
 
       // Validate extension in Dart (the OS picker is unfiltered)
       if (!ModelProject.supportedExtensions.contains(ext)) {
+        state = state.copyWith(isImporting: false);
         return ImportFailure('Unsupported format "$ext". '
             'Accepted: ${ModelProject.supportedExtensions.join(', ')}');
       }
@@ -143,25 +209,40 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
           chunks.addAll(chunk);
         }
         if (chunks.isEmpty) {
+          state = state.copyWith(isImporting: false);
           return const ImportFailure('File appears to be empty (0 bytes read from stream).');
         }
         await persistentFile.writeAsBytes(Uint8List.fromList(chunks));
         debugPrint('Import: streamed ${chunks.length} bytes from content provider');
       } else {
-        return const ImportFailure('Could not read file data from device. '
-            'Try copying the file to internal storage and retry.');
+        debugPrint('Import: Failed to obtain file bytes (all strategies exhausted).');
+        state = state.copyWith(isImporting: false);
+        return const ImportFailure('Failed to load file contents.');
       }
 
-      final fileInfo = await persistentFile.stat();
+      // ── Local Validation ──
+      if (ext == '.dae' || ext == '.zip') {
+        final isValid = await _validateDaeVertices(persistentFile.path);
+        if (!isValid) {
+          await persistentFile.delete();
+          state = state.copyWith(isImporting: false);
+          return ImportFailure(
+            'This model is too complex for Google Earth. Please decimate it in Blender to under 64,000 vertices per mesh and try again.'
+          );
+        }
+      }
+
+      final modelSize = await persistentFile.length();
 
       state = state.copyWith(
         id: _generateId(),
         filePath: persistentFile.path,
         fileName: fileName,
-        fileSize: fileInfo.size,
+        fileSize: modelSize,
         fileExtension: ext,
         isAsset: false,
         assetPath: null,
+        isImporting: false,
       );
 
       debugPrint(
@@ -169,6 +250,7 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
       return const ImportSuccess(); // success
     } catch (e) {
       debugPrint('File import failed: $e');
+      state = state.copyWith(isImporting: false);
       return ImportFailure('File import failed: $e');
     }
   }
@@ -176,6 +258,8 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
   /// Loads a bundled asset model for testing. Returns null if successful, or error message.
   Future<ImportResult> loadBundledModel(BundledModel bundled) async {
     try {
+      state = state.copyWith(isImporting: true);
+
       // Copy asset to app documents directory so it can be read as a File and doesn't get pruned
       final byteData = await rootBundle.load(bundled.assetPath);
       final appDir = await getApplicationDocumentsDirectory();
@@ -199,13 +283,15 @@ class ModelBuilderNotifier extends Notifier<ModelProject> {
         fileExtension: ext,
         isAsset: true,
         assetPath: bundled.assetPath,
+        isImporting: false,
       );
 
       debugPrint('Bundled model loaded: ${bundled.displayName}');
       return const ImportSuccess();
     } catch (e) {
-      debugPrint('Bundled import failed: $e');
-      return ImportFailure('Failed to load bundled model: $e');
+      debugPrint('Load bundled asset failed: $e');
+      state = state.copyWith(isImporting: false);
+      return ImportFailure('Failed to load bundled asset: $e');
     }
   }
 
@@ -416,6 +502,17 @@ class PushNotifier extends Notifier<PushState> {
             );
             ref.read(lgServiceProvider).sendBalloonKml(balloonKml);
           }
+        } else if (!project.isAsset) {
+          // Provide a custom educational balloon for user-imported models.
+          final balloonKml = EducationalBalloonKmlModel.generateBalloonKml(
+            id: 'custom_dae',
+            title: '3D COLLADA DAE Model',
+            description: 'COLLADA (COLLAborative Design Activity) is an XML-based file format (.dae) used to exchange digital assets among various graphics software. Liquid Galaxy uses the DAE format natively within Google Earth. This custom imported model was dynamically converted, optimized, and pushed to the rig in real-time, allowing users to visualize personalized 3D architectures and objects across the immersive panoramic screens.',
+            iconUrl: 'http://lg1:81/kml_icons/custom_model.png',
+            latitude: project.latitude!,
+            longitude: project.longitude!,
+          );
+          ref.read(lgServiceProvider).sendBalloonKml(balloonKml);
         }
       }
     }

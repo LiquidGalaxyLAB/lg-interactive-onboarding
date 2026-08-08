@@ -297,7 +297,7 @@ class _ImportModelCard extends ConsumerWidget {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('Import 3D Model', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-                    Text('Supports .dae, .obj, .fbx, .blend, .gltf, .glb, .stl & more',
+                    Text('Supports .dae and .zip (textures, max 64k verts)',
                       style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.5))),
                   ]),
                 ),
@@ -322,12 +322,27 @@ class _ImportModelCard extends ConsumerWidget {
               const Divider(),
               const SizedBox(height: 12),
             ],
-            _ImportButton(theme: theme),
-            const SizedBox(height: 12),
-            // Bundled assets section
-            Text('Or use a bundled model:', style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.5))),
-            const SizedBox(height: 8),
+            if (project.isImporting)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: Column(
+                    children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 16),
+                      Text('Importing & Validating...', style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.primary, fontWeight: FontWeight.w500)),
+                    ],
+                  ),
+                ),
+              )
+            else ...[
+              _ImportButton(theme: theme),
+              const SizedBox(height: 12),
+              // Bundled assets section
+              Text('Or use a bundled model:', style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5))),
+              const SizedBox(height: 8),
             Wrap(spacing: 8, runSpacing: 8, children: bundledModels.map((b) =>
               ActionChip(
                 avatar: const Icon(Icons.architecture, size: 16),
@@ -350,6 +365,7 @@ class _ImportModelCard extends ConsumerWidget {
                 },
               ),
             ).toList()),
+            ],
           ],
         ),
       ),
@@ -395,9 +411,10 @@ class _FileInfoTile extends StatelessWidget {
           Consumer(builder: (context, ref, _) => IconButton(
             icon: const Icon(Icons.swap_horiz, size: 20), tooltip: 'Replace model',
             onPressed: () async {
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
               final result = await ref.read(modelBuilderProvider.notifier).importModel();
-              if (result is ImportFailure && context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
+              if (result is ImportFailure) {
+                scaffoldMessenger.showSnackBar(
                   SnackBar(content: Text(result.message), backgroundColor: Colors.orangeAccent));
               }
             },
@@ -454,9 +471,10 @@ class _ImportButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return InkWell(
       onTap: () async {
+        final scaffoldMessenger = ScaffoldMessenger.of(context);
         final result = await ref.read(modelBuilderProvider.notifier).importModel();
-        if (result is ImportFailure && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+        if (result is ImportFailure) {
+          scaffoldMessenger.showSnackBar(
             SnackBar(content: Text(result.message), backgroundColor: Colors.orangeAccent));
         }
       },
@@ -474,7 +492,7 @@ class _ImportButton extends ConsumerWidget {
           Text('Tap to import from device', style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.primary, fontWeight: FontWeight.w500)),
           const SizedBox(height: 2),
-          Text('.dae · .obj · .fbx · .blend · .gltf · .glb · .stl & more', style: theme.textTheme.bodySmall?.copyWith(
+          Text('Supports .dae and .zip (textures)', style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurface.withValues(alpha: 0.4))),
         ]),
       ),

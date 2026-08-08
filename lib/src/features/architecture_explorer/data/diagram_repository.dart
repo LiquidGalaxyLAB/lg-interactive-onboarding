@@ -166,10 +166,9 @@ class DiagramRepository {
         detailBody:
             'Commands received via SSH are executed in a bash shell on the '
             'master. Common commands include:\n\n'
-            '• `assimp export` — 3D format conversion\n'
             '• `python3 dae_triangulate.py` — mesh triangulation\n'
             '• `cat > master.kml` — KML injection\n'
-            '• `apt install` / `pip3 install` — dependency management',
+            '• `pip3 install` — Python dependency management',
       ),
     ],
   );
