@@ -77,8 +77,8 @@ class ModelRepository {
       <name>${project.fileName}</name>
       <Model>
         <Link>
-          <href>http://lg1:${AppConstants.lgHttpPort}/model/$hrefPath</href>
-          <href>http://lg1:${AppConstants.lgHttpPort}/model/$hrefPath</href>
+          <href>${Uri.encodeFull('http://lg1:${AppConstants.lgHttpPort}/model/$hrefPath')}</href>
+          <href>${Uri.encodeFull('http://lg1:${AppConstants.lgHttpPort}/model/$hrefPath')}</href>
         </Link>
         <Location>
           <latitude>${project.latitude ?? 0.0}</latitude>
