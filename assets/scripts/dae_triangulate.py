@@ -342,9 +342,11 @@ def _normalize_shaders(root):
     """
     Downgrade <phong> and <blinn> to <lambert> to prevent physical rig shader crashes.
     Remove <index_of_refraction>.
+    Inject lambert into empty <effect> tags.
     """
     shader_count = 0
     ior_count = 0
+    empty_effect_count = 0
 
     for tag in ["phong", "blinn"]:
         for shader in root.iter(tag):
@@ -356,24 +358,44 @@ def _normalize_shaders(root):
         if parent is not None:
             parent.remove(ior)
             ior_count += 1
+            
+    for effect in root.iter("effect"):
+        profile = effect.find("profile_COMMON")
+        if profile is not None:
+            technique = profile.find("technique")
+            if technique is not None:
+                has_shader = False
+                for shader_type in ["lambert", "phong", "blinn", "constant"]:
+                    if technique.find(shader_type) is not None:
+                        has_shader = True
+                        break
+                if not has_shader:
+                    lambert = etree.SubElement(technique, "lambert")
+                    emission = etree.SubElement(lambert, "emission")
+                    etree.SubElement(emission, "color").text = "0 0 0 1"
+                    diffuse = etree.SubElement(lambert, "diffuse")
+                    etree.SubElement(diffuse, "color").text = "0.8 0.8 0.8 1"
+                    empty_effect_count += 1
 
     if shader_count > 0:
         print("NOTE  : Downgraded %d <phong>/<blinn> shaders to <lambert>." % shader_count)
     if ior_count > 0:
         print("NOTE  : Removed %d <index_of_refraction> tags." % ior_count)
+    if empty_effect_count > 0:
+        print("NOTE  : Injected fallback <lambert> shader into %d empty <effect> tags." % empty_effect_count)
 
 def _apply_vertex_scale_and_offset(root, sx, sy, sz):
     """
-    Calculates Auto-Base Translation (finding the lowest point and lifting the model to Z=0)
-    and applies vertex coordinates scaling.
+    Calculates Absolute Scaling, Auto-Centering (X/Y) and Auto-Base Translation (Z).
+    1. Finds global X,Y,Z bounds.
+    2. Calculates max dimension for absolute scaling to 1.0 meter natively.
+    3. Shifts model so X and Y (or X and Z if Y_UP) are centered at 0, 
+       and the vertical axis minimum rests exactly at 0.
     """
     up_axis_node = root.find(".//up_axis")
     is_y_up = False
     if up_axis_node is not None and up_axis_node.text:
         is_y_up = (up_axis_node.text.strip() == "Y_UP")
-
-    if sx == 1.0 and sy == 1.0 and sz == 1.0 and not is_y_up:
-        pass # We might still need to apply translation!
 
     position_source_ids = set()
     for vertices in root.iter("vertices"):
@@ -383,8 +405,9 @@ def _apply_vertex_scale_and_offset(root, sx, sy, sz):
                 if src.startswith("#"):
                     position_source_ids.add(src[1:])
     
-    # Calculate min altitude
-    min_val = float('inf')
+    min_x = min_y = min_z = float('inf')
+    max_x = max_y = max_z = float('-inf')
+    
     for source in root.iter("source"):
         if source.get("id") in position_source_ids:
             float_array = source.find("float_array")
@@ -392,14 +415,41 @@ def _apply_vertex_scale_and_offset(root, sx, sy, sz):
                 parts = float_array.text.split()
                 try:
                     for i in range(0, len(parts), 3):
-                        val = float(parts[i+1]) if is_y_up else float(parts[i+2])
-                        if val < min_val: min_val = val
+                        x = float(parts[i])
+                        y = float(parts[i+1])
+                        z = float(parts[i+2])
+                        if x < min_x: min_x = x
+                        if x > max_x: max_x = x
+                        if y < min_y: min_y = y
+                        if y > max_y: max_y = y
+                        if z < min_z: min_z = z
+                        if z > max_z: max_z = z
                 except ValueError: pass
                 
-    offset = 0.0
-    if min_val < 0 and min_val != float('inf'):
-        offset = abs(min_val)
-        print("NOTE  : Auto-Base Translation applied! Model lowest point was %.3f. Shifted up by %.3f to prevent terrain culling." % (min_val, offset))
+    if min_x == float('inf'):
+        return
+
+    if is_y_up:
+        cx = (min_x + max_x) / 2.0
+        cy = min_y
+        cz = (min_z + max_z) / 2.0
+    else:
+        cx = (min_x + max_x) / 2.0
+        cy = (min_y + max_y) / 2.0
+        cz = min_z
+
+    dim_x = max_x - min_x
+    dim_y = max_y - min_y
+    dim_z = max_z - min_z
+    max_dim = max(dim_x, dim_y, dim_z)
+    
+    if max_dim <= 0.000001:
+        max_dim = 1.0
+
+    print("NOTE  : Absolute Scaling & Auto-Centering applied!")
+    print("        Bounds : X[%.3f, %.3f] Y[%.3f, %.3f] Z[%.3f, %.3f]" % (min_x, max_x, min_y, max_y, min_z, max_z))
+    print("        Shift  : CX=%.3f, CY=%.3f, CZ=%.3f" % (cx, cy, cz))
+    print("        Max Dim: %.3f. Model natively scaled to 1.0." % max_dim)
 
     count = 0
     for source in root.iter("source"):
@@ -410,16 +460,15 @@ def _apply_vertex_scale_and_offset(root, sx, sy, sz):
                 try:
                     floats = []
                     for i in range(0, len(parts), 3):
-                        x = float(parts[i]) * sx
+                        x = float(parts[i])
                         y = float(parts[i+1])
                         z = float(parts[i+2])
-                        if is_y_up:
-                            y = (y + offset) * sy
-                            z = z * sz
-                        else:
-                            y = y * sy
-                            z = (z + offset) * sz
-                        floats.extend([x, y, z])
+                        
+                        new_x = ((x - cx) / max_dim) * sx
+                        new_y = ((y - cy) / max_dim) * sy
+                        new_z = ((z - cz) / max_dim) * sz
+                        
+                        floats.extend([new_x, new_y, new_z])
                     float_array.text = " ".join("{0:.6f}".format(v) for v in floats)
                     count += 1
                 except ValueError: pass
@@ -525,6 +574,68 @@ def _normalize_up_axis(root):
                     visual_scene.append(wrapper)
         print("NOTE  : Normalized <up_axis> from Y_UP to Z_UP and wrapped visual_scene in rotation matrix.")
 
+def _chunk_large_geometries(root):
+    """
+    Split <triangles> tags that exceed 21,845 faces (65,535 vertices) 
+    to prevent Google Earth 64k vertex limit crashes.
+    """
+    MAX_TRIS = 21845
+    count_split = 0
+    for geom in root.iter("geometry"):
+        mesh = geom.find("mesh")
+        if mesh is None: continue
+        
+        tris_to_process = list(mesh.findall("triangles"))
+        for tri_elem in tris_to_process:
+            try:
+                tri_count = int(tri_elem.get("count", "0"))
+            except ValueError:
+                continue
+            
+            if tri_count > MAX_TRIS:
+                p_elem = tri_elem.find("p")
+                if p_elem is None or not (p_elem.text or "").strip():
+                    continue
+                
+                indices = list(map(int, p_elem.text.split()))
+                stride = _get_vertex_index_stride(tri_elem)
+                indices_per_tri = 3 * stride
+                
+                if len(indices) != tri_count * indices_per_tri:
+                    continue 
+                
+                parent = tri_elem.getparent()
+                idx = parent.index(tri_elem)
+                parent.remove(tri_elem)
+                
+                for start_tri in range(0, tri_count, MAX_TRIS):
+                    chunk_tris = min(MAX_TRIS, tri_count - start_tri)
+                    start_idx = start_tri * indices_per_tri
+                    end_idx = start_idx + (chunk_tris * indices_per_tri)
+                    
+                    chunk_indices = indices[start_idx:end_idx]
+                    
+                    new_tri_elem = etree.Element("triangles")
+                    for k, v in tri_elem.items():
+                        if k == "count":
+                            new_tri_elem.set("count", str(chunk_tris))
+                        else:
+                            new_tri_elem.set(k, v)
+                            
+                    for inp in tri_elem.findall("input"):
+                        new_tri_elem.append(etree.fromstring(etree.tostring(inp)))
+                        
+                    new_p = etree.SubElement(new_tri_elem, "p")
+                    new_p.text = " ".join(map(str, chunk_indices))
+                    
+                    parent.insert(idx, new_tri_elem)
+                    idx += 1
+                
+                count_split += 1
+
+    if count_split > 0:
+        print("NOTE  : Chunked %d large <triangles> primitives to prevent 64k vertex limit crashes." % count_split)
+
 # ---------------------------------------------------------------------------
 # Main conversion
 # ---------------------------------------------------------------------------
@@ -551,10 +662,9 @@ def convert_dae_file(input_path, output_path, sx=1.0, sy=1.0, sz=1.0):
         if i >= 0:
             elem.tag = elem.tag[i+1:]
 
-    unit_multiplier = _normalize_scale_unit(root)
-    sx *= unit_multiplier
-    sy *= unit_multiplier
-    sz *= unit_multiplier
+    _normalize_scale_unit(root)
+    # Note: We do not multiply sx, sy, sz by unit_multiplier because
+    # Absolute Scaling makes the model 1.0 natively regardless of units!
 
     _strip_transparency(root)
     _strip_useless_libraries(root)
@@ -609,6 +719,7 @@ def convert_dae_file(input_path, output_path, sx=1.0, sy=1.0, sz=1.0):
         total_new_tris  += new_tris
         total_converted += 1
 
+    _chunk_large_geometries(root)
     _write_tree(tree, output_path, root)
 
     print("")
