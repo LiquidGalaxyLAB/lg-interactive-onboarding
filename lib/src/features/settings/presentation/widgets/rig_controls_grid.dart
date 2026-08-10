@@ -5,6 +5,7 @@ import 'package:lg_interactive_onboarding/src/common/lg/lg_service.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/system_kml_service.dart';
 import 'package:lg_interactive_onboarding/src/features/kml_playground/data/kml_playground_service.dart';
+import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
 import 'package:lg_interactive_onboarding/src/common/theme/app_palette.dart';
 
 class RigControlsGrid extends ConsumerWidget {
@@ -132,6 +133,9 @@ class RigControlsGrid extends ConsumerWidget {
                       title: 'Clear KML',
                       message: 'This will clear all running KMLs from the rig. Continue?',
                       action: () async {
+                        ref.read(lgServiceProvider).orbitStop();
+                        ref.read(orbitingModelIdProvider.notifier).setOrbiting(null);
+                        ref.read(lgServiceProvider).cleanBalloonKML();
                         return await ref.read(kmlPlaygroundServiceProvider).clearKml();
                       },
                       actionLabel: 'Clear KML',

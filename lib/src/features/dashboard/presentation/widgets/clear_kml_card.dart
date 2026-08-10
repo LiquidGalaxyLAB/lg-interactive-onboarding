@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lg_interactive_onboarding/src/common/curriculum/guided_mode_controller.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/ssh_service.dart';
+import 'package:lg_interactive_onboarding/src/common/lg/lg_service.dart';
 import 'package:lg_interactive_onboarding/src/features/kml_playground/data/kml_playground_service.dart';
+import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
 import 'dashboard_palette.dart';
 
 class ClearKmlCard extends ConsumerStatefulWidget {
@@ -114,6 +116,9 @@ class _ClearKmlCardState extends ConsumerState<ClearKmlCard> {
   }
 
   Future<void> _clearKml(BuildContext context, WidgetRef ref) async {
+    ref.read(lgServiceProvider).orbitStop();
+    ref.read(orbitingModelIdProvider.notifier).setOrbiting(null);
+    ref.read(lgServiceProvider).cleanBalloonKML();
     final ok = await ref.read(kmlPlaygroundServiceProvider).clearKml();
     if (!context.mounted) return;
     
