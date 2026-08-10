@@ -116,9 +116,7 @@ class _ClearKmlCardState extends ConsumerState<ClearKmlCard> {
   }
 
   Future<void> _clearKml(BuildContext context, WidgetRef ref) async {
-    ref.read(lgServiceProvider).orbitStop();
-    ref.read(orbitingModelIdProvider.notifier).setOrbiting(null);
-    ref.read(lgServiceProvider).cleanBalloonKML();
+    await ref.read(pushProvider.notifier).clearMasterKml();
     final ok = await ref.read(kmlPlaygroundServiceProvider).clearKml();
     if (!context.mounted) return;
     

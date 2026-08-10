@@ -133,9 +133,7 @@ class RigControlsGrid extends ConsumerWidget {
                       title: 'Clear KML',
                       message: 'This will clear all running KMLs from the rig. Continue?',
                       action: () async {
-                        ref.read(lgServiceProvider).orbitStop();
-                        ref.read(orbitingModelIdProvider.notifier).setOrbiting(null);
-                        ref.read(lgServiceProvider).cleanBalloonKML();
+                        await ref.read(pushProvider.notifier).clearMasterKml();
                         return await ref.read(kmlPlaygroundServiceProvider).clearKml();
                       },
                       actionLabel: 'Clear KML',
