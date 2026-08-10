@@ -96,16 +96,6 @@ class BundledModel {
 
 const bundledModels = [
   BundledModel(
-    displayName: 'Tree',
-    assetPath: 'assets/models/3dmodel_tri.dae',
-    fileName: '3dmodel_tri.dae',
-  ),
-  BundledModel(
-    displayName: 'Football',
-    assetPath: 'assets/models/Ball DAE.dae',
-    fileName: 'Ball DAE.dae',
-  ),
-  BundledModel(
     displayName: 'Car',
     assetPath: 'assets/models/Car.dae',
     fileName: 'Car.dae',
@@ -480,14 +470,10 @@ class PushNotifier extends Notifier<PushState> {
         String? key;
         if (project.isAsset) {
           final fileName = project.fileName;
-          if (fileName == '3dmodel_tri.dae') {
-            key = 'Tree';
-          } else if (fileName == 'Car.dae') {
+          if (fileName == 'Car.dae') {
             key = 'Car';
           } else if (fileName == 'model_pyramid.dae') {
             key = 'Pyramid';
-          } else if (fileName == 'Ball DAE.dae') {
-            key = 'Football';
           }
         }
 
