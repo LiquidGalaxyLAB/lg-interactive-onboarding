@@ -5,6 +5,7 @@ import 'package:lg_interactive_onboarding/src/common/lg/lg_service.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/logo_overlay_service.dart';
 import 'package:lg_interactive_onboarding/src/common/ssh/system_kml_service.dart';
 import 'package:lg_interactive_onboarding/src/features/kml_playground/data/kml_playground_service.dart';
+import 'package:lg_interactive_onboarding/src/features/model_builder/providers/model_builder_providers.dart';
 import 'package:lg_interactive_onboarding/src/common/theme/app_palette.dart';
 
 class RigControlsGrid extends ConsumerWidget {
@@ -14,10 +15,12 @@ class RigControlsGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ssh = ref.watch(sshServiceProvider);
+    final logoService = ref.watch(logoOverlayServiceProvider);
     return ListenableBuilder(
-      listenable: ssh,
+      listenable: Listenable.merge([ssh, logoService]),
       builder: (context, _) {
         final isConnected = ssh.isConnected;
+        final isLogoVisible = logoService.isLogoVisible;
         return Column(
           children: [
             // Row 1: Shutdown + Reboot (wider shutdown)
@@ -130,6 +133,7 @@ class RigControlsGrid extends ConsumerWidget {
                       title: 'Clear KML',
                       message: 'This will clear all running KMLs from the rig. Continue?',
                       action: () async {
+                        await ref.read(pushProvider.notifier).clearMasterKml();
                         return await ref.read(kmlPlaygroundServiceProvider).clearKml();
                       },
                       actionLabel: 'Clear KML',
@@ -140,21 +144,27 @@ class RigControlsGrid extends ConsumerWidget {
                 Expanded(
                   flex: 3,
                   child: RigControlCard(
-                    title: 'Clear Logo',
-                    icon: Icons.hide_image_outlined,
+                    title: isLogoVisible ? 'Clear Logo' : 'Show Logo',
+                    icon: isLogoVisible ? Icons.hide_image_outlined : Icons.image_outlined,
                     accentColor: AppPalette.dustyBlue,
                     isDark: isDark,
                     enabled: isConnected,
                     onTap: () => _confirmDangerous(
                       context,
                       ref,
-                      title: 'Clear Logo',
-                      message: 'Remove the logo overlay from the leftmost LG screen?',
+                      title: isLogoVisible ? 'Clear Logo' : 'Show Logo',
+                      message: isLogoVisible 
+                          ? 'Remove the logo overlay from the leftmost LG screen?'
+                          : 'Show the logo overlay on the leftmost LG screen?',
                       action: () async {
-                        await ref.read(logoOverlayServiceProvider).clearLogo();
+                        if (isLogoVisible) {
+                          await ref.read(logoOverlayServiceProvider).clearLogo();
+                        } else {
+                          await ref.read(logoOverlayServiceProvider).sendLogo();
+                        }
                         return true;
                       },
-                      actionLabel: 'Clear Logo',
+                      actionLabel: isLogoVisible ? 'Clear Logo' : 'Show Logo',
                     ),
                   ),
                 ),

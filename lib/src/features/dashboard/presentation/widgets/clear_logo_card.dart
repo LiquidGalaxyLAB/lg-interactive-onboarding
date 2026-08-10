@@ -17,16 +17,18 @@ class ClearLogoCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ssh = ref.watch(sshServiceProvider);
     final pushState = ref.watch(pushProvider);
+    final logoService = ref.watch(logoOverlayServiceProvider);
     final isPushing = pushState.status == PushStatus.pushing;
 
     return ListenableBuilder(
-      listenable: ssh,
+      listenable: Listenable.merge([ssh, logoService]),
       builder: (context, _) {
         final isConnected = ssh.isConnected;
+        final isLogoVisible = logoService.isLogoVisible;
         final enabled = isConnected && !isPushing;
 
         return GestureDetector(
-          onTap: enabled ? () => _confirmClearLogo(context, ref) : null,
+          onTap: enabled ? () => _confirmClearLogo(context, ref, isLogoVisible) : null,
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -49,7 +51,7 @@ class ClearLogoCard extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(11),
                   ),
                   child: Icon(
-                    Icons.hide_image_outlined,
+                    isLogoVisible ? Icons.hide_image_outlined : Icons.image_outlined,
                     size: 22,
                     color: enabled
                         ? _accentColor
@@ -62,7 +64,7 @@ class ClearLogoCard extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Clear Logo',
+                        isLogoVisible ? 'Clear Logo' : 'Show Logo',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -73,7 +75,9 @@ class ClearLogoCard extends ConsumerWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Remove the logo overlay from the left LG screen',
+                        isLogoVisible
+                            ? 'Remove the logo overlay from the left LG screen'
+                            : 'Show the logo overlay on the left LG screen',
                         style: TextStyle(
                           fontSize: 11,
                           color: enabled
@@ -106,21 +110,23 @@ class ClearLogoCard extends ConsumerWidget {
     );
   }
 
-  void _confirmClearLogo(BuildContext context, WidgetRef ref) {
+  void _confirmClearLogo(BuildContext context, WidgetRef ref, bool isLogoVisible) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.hide_image_outlined,
+            Icon(isLogoVisible ? Icons.hide_image_outlined : Icons.image_outlined,
                 color: _accentColor, size: 22),
-            SizedBox(width: 10),
-            Text('Clear Logo'),
+            const SizedBox(width: 10),
+            Text(isLogoVisible ? 'Clear Logo' : 'Show Logo'),
           ],
         ),
-        content: const Text(
-          'Remove the logo overlay from the leftmost LG screen?',
+        content: Text(
+          isLogoVisible 
+              ? 'Remove the logo overlay from the leftmost LG screen?'
+              : 'Show the logo overlay on the leftmost LG screen?',
         ),
         actions: [
           TextButton(
@@ -130,12 +136,16 @@ class ClearLogoCard extends ConsumerWidget {
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
-              ref.read(logoOverlayServiceProvider).clearLogo();
+              if (isLogoVisible) {
+                ref.read(logoOverlayServiceProvider).clearLogo();
+              } else {
+                ref.read(logoOverlayServiceProvider).sendLogo();
+              }
             },
             style: FilledButton.styleFrom(
               backgroundColor: _accentColor,
             ),
-            child: const Text('Clear Logo'),
+            child: Text(isLogoVisible ? 'Clear Logo' : 'Show Logo'),
           ),
         ],
       ),
