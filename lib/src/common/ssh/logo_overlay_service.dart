@@ -20,7 +20,7 @@ import 'package:lg_interactive_onboarding/src/features/settings/data/settings_se
 ///   - 3 rigs: lg3 (left), lg1 (master/center), lg2 (right)
 ///   - 5 rigs: lg4, lg5, lg1, lg2, lg3  → leftmost = lg4
 ///   - Formula: leftScreen = (rigsCount ~/ 2) + 2
-class LogoOverlayService {
+class LogoOverlayService extends ChangeNotifier {
   final SSHService _sshService;
   final SettingsService _settingsService;
 
@@ -35,6 +35,10 @@ class LogoOverlayService {
   /// explicitly BEFORE [SSHService.disconnect] so the SSH channel is still
   /// open when we upload the empty KML.
   bool _wasConnected = false;
+  
+  /// Whether the logo is currently visible on the LG screen.
+  bool _isLogoVisible = false;
+  bool get isLogoVisible => _isLogoVisible;
 
   /// Called by [logoConnectionWatcherProvider] on every [SSHService] notification.
   /// Only reacts to false→true connect edges; disconnect is handled pre-emptively
@@ -50,6 +54,8 @@ class LogoOverlayService {
       // Disconnect edge: reset session flag to ensure the next connection
       // re-uploads the logo PNG from scratch.
       _logoUploaded = false;
+      _isLogoVisible = false;
+      notifyListeners();
     }
   }
 
@@ -111,6 +117,8 @@ class LogoOverlayService {
       await _forceRefreshSlave('slave_$leftScreen.kml');
 
       debugPrint('LogoOverlay: Logo sent to slave_$leftScreen');
+      _isLogoVisible = true;
+      notifyListeners();
     } catch (e) {
       debugPrint('LogoOverlay: sendLogo failed: $e');
     }
@@ -166,6 +174,8 @@ class LogoOverlayService {
       _logoUploaded = false;
 
       debugPrint('LogoOverlay: Logo cleared from slave_$leftScreen and file removed from master');
+      _isLogoVisible = false;
+      notifyListeners();
     } catch (e) {
       debugPrint('LogoOverlay: clearLogo failed: $e');
     }

@@ -14,10 +14,12 @@ class RigControlsGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ssh = ref.watch(sshServiceProvider);
+    final logoService = ref.watch(logoOverlayServiceProvider);
     return ListenableBuilder(
-      listenable: ssh,
+      listenable: Listenable.merge([ssh, logoService]),
       builder: (context, _) {
         final isConnected = ssh.isConnected;
+        final isLogoVisible = logoService.isLogoVisible;
         return Column(
           children: [
             // Row 1: Shutdown + Reboot (wider shutdown)
@@ -140,21 +142,27 @@ class RigControlsGrid extends ConsumerWidget {
                 Expanded(
                   flex: 3,
                   child: RigControlCard(
-                    title: 'Clear Logo',
-                    icon: Icons.hide_image_outlined,
+                    title: isLogoVisible ? 'Clear Logo' : 'Show Logo',
+                    icon: isLogoVisible ? Icons.hide_image_outlined : Icons.image_outlined,
                     accentColor: AppPalette.dustyBlue,
                     isDark: isDark,
                     enabled: isConnected,
                     onTap: () => _confirmDangerous(
                       context,
                       ref,
-                      title: 'Clear Logo',
-                      message: 'Remove the logo overlay from the leftmost LG screen?',
+                      title: isLogoVisible ? 'Clear Logo' : 'Show Logo',
+                      message: isLogoVisible 
+                          ? 'Remove the logo overlay from the leftmost LG screen?'
+                          : 'Show the logo overlay on the leftmost LG screen?',
                       action: () async {
-                        await ref.read(logoOverlayServiceProvider).clearLogo();
+                        if (isLogoVisible) {
+                          await ref.read(logoOverlayServiceProvider).clearLogo();
+                        } else {
+                          await ref.read(logoOverlayServiceProvider).sendLogo();
+                        }
                         return true;
                       },
-                      actionLabel: 'Clear Logo',
+                      actionLabel: isLogoVisible ? 'Clear Logo' : 'Show Logo',
                     ),
                   ),
                 ),
