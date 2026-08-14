@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -45,7 +46,9 @@ class RagService {
   // Top-level function for isolate spawning.
   static Future<List<VectorChunk>> _loadAndParseEmbeddings(RootIsolateToken token) async {
     BackgroundIsolateBinaryMessenger.ensureInitialized(token);
-    final jsonString = await rootBundle.loadString('assets/knowledge/lg_wiki_embeddings.json');
+    final bytes = await rootBundle.load('assets/knowledge/lg_wiki_embeddings.json.gz');
+    final unzipped = GZipDecoder().decodeBytes(bytes.buffer.asUint8List());
+    final jsonString = utf8.decode(unzipped);
     final List<dynamic> data = jsonDecode(jsonString);
     final List<VectorChunk> result = [];
     
