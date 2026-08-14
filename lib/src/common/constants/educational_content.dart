@@ -12,13 +12,7 @@ class EducationalContent {
 
 class EducationalConstants {
   static const Map<String, EducationalContent> modelContent = {
-    'Tree': EducationalContent(
-      title: '3D Tree Model',
-      description:
-          'Trees are an essential part of the ecosystem. In Google Earth, placing 3D models like trees allows urban planners and educators to visualize green spaces. This specific model is exported as a Collada (.dae) file, which is perfectly supported by the Liquid Galaxy system.',
-      iconUrl:
-          'http://lg1:81/kml_icons/tree.png',
-    ),
+
     'Car': EducationalContent(
       title: '3D Car Model',
       description:
@@ -33,13 +27,7 @@ class EducationalConstants {
       iconUrl:
           'http://lg1:81/kml_icons/pyramid.png',
     ),
-    'Football': EducationalContent(
-      title: '3D Football Model',
-      description:
-          'A simple geometric sphere mapped with a texture. In Liquid Galaxy, models with custom textures require a KMZ package (a zipped KML + texture images) rather than just a simple KML file.',
-      iconUrl:
-          'http://lg1:81/kml_icons/football.png',
-    ),
+
   };
 
   static const Map<String, EducationalContent> kmlContent = {
