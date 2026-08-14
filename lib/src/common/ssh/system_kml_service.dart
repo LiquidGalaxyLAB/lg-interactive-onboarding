@@ -137,7 +137,7 @@ class SystemKmlService {
   /// Uploads local KML balloon icons from assets to the LG rig's web server.
   Future<void> _uploadKmlIcons() async {
     const icons = [
-      'tree.png', 'car.png', 'pyramid.png', 'football.png',
+      'car.png', 'pyramid.png',
       'placemark.png', 'polygon.png', 'linestring.png',
       'ground_overlay.png', 'screen_overlay.png', 'tour.png',
       'custom_model.png'
